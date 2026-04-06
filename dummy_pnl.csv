@@ -1,0 +1,43 @@
+Laporan Laba Rugi (Profit & Loss)
+Periode: Maret 2026
+
+Keterangan,Jumlah (IDR)
+
+PENDAPATAN
+Penjualan Laptop,185000000
+Penjualan Aksesoris,42000000
+Jasa Service/Reparasi,28500000
+Total Revenue,255500000
+
+HARGA POKOK PENJUALAN (COGS)
+Pembelian Laptop,128000000
+Pembelian Aksesoris,18500000
+Spare Part Service,8200000
+Total COGS,154700000
+
+LABA KOTOR (Gross Profit),100800000
+
+BEBAN OPERASIONAL (OPEX)
+Gaji Karyawan,35000000
+Sewa Toko,12000000
+Listrik & Air,3500000
+Internet & Telepon,1800000
+Marketing & Iklan,5500000
+Transportasi & Pengiriman,2800000
+Perlengkapan Kantor/ATK,950000
+Maintenance Toko,1200000
+Total Opex,62750000
+
+LABA OPERASIONAL (Operating Profit),38050000
+
+Beban Bunga (Interest),2500000
+Pajak (Taxes),4200000
+
+LABA BERSIH (Net Profit),31350000
+
+Jumlah Transaksi Bulan Ini: 347
+Unit Laptop Terjual: 42
+Unit Aksesoris Terjual: 185
+Unit Service: 63
+
+Catatan: Penjualan laptop meningkat 12% dibanding bulan lalu karena promo back-to-school.

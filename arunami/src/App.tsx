@@ -12,6 +12,9 @@ import AdminLayout from '@/pages/admin/AdminLayout'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import AdminUsers from '@/pages/admin/AdminUsers'
 import AdminPortfolios from '@/pages/admin/AdminPortfolios'
+import AdminInvestors from '@/pages/admin/AdminInvestors'
+import AdminInvestorDetail from '@/pages/admin/AdminInvestorDetail'
+import PortfolioSetupWizard from '@/pages/admin/setup/PortfolioSetupWizard'
 
 // Analyst
 import AnalystDashboard from '@/pages/analyst/AnalystDashboard'
@@ -65,6 +68,9 @@ export default function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="portfolios" element={<AdminPortfolios />} />
+            <Route path="portfolios/new" element={<PortfolioSetupWizard />} />
+            <Route path="investors" element={<AdminInvestors />} />
+            <Route path="investors/:uid" element={<AdminInvestorDetail />} />
           </Route>
 
           {/* Analyst routes */}

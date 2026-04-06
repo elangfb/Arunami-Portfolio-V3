@@ -4,12 +4,13 @@ import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, Briefcase, TrendingUp, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, Briefcase, TrendingUp, LogOut, UserCheck } from 'lucide-react'
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Pengguna', icon: Users },
   { to: '/admin/portfolios', label: 'Portofolio', icon: Briefcase },
+  { to: '/admin/investors', label: 'Investor', icon: UserCheck },
 ]
 
 export default function AdminLayout() {

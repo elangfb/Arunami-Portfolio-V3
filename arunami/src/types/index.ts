@@ -4,6 +4,58 @@ import type { Timestamp } from 'firebase/firestore'
 
 export type UserRole = 'admin' | 'analyst' | 'investor'
 
+// ─── Portfolio Configuration ──────────────────────────────────────────────
+
+export type IndustryType = 'retail' | 'saas' | 'fnb' | 'jasa' | 'manufaktur' | 'lainnya'
+export type ReturnModelType = 'slot_based' | 'percentage_based' | 'fixed_return'
+export type ReportingFrequency = 'bulanan' | 'kuartalan' | 'semesteran'
+
+export interface RevenueCategory {
+  id: string
+  name: string
+  color: string
+}
+
+export interface KpiMetric {
+  id: string
+  name: string
+  targetValue: number
+  unit: 'currency' | 'percentage' | 'count' | 'ratio'
+}
+
+export interface InvestorConfigBase {
+  investorSharePercent: number
+  arunamiFeePercent: number
+}
+
+export interface SlotBasedConfig extends InvestorConfigBase {
+  type: 'slot_based'
+  totalSlots: number
+  nominalPerSlot: number
+}
+
+export interface PercentageBasedConfig extends InvestorConfigBase {
+  type: 'percentage_based'
+}
+
+export interface FixedReturnConfig extends InvestorConfigBase {
+  type: 'fixed_return'
+  targetReturnPercent: number
+  payoutFrequency: ReportingFrequency
+}
+
+export type InvestorConfigUnion = SlotBasedConfig | PercentageBasedConfig | FixedReturnConfig
+
+export interface PortfolioConfig {
+  industryType: IndustryType
+  revenueCategories: RevenueCategory[]
+  returnModel: ReturnModelType
+  investorConfig: InvestorConfigUnion
+  reportingFrequency: ReportingFrequency
+  kpiMetrics: KpiMetric[]
+  createdAt: Timestamp
+}
+
 export interface AppUser {
   uid: string
   email: string
@@ -23,8 +75,11 @@ export interface Portfolio {
   periode: string
   investasiAwal: number
   description: string
+  industryType: IndustryType
+  isGracePeriod: boolean
   assignedInvestors: string[]
   assignedAnalysts: string[]
+  slotsSummary?: SlotsSummary
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -45,9 +100,7 @@ export interface CostItem {
 
 export interface TransactionDataPoint {
   month: string
-  laptop: number
-  service: number
-  aksesoris: number
+  categories: Record<string, number>
 }
 
 export interface AovDataPoint {
@@ -98,6 +151,7 @@ export interface FinancialData {
 export interface OpexItem {
   name: string
   amount: number
+  percentage?: number
 }
 
 export interface PnLExtractedData {
@@ -107,15 +161,19 @@ export interface PnLExtractedData {
   grossProfit: number
   opex: OpexItem[]
   totalOpex: number
+  operatingProfit: number
+  interest: number
+  taxes: number
   netProfit: number
   transactionCount: number
-  unitBreakdown: { laptop: number; service: number; aksesoris: number }
+  unitBreakdown: Record<string, number>
   notes: string
 }
 
 export interface ProjectionExtractedData {
   period: string
   projectedRevenue: number
+  projectedCogsPercent: number
   projectedCogs: number
   projectedGrossProfit: number
   projectedOpex: OpexItem[]
@@ -124,16 +182,91 @@ export interface ProjectionExtractedData {
   assumptions: string
 }
 
+export type ReportType = 'pnl' | 'projection' | 'management_report' | 'arunami_note'
+
 export interface PortfolioReport {
   id: string
-  type: 'pnl' | 'projection'
+  type: ReportType
   fileName: string
   fileUrl: string
   period: string
-  extractedData: PnLExtractedData | ProjectionExtractedData
+  extractedData: PnLExtractedData | ProjectionExtractedData | Record<string, never>
   uploadedBy: string
   createdAt: Timestamp
 }
+
+// ─── AI Extraction with Classification ───────────────────────────────────
+
+export interface ClassifiedOpexItem extends OpexItem {
+  isStandard: boolean
+}
+
+export interface RevenueBreakdownItem {
+  name: string
+  amount: number
+  unitCount: number
+  isStandard: boolean
+}
+
+export interface DiscoveredVariable {
+  name: string
+  category: 'opex' | 'revenue' | 'kpi' | 'other'
+  value: number
+  description: string
+  included: boolean
+}
+
+export interface SuggestedKpi {
+  name: string
+  value: number
+  unit: 'currency' | 'percentage' | 'count' | 'ratio'
+  derivedFrom: string
+}
+
+export interface ClassifiedPnLData {
+  period: string
+  revenue: number
+  cogs: number
+  grossProfit: number
+  opex: ClassifiedOpexItem[]
+  totalOpex: number
+  operatingProfit: number
+  interest: number
+  taxes: number
+  netProfit: number
+  transactionCount: number
+  revenueBreakdown: RevenueBreakdownItem[]
+  notes: string
+}
+
+export interface ClassifiedProjectionData {
+  period: string
+  projectedRevenue: number
+  projectedCogsPercent: number
+  projectedCogs: number
+  projectedGrossProfit: number
+  projectedOpex: ClassifiedOpexItem[]
+  projectedTotalOpex: number
+  projectedNetProfit: number
+  assumptions: string
+}
+
+export interface PortfolioSetupExtraction {
+  pnl: ClassifiedPnLData | null
+  projection: ClassifiedProjectionData | null
+  discoveredVariables: DiscoveredVariable[]
+  suggestedKpis: SuggestedKpi[]
+}
+
+export type ExtractionStage =
+  | 'idle'
+  | 'reading_pnl'
+  | 'extracting_pnl'
+  | 'reading_projection'
+  | 'extracting_projection'
+  | 'classifying'
+  | 'done'
+  | 'error'
 
 // ─── Management Report ────────────────────────────────────────────────────
 
@@ -186,6 +319,28 @@ export interface Note {
   createdAt: Timestamp
 }
 
+// ─── Investor Allocations ─────────────────────────────────────────────────
+
+export interface InvestorAllocation {
+  id: string
+  investorUid: string
+  investorName: string
+  investorEmail: string
+  portfolioId: string
+  portfolioName: string
+  portfolioCode: string
+  slots: number
+  investedAmount: number
+  joinedAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export interface SlotsSummary {
+  totalSlots: number
+  allocatedSlots: number
+  investorCount: number
+}
+
 // ─── Transfer Proof ───────────────────────────────────────────────────────
 
 export interface TransferProof {
@@ -198,4 +353,29 @@ export interface TransferProof {
   fileName: string
   notes: string
   createdAt: Timestamp
+}
+
+// ─── Investor CRM ────────────────────────────────────────────────────────
+
+export type CommunicationType = 'report' | 'custom_message'
+export type CommunicationChannel = 'clipboard' | 'email' | 'download'
+
+export interface InvestorCommunication {
+  id: string
+  investorUid: string
+  type: CommunicationType
+  channel: CommunicationChannel
+  subject: string
+  period: string
+  portfolioIds: string[]
+  sentBy: string
+  createdAt: Timestamp
+}
+
+export interface InvestorSummary {
+  user: AppUser
+  allocations: InvestorAllocation[]
+  totalInvested: number
+  totalSlots: number
+  portfolioCount: number
 }

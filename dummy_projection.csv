@@ -1,0 +1,33 @@
+Proyeksi Keuangan
+Periode: April 2026
+
+Keterangan,Jumlah (IDR)
+
+PROYEKSI PENDAPATAN
+Projected Revenue,280000000
+
+PROYEKSI HARGA POKOK (COGS)
+Projected COGS (60% of Revenue),168000000
+
+PROYEKSI LABA KOTOR
+Projected Gross Profit,112000000
+
+PROYEKSI BEBAN OPERASIONAL (OPEX)
+Gaji Karyawan,37000000
+Sewa Toko,12000000
+Listrik & Air,3800000
+Internet & Telepon,1800000
+Marketing & Iklan,8000000
+Transportasi & Pengiriman,3200000
+Perlengkapan Kantor/ATK,1000000
+Maintenance Toko,1500000
+Total Projected Opex,68300000
+
+PROYEKSI LABA BERSIH
+Projected Net Profit,43700000
+
+Asumsi:
+- Revenue naik ~10% dari bulan sebelumnya karena Ramadan dan Lebaran
+- COGS diperkirakan 60% dari revenue
+- Tambahan budget marketing Rp 2.5jt untuk kampanye Lebaran
+- Gaji naik karena THR proporsional untuk 2 karyawan baru

@@ -3,23 +3,28 @@ import { Link, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
-import { getInvestorPortfolios } from '@/lib/firestore'
+import { getInvestorPortfolios, getAllocationsForInvestor } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { TrendingUp, LogOut, Briefcase } from 'lucide-react'
-import type { Portfolio } from '@/types'
+import type { Portfolio, InvestorAllocation } from '@/types'
 
 export default function InvestorDashboard() {
   const navigate = useNavigate()
   const { user, setUser } = useAuthStore()
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
+  const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (user) {
-      getInvestorPortfolios(user.uid).then(data => { setPortfolios(data); setLoading(false) })
+      Promise.all([
+        getInvestorPortfolios(user.uid),
+        getAllocationsForInvestor(user.uid),
+      ]).then(([p, a]) => { setPortfolios(p); setAllocations(a); setLoading(false) })
     }
   }, [user])
 
@@ -67,27 +72,39 @@ export default function InvestorDashboard() {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {portfolios.map(p => (
-              <Link key={p.id} to={`/investor/portfolios/${p.id}/overview`}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base">{p.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-1">{p.code} · {p.stage}</p>
+            {portfolios.map(p => {
+              const alloc = allocations.find(a => a.portfolioId === p.id)
+              return (
+                <Link key={p.id} to={`/investor/portfolios/${p.id}/overview`}>
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-base">{p.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">{p.code} · {p.stage}</p>
+                        </div>
+                        <span className="text-xs bg-[#1e5f3f]/10 text-[#1e5f3f] rounded-full px-2 py-0.5 font-medium">{p.periode}</span>
                       </div>
-                      <span className="text-xs bg-[#1e5f3f]/10 text-[#1e5f3f] rounded-full px-2 py-0.5 font-medium">{p.periode}</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Investasi Awal</span>
-                      <span className="font-semibold text-[#1e5f3f]">{formatCurrencyCompact(p.investasiAwal)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Investasi Awal</span>
+                        <span className="font-semibold text-[#1e5f3f]">{formatCurrencyCompact(p.investasiAwal)}</span>
+                      </div>
+                      {alloc && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Slot Saya</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">{alloc.slots} slot</Badge>
+                            <span className="font-medium text-xs">{formatCurrencyCompact(alloc.investedAmount)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
           </div>
         )}
       </main>

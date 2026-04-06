@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2, AlertTriangle } from 'lucide-react'
 import type { FinancialData, Portfolio } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -16,7 +16,7 @@ interface Context { portfolio: Portfolio | null; portfolioId: string | undefined
 const GREEN_PALETTE = ['#1e5f3f', '#38a169', '#48bb78', '#68d391', '#9ae6b4']
 
 export default function OverviewPage() {
-  const { portfolioId } = useOutletContext<Context>()
+  const { portfolio, portfolioId } = useOutletContext<Context>()
   const [data, setData] = useState<FinancialData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -25,6 +25,24 @@ export default function OverviewPage() {
   }, [portfolioId])
 
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
+
+  if (!data && portfolio?.isGracePeriod) return (
+    <div className="p-8">
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-6">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
+          <div>
+            <h3 className="font-semibold text-amber-900">Proyek dalam Grace Period</h3>
+            <p className="mt-1 text-sm text-amber-700">
+              Data finansial (PnL & Proyeksi) belum tersedia karena proyek ini masih dalam masa grace period.
+              Dashboard akan menampilkan data lengkap setelah dokumen PnL dan Proyeksi diupload.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   if (!data) return <div className="p-8 text-muted-foreground">Data finansial belum tersedia. Upload dokumen PnL terlebih dahulu.</div>
 
   const lastRevenue = data.revenueData.at(-1)?.aktual ?? 0
@@ -32,9 +50,9 @@ export default function OverviewPage() {
   const lastProfit = data.profitData.at(-1)?.aktual ?? 0
   const prevProfit = data.profitData.at(-2)?.aktual ?? 0
   const lastTx = data.transactionData.at(-1)
-  const totalTx = lastTx ? lastTx.laptop + lastTx.service + lastTx.aksesoris : 0
+  const totalTx = lastTx ? Object.values(lastTx.categories).reduce((s, v) => s + v, 0) : 0
   const prevTx = data.transactionData.at(-2)
-  const prevTotalTx = prevTx ? prevTx.laptop + prevTx.service + prevTx.aksesoris : 0
+  const prevTotalTx = prevTx ? Object.values(prevTx.categories).reduce((s, v) => s + v, 0) : 0
 
   const roi = calculateROI(lastProfit, data.investorConfig)
 

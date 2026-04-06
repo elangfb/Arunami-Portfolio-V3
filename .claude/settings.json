@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Read(//d/Work/Arunami Portfolio/**)"
+    ]
+  }
+}

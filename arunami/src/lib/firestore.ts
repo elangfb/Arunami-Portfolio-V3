@@ -1,12 +1,16 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore'
 import { createUserWithEmailAndPassword, signOut } from 'firebase/auth'
-import { auth, secondaryAuth, db } from './firebase'
+import { secondaryAuth, db } from './firebase'
 import type {
   AppUser, Portfolio, FinancialData, PortfolioReport,
-  ManagementReport, Note, TransferProof,
+  ManagementReport, Note, TransferProof, InvestorAllocation,
+  PnLExtractedData, ProjectionExtractedData,
+  MonthlyDataPoint, CostItem, TransactionDataPoint, RevenueMixItem,
+  PortfolioConfig, SlotsSummary, InvestorCommunication,
 } from '@/types'
 
 // ─── Users ────────────────────────────────────────────────────────────────
@@ -18,7 +22,7 @@ export async function getUser(uid: string): Promise<AppUser | null> {
 
 export async function getAllUsers(): Promise<AppUser[]> {
   const snap = await getDocs(collection(db, 'users'))
-  return snap.docs.map(d => d.data() as AppUser)
+  return snap.docs.map(d => ({ ...d.data(), uid: d.id }) as AppUser)
 }
 
 export async function createUser(
@@ -86,6 +90,51 @@ export async function deletePortfolio(id: string) {
   await deleteDoc(doc(db, 'portfolios', id))
 }
 
+// ─── Portfolio Config ─────────────────────────────────────────────────────
+
+export async function getPortfolioConfig(portfolioId: string): Promise<PortfolioConfig | null> {
+  const snap = await getDoc(doc(db, 'portfolios', portfolioId, 'config', 'current'))
+  return snap.exists() ? (snap.data() as PortfolioConfig) : null
+}
+
+const LEGACY_RETAIL_CONFIG: Omit<PortfolioConfig, 'createdAt'> = {
+  industryType: 'retail',
+  revenueCategories: [
+    { id: 'laptop', name: 'Laptop', color: '#38a169' },
+    { id: 'service', name: 'Service', color: '#3182ce' },
+    { id: 'aksesoris', name: 'Aksesoris', color: '#d69e2e' },
+  ],
+  returnModel: 'slot_based',
+  investorConfig: {
+    type: 'slot_based',
+    totalSlots: 10,
+    nominalPerSlot: 5000000,
+    investorSharePercent: 70,
+    arunamiFeePercent: 10,
+  },
+  reportingFrequency: 'bulanan',
+  kpiMetrics: [
+    { id: 'revenue', name: 'Revenue', targetValue: 0, unit: 'currency' },
+    { id: 'net-profit', name: 'Net Profit', targetValue: 0, unit: 'currency' },
+    { id: 'gross-margin', name: 'Gross Margin', targetValue: 0, unit: 'percentage' },
+    { id: 'efficiency', name: 'Efisiensi', targetValue: 0, unit: 'percentage' },
+    { id: 'transaction-count', name: 'Transaksi', targetValue: 0, unit: 'count' },
+  ],
+}
+
+export async function getPortfolioConfigOrDefault(portfolioId: string): Promise<PortfolioConfig> {
+  const config = await getPortfolioConfig(portfolioId)
+  if (config) return config
+  return { ...LEGACY_RETAIL_CONFIG, createdAt: null as unknown as import('firebase/firestore').Timestamp }
+}
+
+export async function savePortfolioConfig(portfolioId: string, config: Omit<PortfolioConfig, 'createdAt'>) {
+  await setDoc(doc(db, 'portfolios', portfolioId, 'config', 'current'), {
+    ...config,
+    createdAt: serverTimestamp(),
+  })
+}
+
 // ─── Financial Data ───────────────────────────────────────────────────────
 
 export async function getFinancialData(portfolioId: string): Promise<FinancialData | null> {
@@ -108,12 +157,24 @@ export async function getReports(portfolioId: string, type: 'pnl' | 'projection'
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as PortfolioReport)
 }
 
-export async function saveReport(portfolioId: string, report: Omit<PortfolioReport, 'id'>) {
+export async function saveReport(portfolioId: string, report: Omit<PortfolioReport, 'id' | 'createdAt'>) {
   const ref = await addDoc(collection(db, 'portfolios', portfolioId, 'reports'), {
     ...report,
     createdAt: serverTimestamp(),
   })
   return ref.id
+}
+
+export async function updateReport(
+  portfolioId: string,
+  reportId: string,
+  data: Partial<Omit<PortfolioReport, 'id' | 'createdAt'>>,
+) {
+  await updateDoc(doc(db, 'portfolios', portfolioId, 'reports', reportId), data)
+}
+
+export async function deleteReport(portfolioId: string, reportId: string) {
+  await deleteDoc(doc(db, 'portfolios', portfolioId, 'reports', reportId))
 }
 
 // ─── Management Reports ───────────────────────────────────────────────────
@@ -167,4 +228,228 @@ export async function deleteNote(portfolioId: string, id: string) {
 export async function getTransferProofs(portfolioId: string): Promise<TransferProof[]> {
   const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'transferProofs'))
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as TransferProof)
+}
+
+// ─── Investor Allocations ────────────────────────────────────────────────
+
+export async function getAllocationsForPortfolio(portfolioId: string): Promise<InvestorAllocation[]> {
+  const q = query(collection(db, 'investorAllocations'), where('portfolioId', '==', portfolioId))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorAllocation)
+}
+
+export async function getAllocationsForInvestor(investorUid: string): Promise<InvestorAllocation[]> {
+  const q = query(collection(db, 'investorAllocations'), where('investorUid', '==', investorUid))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorAllocation)
+}
+
+/** Recalculates and writes slotsSummary + assignedInvestors on the portfolio doc. */
+async function refreshPortfolioSlotsSummary(portfolioId: string, totalSlots: number) {
+  const allocations = await getAllocationsForPortfolio(portfolioId)
+  const summary: SlotsSummary = {
+    totalSlots,
+    allocatedSlots: allocations.reduce((sum, a) => sum + a.slots, 0),
+    investorCount: allocations.length,
+  }
+  const investorUids = allocations.map(a => a.investorUid)
+  await updateDoc(doc(db, 'portfolios', portfolioId), {
+    slotsSummary: summary,
+    assignedInvestors: investorUids,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function createAllocation(
+  data: Omit<InvestorAllocation, 'id' | 'joinedAt' | 'updatedAt'>,
+  totalSlots: number,
+) {
+  const batch = writeBatch(db)
+
+  const allocRef = doc(collection(db, 'investorAllocations'))
+  batch.set(allocRef, {
+    ...data,
+    joinedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+
+  await batch.commit()
+  await refreshPortfolioSlotsSummary(data.portfolioId, totalSlots)
+  return allocRef.id
+}
+
+export async function updateAllocation(
+  allocationId: string,
+  data: Pick<InvestorAllocation, 'slots' | 'investedAmount'>,
+  portfolioId: string,
+  totalSlots: number,
+) {
+  await updateDoc(doc(db, 'investorAllocations', allocationId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  })
+  await refreshPortfolioSlotsSummary(portfolioId, totalSlots)
+}
+
+export async function deleteAllocation(
+  allocationId: string,
+  portfolioId: string,
+  totalSlots: number,
+) {
+  await deleteDoc(doc(db, 'investorAllocations', allocationId))
+  await refreshPortfolioSlotsSummary(portfolioId, totalSlots)
+}
+
+// ─── All Allocations (for CRM) ──────────────────────────────────────────
+
+export async function getAllAllocations(): Promise<InvestorAllocation[]> {
+  const snap = await getDocs(collection(db, 'investorAllocations'))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorAllocation)
+}
+
+// ─── Investor Communications ────────────────────────────────────────────
+
+export async function getCommunicationsForInvestor(investorUid: string): Promise<InvestorCommunication[]> {
+  const q = query(collection(db, 'investorCommunications'), where('investorUid', '==', investorUid))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorCommunication)
+}
+
+export async function saveCommunication(
+  data: Omit<InvestorCommunication, 'id' | 'createdAt'>,
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'investorCommunications'), {
+    ...data,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+// ─── Sync Financial Data ─────────────────────────────────────────────────
+// Aggregates all PnL + Projection reports into the financialData/current doc
+// so the analysis pages (Overview, Revenue, Costs, Investors) can display data.
+
+export async function syncFinancialData(portfolioId: string) {
+  const [pnlReports, projReports, existingData] = await Promise.all([
+    getReports(portfolioId, 'pnl'),
+    getReports(portfolioId, 'projection'),
+    getFinancialData(portfolioId),
+  ])
+
+  // Sort reports by period for chronological order
+  const sortByPeriod = (a: PortfolioReport, b: PortfolioReport) =>
+    a.period.localeCompare(b.period)
+  const sortedPnl = pnlReports.sort(sortByPeriod)
+  const sortedProj = projReports.sort(sortByPeriod)
+
+  // Build a map of projection data keyed by period
+  const projMap = new Map<string, ProjectionExtractedData>()
+  for (const r of sortedProj) {
+    projMap.set(r.period, r.extractedData as ProjectionExtractedData)
+  }
+
+  // Collect all unique periods (from both PnL and projections)
+  const allPeriods = [...new Set([
+    ...sortedPnl.map(r => r.period),
+    ...sortedProj.map(r => r.period),
+  ])]
+
+  // Build a map of PnL data keyed by period
+  const pnlMap = new Map<string, PnLExtractedData>()
+  for (const r of sortedPnl) {
+    pnlMap.set(r.period, r.extractedData as PnLExtractedData)
+  }
+
+  // Build revenueData & profitData
+  const revenueData: MonthlyDataPoint[] = allPeriods.map(period => {
+    const pnl = pnlMap.get(period)
+    const proj = projMap.get(period)
+    return {
+      month: period,
+      aktual: pnl?.revenue ?? 0,
+      proyeksi: proj?.projectedRevenue ?? 0,
+    }
+  })
+
+  const profitData: MonthlyDataPoint[] = allPeriods.map(period => {
+    const pnl = pnlMap.get(period)
+    const proj = projMap.get(period)
+    return {
+      month: period,
+      aktual: pnl?.netProfit ?? 0,
+      proyeksi: proj?.projectedNetProfit ?? 0,
+    }
+  })
+
+  // Build costStructure from the latest PnL
+  const latestPnl = sortedPnl.at(-1)?.extractedData as PnLExtractedData | undefined
+  let costStructure: CostItem[] = []
+  if (latestPnl?.opex && latestPnl.opex.length > 0) {
+    const totalOpex = latestPnl.totalOpex || latestPnl.opex.reduce((s, o) => s + o.amount, 0)
+    costStructure = latestPnl.opex.map(o => ({
+      name: o.name,
+      amount: o.amount,
+      percentage: totalOpex > 0 ? (o.amount / totalOpex) * 100 : 0,
+    }))
+  }
+
+  // Fetch portfolio config for dynamic categories
+  const config = await getPortfolioConfigOrDefault(portfolioId)
+  const categoryIds = config.revenueCategories.map(c => c.id)
+  const categoryNameMap = Object.fromEntries(config.revenueCategories.map(c => [c.id, c.name]))
+
+  // Build transactionData from PnL unit breakdowns (dynamic categories)
+  const transactionData: TransactionDataPoint[] = sortedPnl.map(r => {
+    const d = r.extractedData as PnLExtractedData
+    const categories: Record<string, number> = {}
+    for (const catId of categoryIds) {
+      categories[catId] = d.unitBreakdown?.[catId] ?? 0
+    }
+    return { month: r.period, categories }
+  })
+
+  // Build revenueMix from the latest PnL unit breakdown (dynamic categories)
+  let revenueMix: RevenueMixItem[] = []
+  if (latestPnl?.unitBreakdown) {
+    const ub = latestPnl.unitBreakdown
+    const total = categoryIds.reduce((sum, id) => sum + (ub[id] ?? 0), 0)
+    if (total > 0) {
+      revenueMix = categoryIds.map(id => ({
+        name: categoryNameMap[id],
+        value: ub[id] ?? 0,
+        percentage: ((ub[id] ?? 0) / total) * 100,
+      }))
+    }
+  }
+
+  // Build radarData from the latest PnL
+  const radarData = latestPnl ? [
+    { metric: 'Revenue', value: latestPnl.revenue, fullMark: latestPnl.revenue * 1.5 },
+    { metric: 'Profit', value: latestPnl.netProfit, fullMark: latestPnl.revenue },
+    { metric: 'Transaksi', value: latestPnl.transactionCount, fullMark: latestPnl.transactionCount * 2 },
+    { metric: 'Gross Margin', value: latestPnl.revenue > 0 ? (latestPnl.grossProfit / latestPnl.revenue) * 100 : 0, fullMark: 100 },
+    { metric: 'Efisiensi', value: latestPnl.revenue > 0 ? ((latestPnl.revenue - latestPnl.totalOpex) / latestPnl.revenue) * 100 : 0, fullMark: 100 },
+  ] : []
+
+  // Preserve existing investorConfig or use defaults
+  const investorConfig = existingData?.investorConfig ?? {
+    totalSlots: 10,
+    nominalPerSlot: 5000000,
+    investorSharePercent: 70,
+    arunamiFeePercent: 10,
+  }
+
+  const financialData: FinancialData = {
+    revenueData,
+    profitData,
+    costStructure,
+    transactionData,
+    aovData: existingData?.aovData ?? [],
+    revenueMix,
+    projections: [],
+    radarData,
+    investorConfig,
+  }
+
+  await saveFinancialData(portfolioId, financialData)
 }

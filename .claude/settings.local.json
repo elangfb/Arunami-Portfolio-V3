@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(find \"/d/Work/Arunami Portfolio/arunami/src\" -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"extractPnL\\\\|extractProjection\\\\|saveReport\\\\|getReports\" {} \\\\;)",
+      "Bash(find \"/d/Work/Arunami Portfolio/arunami/src\" -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"upload\\\\|file\\\\|File\" {} \\\\;)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }
