@@ -89,3 +89,78 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* ─── Print-Ready Report Styles ─────────────────────────────────────────── */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm 20mm;
+  }
+
+  /* Hide sidebar and app chrome */
+  aside {
+    display: none !important;
+  }
+
+  .flex.h-screen {
+    display: block !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Professional print typography */
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+    font-size: 11pt !important;
+    color: #000 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page breaks between portfolio sections */
+  .report-portfolio-section {
+    break-before: page;
+  }
+
+  .report-portfolio-section:first-of-type {
+    break-before: avoid;
+  }
+
+  /* Prevent breaking inside key blocks */
+  .report-no-break {
+    break-inside: avoid;
+  }
+
+  /* Flatten card styles for clean print */
+  [class*="shadow"],
+  [class*="rounded-lg"] {
+    box-shadow: none !important;
+  }
+
+  /* Ensure brand header prints in color */
+  .report-brand-header {
+    background-color: #1e5f3f !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Severity badges print with color */
+  .report-severity-high {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+  }
+  .report-severity-medium {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+  }
+  .report-severity-low {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+  }
+}

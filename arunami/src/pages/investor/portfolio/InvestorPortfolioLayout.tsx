@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useParams, useNavigate, Link } from 'react-router-dom'
+import { NavLink, Outlet, useParams, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
-import { getPortfolio } from '@/lib/firestore'
+import { getPortfolio, getAllocationsForInvestor } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
+import { useReportFilterStore } from '@/store/reportFilterStore'
 import { cn } from '@/lib/utils'
-import type { Portfolio } from '@/types'
-import { TrendingUp, LayoutDashboard, TrendingDown, Download, ChevronLeft, LogOut } from 'lucide-react'
+import type { Portfolio, InvestorAllocation } from '@/types'
+import { TrendingUp, LayoutDashboard, TrendingDown, FileText, LogOut } from 'lucide-react'
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectSeparator,
+} from '@/components/ui/select'
 
 const navItems = [
   { to: 'overview', label: 'Overview', icon: LayoutDashboard },
   { to: 'returns', label: 'Return Saya', icon: TrendingDown },
-  { to: 'report', label: 'Download Laporan', icon: Download },
+  { to: 'report', label: 'Laporan Investor', icon: FileText },
 ]
 
 export default function InvestorPortfolioLayout() {
@@ -20,10 +24,16 @@ export default function InvestorPortfolioLayout() {
   const navigate = useNavigate()
   const { user, setUser } = useAuthStore()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
+  const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
+  const { selectedFilter, setSelectedFilter } = useReportFilterStore()
 
   useEffect(() => {
     if (id) getPortfolio(id).then(setPortfolio)
   }, [id])
+
+  useEffect(() => {
+    if (user) getAllocationsForInvestor(user.uid).then(setAllocations)
+  }, [user])
 
   const handleLogout = async () => {
     await signOut(auth); setUser(null)
@@ -41,10 +51,22 @@ export default function InvestorPortfolioLayout() {
           <span className="text-base font-bold text-white truncate">{portfolio?.name ?? 'ARUNAMI'}</span>
         </div>
 
-        <div className="px-4 pt-3">
-          <Link to="/investor" className="flex items-center gap-2 text-xs text-[#9ca3af] hover:text-white transition-colors">
-            <ChevronLeft className="h-3 w-3" /> Kembali
-          </Link>
+        {/* Project filter dropdown */}
+        <div className="px-3 pt-3">
+          <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+            <SelectTrigger className="h-9 bg-white/5 border-white/10 text-white text-xs hover:bg-white/10 focus:ring-[#38a169]">
+              <SelectValue placeholder="Pilih Proyek" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Proyek</SelectItem>
+              {allocations.length > 0 && <SelectSeparator />}
+              {allocations.map((a) => (
+                <SelectItem key={a.portfolioId} value={a.portfolioId}>
+                  {a.portfolioName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5">
