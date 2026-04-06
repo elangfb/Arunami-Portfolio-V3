@@ -354,6 +354,7 @@ export async function syncFinancialData(portfolioId: string) {
     ...sortedProj.map(r => r.period),
   ])]
 
+  
   // Build a map of PnL data keyed by period
   const pnlMap = new Map<string, PnLExtractedData>()
   for (const r of sortedPnl) {
