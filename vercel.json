@@ -1,0 +1,8 @@
+{
+  "buildCommand": "cd arunami && npm run build",
+  "outputDirectory": "arunami/dist",
+  "installCommand": "cd arunami && npm install",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
