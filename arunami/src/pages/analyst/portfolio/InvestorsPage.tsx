@@ -8,6 +8,7 @@ import { calculateROI, calculateInvestorROI } from '@/lib/roi'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { formatPeriod } from '@/lib/dateUtils'
 import type {
   FinancialData, TransferProof, Portfolio,
   InvestorAllocation, SlotBasedConfig,
@@ -51,7 +52,10 @@ export default function InvestorsPage() {
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
   if (!data) return <div className="p-8 text-muted-foreground">Data investor belum tersedia.</div>
 
-  const lastProfit = data.profitData.at(-1)?.aktual ?? 0
+  const latestActual = [...data.profitData].reverse().find(r => r.aktual > 0)
+  const latestActualPeriod = latestActual?.month ?? data.profitData.at(-1)?.month
+  const lastProfit = latestActual?.aktual ?? data.profitData.at(-1)?.aktual ?? 0
+  const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Ini'
   const roi = calculateROI(lastProfit, data.investorConfig)
 
   const allocatedSlots = allocations.reduce((sum, a) => sum + a.slots, 0)
@@ -98,7 +102,7 @@ export default function InvestorsPage() {
                   <th className="text-center py-2.5 px-3 font-medium">Slot</th>
                   <th className="text-center py-2.5 px-3 font-medium">Kepemilikan</th>
                   <th className="text-right py-2.5 px-3 font-medium">Investasi</th>
-                  <th className="text-right py-2.5 px-3 font-medium">Earning (Bulan Ini)</th>
+                  <th className="text-right py-2.5 px-3 font-medium">Earning ({periodLabel})</th>
                   <th className="text-right py-2.5 px-3 font-medium">ROI Bulanan</th>
                 </tr>
               </thead>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { FileText, TrendingUp, Check, Loader2, Circle, AlertCircle, Bot, ClipboardList, StickyNote } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -17,6 +17,7 @@ interface StepUploadDocumentsProps {
   graceNoteFile?: File | null
   onGraceMgmtFile?: (f: File | null) => void
   onGraceNoteFile?: (f: File | null) => void
+  onProcessingChange?: (processing: boolean) => void
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -50,6 +51,7 @@ export default function StepUploadDocuments({
   graceNoteFile,
   onGraceMgmtFile,
   onGraceNoteFile,
+  onProcessingChange,
 }: StepUploadDocumentsProps) {
   const [pnlFile, setPnlFile] = useState<File | null>(null)
   const [projectionFile, setProjectionFile] = useState<File | null>(null)
@@ -58,6 +60,8 @@ export default function StepUploadDocuments({
 
   const isProcessing = stage !== 'idle' && stage !== 'done' && stage !== 'error'
   const hasFiles = pnlFile !== null || projectionFile !== null
+
+  useEffect(() => { onProcessingChange?.(isProcessing) }, [isProcessing, onProcessingChange])
 
   // ─── Grace Period Mode ──────────────────────────────────────────────
   if (gracePeriod) {
@@ -122,24 +126,37 @@ export default function StepUploadDocuments({
     if (!hasFiles) return
 
     setError(null)
+    setStage('reading_pnl')
 
     try {
-      // Simulate stage progression for UX
-      const stages = getStageOrder(!!pnlFile, !!projectionFile)
+      const result = await extractPortfolioSetup(
+        pnlFile,
+        projectionFile,
+        industryType,
+        (s) => setStage(s as ExtractionStage),
+      )
 
-      for (const s of stages.slice(0, -1)) {
-        setStage(s as ExtractionStage)
-        // Small delay between stages for visual feedback
-        await new Promise(r => setTimeout(r, 300))
+      // Check for per-file errors
+      const { errors, ...extraction } = result
+      const errorMessages: string[] = []
+      if (errors.pnl) errorMessages.push(errors.pnl)
+      if (errors.projection) errorMessages.push(errors.projection)
+
+      // If both failed, treat as full error
+      if (pnlFile && errors.pnl && projectionFile && errors.projection) {
+        setStage('error')
+        setError(errorMessages.join('\n'))
+        return
       }
-      setStage(stages.at(-1) as ExtractionStage)
 
-      // Actual extraction happens here
-      const result = await extractPortfolioSetup(pnlFile, projectionFile, industryType)
+      // Partial success — show warnings but proceed
+      if (errorMessages.length > 0) {
+        toast.warning(errorMessages.join(' | '))
+      }
 
       setStage('done')
       toast.success('Data berhasil diekstrak! Silakan review di langkah berikutnya.')
-      onExtractionComplete(result)
+      onExtractionComplete(extraction)
     } catch (err) {
       console.error('Extraction failed:', err)
       setStage('error')

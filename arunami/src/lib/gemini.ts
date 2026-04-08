@@ -80,7 +80,10 @@ Semua nilai moneter dalam IDR (angka saja, tanpa simbol).
 `
 
 export async function extractPnL(file: File, config?: PortfolioConfig): Promise<PnLExtractedData> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: { responseMimeType: 'application/json' },
+  })
   const ext = file.name.split('.').pop()?.toLowerCase()
   const prompt = buildPnLPrompt(config)
 
@@ -97,7 +100,7 @@ export async function extractPnL(file: File, config?: PortfolioConfig): Promise<
   }
 
   const raw = result.response.text().replace(/```json|```/g, '').trim()
-  return JSON.parse(raw) as PnLExtractedData
+  return safeParseJSON<PnLExtractedData>(raw)
 }
 
 // ─── Portfolio Setup Extraction (with classification) ────────────────────
@@ -135,16 +138,32 @@ Kamu adalah asisten keuangan untuk platform manajemen portofolio investasi Indon
 
 Analisis dokumen proyeksi keuangan ini dan kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
 {
-  "period": "string format YYYY-MM (contoh: 2024-01 untuk Januari 2024)",
-  "projectedRevenue": number,
-  "projectedCogsPercent": number,
-  "projectedCogs": number,
-  "projectedGrossProfit": number,
-  "projectedOpex": [{"name": "string", "amount": number, "isStandard": boolean}],
-  "projectedTotalOpex": number,
-  "projectedNetProfit": number,
-  "assumptions": "string"
+  "period": "string format YYYY-MM dari bulan PERTAMA proyeksi (contoh: 2024-01 untuk Januari 2024)",
+  "assumptions": "string",
+  "cogsPercent": number,
+  "monthlyData": [
+    {
+      "month": "YYYY-MM",
+      "projectedRevenue": number,
+      "projectedCogs": number,
+      "projectedGrossProfit": number,
+      "opexBreakdown": [{"name": "string", "amount": number, "isStandard": boolean}],
+      "totalOpex": number,
+      "projectedNetProfit": number
+    }
+  ]
 }
+
+ATURAN PENTING:
+- Ekstrak SEMUA bulan yang ada di dokumen. Setiap bulan menjadi satu entry di "monthlyData"
+- "month" format YYYY-MM (contoh: "2026-01" untuk Januari 2026)
+- "period" adalah bulan PERTAMA dari proyeksi
+- cogsPercent: hitung sebagai rata-rata (projectedCogs / projectedRevenue * 100) dari semua bulan, bulatkan 1 desimal. Jika COGS tidak ada, isi 0
+- Per bulan: projectedGrossProfit = projectedRevenue - projectedCogs
+- Per bulan: projectedNetProfit = projectedGrossProfit - totalOpex
+- Jika dokumen hanya berisi data tahunan/total tanpa breakdown bulanan, buat satu entry saja
+- assumptions: ambil dari bagian asumsi/catatan di dokumen, atau tulis ringkasan singkat jika tidak ada
+- Pastikan semua bulan memiliki opexBreakdown yang KONSISTEN (nama item yang sama di setiap bulan)
 
 ATURAN KLASIFIKASI isStandard:
 - Opex STANDAR (isStandard: true): Gaji/Salary, Sewa/Rent, Utilitas/Utilities, Listrik, Air, Internet, Marketing/Iklan, Transportasi, Perlengkapan/ATK, Asuransi, Depresiasi/Penyusutan, Pajak, Administrasi, Maintenance/Perawatan
@@ -152,8 +171,29 @@ ATURAN KLASIFIKASI isStandard:
 - Semua nilai moneter dalam IDR (angka saja, tanpa simbol Rp atau titik ribuan)
 `
 
+/** Try JSON.parse with fallback repairs for common LLM output issues */
+function safeParseJSON<T>(raw: string): T {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // Fix trailing commas before } or ]
+    let fixed = raw.replace(/,\s*([}\]])/g, '$1')
+    // Fix unescaped newlines inside string values
+    fixed = fixed.replace(/(?<=:\s*"[^"]*)\n/g, '\\n')
+    try {
+      return JSON.parse(fixed)
+    } catch (e) {
+      console.error('Raw Gemini response that failed to parse:', raw.slice(0, 500))
+      throw e
+    }
+  }
+}
+
 async function sendToGemini(file: File, prompt: string): Promise<string> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: { responseMimeType: 'application/json' },
+  })
   const ext = file.name.split('.').pop()?.toLowerCase()
 
   let result
@@ -171,19 +211,119 @@ async function sendToGemini(file: File, prompt: string): Promise<string> {
   return result.response.text().replace(/```json|```/g, '').trim()
 }
 
+/** Ensure all numeric fields are valid numbers (replace NaN/undefined with 0) */
+function sanitizeNumber(v: unknown): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+function sanitizeProjection(raw: ClassifiedProjectionData): ClassifiedProjectionData {
+  const cogsPercent = sanitizeNumber(raw.cogsPercent)
+
+  const monthlyData = (raw.monthlyData ?? []).map(m => {
+    const projectedRevenue = sanitizeNumber(m.projectedRevenue)
+    let projectedCogs = sanitizeNumber(m.projectedCogs)
+    // Recalculate COGS from percentage if available
+    if (cogsPercent > 0 && projectedRevenue > 0) {
+      projectedCogs = Math.round(projectedRevenue * cogsPercent / 100)
+    }
+    const projectedGrossProfit = projectedRevenue - projectedCogs
+    const opexBreakdown = (m.opexBreakdown ?? []).map(o => ({
+      ...o,
+      amount: sanitizeNumber(o.amount),
+    }))
+    const totalOpex = opexBreakdown.reduce((s, o) => s + o.amount, 0)
+
+    return {
+      month: m.month || '',
+      projectedRevenue,
+      projectedCogs,
+      projectedGrossProfit,
+      opexBreakdown,
+      totalOpex,
+      projectedNetProfit: projectedGrossProfit - totalOpex,
+    }
+  })
+
+  // Derive cogsPercent from actual values if not provided
+  let finalCogsPercent = cogsPercent
+  if (finalCogsPercent === 0 && monthlyData.length > 0) {
+    const totalRevenue = monthlyData.reduce((s, m) => s + m.projectedRevenue, 0)
+    const totalCogs = monthlyData.reduce((s, m) => s + m.projectedCogs, 0)
+    if (totalRevenue > 0 && totalCogs > 0) {
+      finalCogsPercent = Math.round((totalCogs / totalRevenue) * 100 * 10) / 10
+    }
+  }
+
+  return {
+    period: raw.period || '',
+    assumptions: raw.assumptions || '',
+    cogsPercent: finalCogsPercent,
+    monthlyData,
+  }
+}
+
+function sanitizePnl(raw: ClassifiedPnLData): ClassifiedPnLData {
+  return {
+    ...raw,
+    revenue: sanitizeNumber(raw.revenue),
+    cogs: sanitizeNumber(raw.cogs),
+    grossProfit: sanitizeNumber(raw.grossProfit),
+    totalOpex: sanitizeNumber(raw.totalOpex),
+    operatingProfit: sanitizeNumber(raw.operatingProfit),
+    interest: sanitizeNumber(raw.interest),
+    taxes: sanitizeNumber(raw.taxes),
+    netProfit: sanitizeNumber(raw.netProfit),
+    transactionCount: sanitizeNumber(raw.transactionCount),
+    opex: (raw.opex ?? []).map(o => ({ ...o, amount: sanitizeNumber(o.amount) })),
+    revenueBreakdown: (raw.revenueBreakdown ?? []).map(r => ({
+      ...r,
+      amount: sanitizeNumber(r.amount),
+      unitCount: sanitizeNumber(r.unitCount),
+    })),
+    notes: raw.notes || '',
+  }
+}
+
+export interface ExtractionErrors {
+  pnl?: string
+  projection?: string
+}
+
 export async function extractPortfolioSetup(
   pnlFile: File | null,
   projectionFile: File | null,
   industryType?: IndustryType,
-): Promise<PortfolioSetupExtraction> {
+  onStage?: (stage: string) => void,
+): Promise<PortfolioSetupExtraction & { errors: ExtractionErrors }> {
   let pnl: ClassifiedPnLData | null = null
   let projection: ClassifiedProjectionData | null = null
+  const errors: ExtractionErrors = {}
 
-  if (pnlFile) {
-    const raw = await sendToGemini(pnlFile, SETUP_PNL_PROMPT)
-    pnl = JSON.parse(raw) as ClassifiedPnLData
+  // Extract both files in parallel
+  const pnlPromise = pnlFile
+    ? (async () => {
+        onStage?.('reading_pnl')
+        const raw = await sendToGemini(pnlFile, SETUP_PNL_PROMPT)
+        onStage?.('extracting_pnl')
+        return safeParseJSON<ClassifiedPnLData>(raw)
+      })()
+    : Promise.resolve(null)
 
-    // Client-side fallback classification
+  const projPromise = projectionFile
+    ? (async () => {
+        onStage?.('reading_projection')
+        const raw = await sendToGemini(projectionFile, SETUP_PROJECTION_PROMPT)
+        onStage?.('extracting_projection')
+        return safeParseJSON<ClassifiedProjectionData>(raw)
+      })()
+    : Promise.resolve(null)
+
+  const [pnlResult, projResult] = await Promise.allSettled([pnlPromise, projPromise])
+
+  // Process PnL result
+  if (pnlResult.status === 'fulfilled' && pnlResult.value) {
+    pnl = sanitizePnl(pnlResult.value)
     pnl.opex = pnl.opex.map(item => ({
       ...item,
       isStandard: item.isStandard ?? isStandardOpex(item.name, industryType),
@@ -192,19 +332,48 @@ export async function extractPortfolioSetup(
       ...item,
       isStandard: item.isStandard ?? isStandardRevenue(item.name, industryType),
     }))
+  } else if (pnlResult.status === 'rejected') {
+    console.error('PnL extraction failed:', pnlResult.reason)
+    errors.pnl = `Gagal mengekstrak PnL: ${pnlResult.reason?.message || 'Unknown error'}`
   }
 
-  if (projectionFile) {
-    const raw = await sendToGemini(projectionFile, SETUP_PROJECTION_PROMPT)
-    projection = JSON.parse(raw) as ClassifiedProjectionData
-
-    projection.projectedOpex = (projection.projectedOpex ?? []).map(item => ({
-      ...item,
-      isStandard: item.isStandard ?? isStandardOpex(item.name, industryType),
+  // Process Projection result
+  if (projResult.status === 'fulfilled' && projResult.value) {
+    projection = sanitizeProjection(projResult.value)
+    projection.monthlyData = projection.monthlyData.map(m => ({
+      ...m,
+      opexBreakdown: m.opexBreakdown.map(item => ({
+        ...item,
+        isStandard: item.isStandard ?? isStandardOpex(item.name, industryType),
+      })),
     }))
+  } else if (projResult.status === 'rejected') {
+    console.error('Projection extraction failed:', projResult.reason)
+    errors.projection = `Gagal mengekstrak Proyeksi: ${projResult.reason?.message || 'Unknown error'}`
   }
+
+  onStage?.('classifying')
 
   // Build discovered variables from non-standard items
+  const projOpexSeen = new Set<string>()
+  const projDiscovered: { name: string; category: 'opex'; value: number; description: string; included: boolean }[] = []
+  if (projection) {
+    for (const m of projection.monthlyData) {
+      for (const o of m.opexBreakdown) {
+        if (!o.isStandard && !projOpexSeen.has(o.name)) {
+          projOpexSeen.add(o.name)
+          projDiscovered.push({
+            name: o.name,
+            category: 'opex' as const,
+            value: o.amount,
+            description: `Item opex ditemukan dari dokumen proyeksi`,
+            included: true,
+          })
+        }
+      }
+    }
+  }
+
   const discoveredVariables = [
     ...(pnl?.opex.filter(o => !o.isStandard).map(o => ({
       name: o.name,
@@ -220,13 +389,7 @@ export async function extractPortfolioSetup(
       description: `Kategori pendapatan ditemukan dari dokumen PnL`,
       included: true,
     })) ?? []),
-    ...(projection?.projectedOpex.filter(o => !o.isStandard).map(o => ({
-      name: o.name,
-      category: 'opex' as const,
-      value: o.amount,
-      description: `Item opex ditemukan dari dokumen proyeksi`,
-      included: true,
-    })) ?? []),
+    ...projDiscovered,
   ]
 
   // Suggest KPIs from extracted data
@@ -260,7 +423,7 @@ export async function extractPortfolioSetup(
     }
   }
 
-  return { pnl, projection, discoveredVariables, suggestedKpis }
+  return { pnl, projection, discoveredVariables, suggestedKpis, errors }
 }
 
 // ─── Monthly Projection Extraction (Analyst Review) ────────────────────
@@ -293,14 +456,17 @@ ATURAN:
 
 export async function extractProjectionMonthly(file: File): Promise<ProjectionUploadPending> {
   const raw = await sendToGemini(file, PROJECTION_MONTHLY_PROMPT)
-  const parsed = JSON.parse(raw) as ProjectionUploadPending
+  const parsed = safeParseJSON<ProjectionUploadPending>(raw)
   return { ...parsed, status: 'pending_review' }
 }
 
 // ─── Legacy extraction functions (used by analyst pages) ─────────────────
 
 export async function extractProjection(file: File): Promise<ProjectionExtractedData> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: { responseMimeType: 'application/json' },
+  })
   const ext = file.name.split('.').pop()?.toLowerCase()
 
   let result
@@ -316,5 +482,5 @@ export async function extractProjection(file: File): Promise<ProjectionExtracted
   }
 
   const raw = result.response.text().replace(/```json|```/g, '').trim()
-  return JSON.parse(raw) as ProjectionExtractedData
+  return safeParseJSON<ProjectionExtractedData>(raw)
 }

@@ -44,7 +44,10 @@ export default function InvestorReturnsPage() {
   const investorSharePct = slotConfig?.investorSharePercent ?? data.investorConfig.investorSharePercent
   const arunamiFeePct = slotConfig?.arunamiFeePercent ?? data.investorConfig.arunamiFeePercent
 
-  const lastProfit = data.profitData.at(-1)?.aktual ?? 0
+  const latestActual = [...data.profitData].reverse().find(r => r.aktual > 0)
+  const latestActualPeriod = latestActual?.month ?? data.profitData.at(-1)?.month
+  const lastProfit = latestActual?.aktual ?? data.profitData.at(-1)?.aktual ?? 0
+  const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Ini'
   const myRoi = calculateInvestorROI(lastProfit, mySlots, totalSlots, investorSharePct, arunamiFeePct, nominalPerSlot)
 
   // Monthly breakdown — personalized per-investor
@@ -65,7 +68,7 @@ export default function InvestorReturnsPage() {
         {[
           ['Slot Saya', `${mySlots} / ${totalSlots}`],
           ['Investasi Saya', formatCurrencyCompact(allocation?.investedAmount ?? mySlots * nominalPerSlot)],
-          ['Earning Bulan Ini', formatCurrencyCompact(myRoi.earnings)],
+          [`Earning ${periodLabel}`, formatCurrencyCompact(myRoi.earnings)],
           ['Total Earning', formatCurrencyCompact(totalEarnings)],
           ['Kepemilikan', `${myRoi.ownershipPct.toFixed(1)}%`],
           ['Nominal / Slot', formatCurrencyCompact(nominalPerSlot)],

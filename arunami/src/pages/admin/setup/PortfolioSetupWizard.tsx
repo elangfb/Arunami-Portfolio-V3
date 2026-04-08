@@ -7,11 +7,13 @@ import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createPortfolio, savePortfolioConfig, saveReport, syncFinancialData } from '@/lib/firestore'
+import { normalizePeriod } from '@/lib/dateUtils'
 import { INDUSTRY_PRESETS } from '@/lib/industryPresets'
 import type {
   IndustryType, ReturnModelType, ReportingFrequency,
   RevenueCategory, KpiMetric, InvestorConfigUnion,
   ClassifiedPnLData, ClassifiedProjectionData,
+  ProjectionExtractedData,
   PortfolioSetupExtraction, SuggestedKpi,
 } from '@/types'
 
@@ -101,6 +103,7 @@ export default function PortfolioSetupWizard() {
   const [extractedPnl, setExtractedPnl] = useState<ClassifiedPnLData | null>(null)
   const [extractedProjection, setExtractedProjection] = useState<ClassifiedProjectionData | null>(null)
   const [suggestedKpis, setSuggestedKpis] = useState<SuggestedKpi[]>([])
+  const [isExtracting, setIsExtracting] = useState(false)
 
   const form = useForm<WizardFormData>({
     resolver: zodResolver(wizardSchema) as any,
@@ -251,18 +254,28 @@ export default function PortfolioSetupWizard() {
         }
 
         if (extractedProjection) {
-          const { projectedOpex, ...projFields } = extractedProjection
-          await saveReport(portfolioId, {
-            type: 'projection',
-            fileName: 'Upload Setup (AI)',
-            fileUrl: '',
-            period: extractedProjection.period,
-            extractedData: {
-              ...projFields,
-              projectedOpex: projectedOpex.map(({ isStandard: _, ...rest }) => rest),
-            },
-            uploadedBy: 'admin',
-          })
+          for (const month of extractedProjection.monthlyData) {
+            const period = normalizePeriod(month.month)
+            const extractedData: ProjectionExtractedData = {
+              period,
+              projectedRevenue: month.projectedRevenue,
+              projectedCogsPercent: extractedProjection.cogsPercent,
+              projectedCogs: month.projectedCogs,
+              projectedGrossProfit: month.projectedGrossProfit,
+              projectedOpex: month.opexBreakdown.map(({ isStandard: _, ...rest }) => rest),
+              projectedTotalOpex: month.totalOpex,
+              projectedNetProfit: month.projectedNetProfit,
+              assumptions: extractedProjection.assumptions,
+            }
+            await saveReport(portfolioId, {
+              type: 'projection',
+              fileName: 'Upload Setup (AI)',
+              fileUrl: '',
+              period,
+              extractedData,
+              uploadedBy: 'admin',
+            })
+          }
         }
 
         // Sync financial data if reports were saved
@@ -310,6 +323,7 @@ export default function PortfolioSetupWizard() {
                 industryType={industryType}
                 onExtractionComplete={handleExtractionComplete}
                 hasExtraction={extractedPnl !== null || extractedProjection !== null}
+                onProcessingChange={setIsExtracting}
               />
             )}
             {currentStep === 2 && (
@@ -345,7 +359,11 @@ export default function PortfolioSetupWizard() {
             {submitting ? 'Membuat...' : 'Buat Portofolio'}
           </Button>
         ) : (
-          <Button onClick={handleNext} className="bg-green-600 hover:bg-green-700">
+          <Button
+            onClick={handleNext}
+            disabled={currentStep === 1 && !isGracePeriod && (isExtracting || (!extractedPnl && !extractedProjection))}
+            className="bg-green-600 hover:bg-green-700"
+          >
             Lanjut
           </Button>
         )}

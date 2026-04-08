@@ -261,16 +261,21 @@ export interface ClassifiedPnLData {
   notes: string
 }
 
-export interface ClassifiedProjectionData {
-  period: string
+export interface ClassifiedMonthlyProjectionRow {
+  month: string
   projectedRevenue: number
-  projectedCogsPercent: number
   projectedCogs: number
   projectedGrossProfit: number
-  projectedOpex: ClassifiedOpexItem[]
-  projectedTotalOpex: number
+  opexBreakdown: ClassifiedOpexItem[]
+  totalOpex: number
   projectedNetProfit: number
+}
+
+export interface ClassifiedProjectionData {
+  period: string
   assumptions: string
+  cogsPercent: number
+  monthlyData: ClassifiedMonthlyProjectionRow[]
 }
 
 export interface PortfolioSetupExtraction {

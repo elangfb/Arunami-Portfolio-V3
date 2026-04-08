@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Read(//d/Work/Arunami Portfolio/**)"
+      "Read(//d/Work/Arunami Portfolio/**)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

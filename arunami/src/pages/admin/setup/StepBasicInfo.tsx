@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { INDUSTRY_OPTIONS, STAGE_OPTIONS } from '@/lib/industryPresets'
 import type { WizardFormData } from './PortfolioSetupWizard'
 
@@ -83,8 +84,11 @@ export default function StepBasicInfo({ form }: Props) {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="periode">Periode Mulai *</Label>
-            <Input id="periode" placeholder="Januari 2024" {...register('periode')} />
+            <Label>Periode Mulai *</Label>
+            <MonthYearPicker
+              value={watch('periode')}
+              onChange={(v) => setValue('periode', v, { shouldValidate: true })}
+            />
             {errors.periode && <p className="text-xs text-red-500">{errors.periode.message}</p>}
           </div>
           <div className="space-y-2">

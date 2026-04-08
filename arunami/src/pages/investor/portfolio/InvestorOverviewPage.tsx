@@ -40,8 +40,14 @@ export default function InvestorOverviewPage() {
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
   if (!data) return <div className="p-8 text-muted-foreground">Data belum tersedia.</div>
 
-  const lastRevenue = data.revenueData.at(-1)?.aktual ?? 0
-  const lastProfit = data.profitData.at(-1)?.aktual ?? 0
+  // Find the latest period that has actual PnL data (aktual > 0), not just projections
+  const latestActual = [...data.revenueData].reverse().find(r => r.aktual > 0)
+  const latestActualPeriod = latestActual?.month ?? data.revenueData.at(-1)?.month
+  const latestRevEntry = latestActualPeriod ? data.revenueData.find(r => r.month === latestActualPeriod) : data.revenueData.at(-1)
+  const latestProfEntry = latestActualPeriod ? data.profitData.find(r => r.month === latestActualPeriod) : data.profitData.at(-1)
+  const lastRevenue = latestRevEntry?.aktual ?? 0
+  const lastProfit = latestProfEntry?.aktual ?? 0
+  const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Ini'
   const roi = calculateROI(lastProfit, data.investorConfig)
 
   const mySlots = allocation?.slots ?? 0
@@ -55,10 +61,10 @@ export default function InvestorOverviewPage() {
     : null
 
   const kpis = [
-    { label: 'Revenue (Bulan Ini)', value: formatCurrencyCompact(lastRevenue), icon: DollarSign },
-    { label: 'Net Profit (Bulan Ini)', value: formatCurrencyCompact(lastProfit), icon: TrendingUp },
+    { label: `Revenue (${periodLabel})`, value: formatCurrencyCompact(lastRevenue), icon: DollarSign },
+    { label: `Net Profit (${periodLabel})`, value: formatCurrencyCompact(lastProfit), icon: TrendingUp },
     { label: 'Slot Saya', value: allocation ? `${mySlots} / ${totalSlots}` : `${totalSlots} total`, icon: PieChart },
-    { label: 'Earning Saya (Bulan Ini)', value: myRoi ? formatCurrencyCompact(myRoi.earnings) : formatCurrencyCompact(roi.returnPerSlot), icon: BarChart2 },
+    { label: `Earning Saya (${periodLabel})`, value: myRoi ? formatCurrencyCompact(myRoi.earnings) : formatCurrencyCompact(roi.returnPerSlot), icon: BarChart2 },
   ]
 
   const revenueChartData = data.revenueData.map(r => ({ month: r.month, aktual: r.aktual }))
@@ -80,7 +86,7 @@ export default function InvestorOverviewPage() {
               <p className="font-semibold">{formatCurrencyCompact(allocation.investedAmount)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Earning Bulan Ini</p>
+              <p className="text-xs text-muted-foreground">Earning {periodLabel}</p>
               <p className="font-semibold">{formatCurrencyCompact(myRoi.earnings)}</p>
             </div>
             <div>

@@ -7,6 +7,7 @@ import {
 } from '@/lib/firestore'
 import { calculateInvestorROI } from '@/lib/roi'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
+import { formatPeriod } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +26,7 @@ interface PortfolioEnriched {
   earnings: number
   monthlyROI: number
   netProfit: number
+  periodLabel: string
 }
 
 export default function AdminInvestorDetail() {
@@ -72,11 +74,14 @@ export default function AdminInvestorDetail() {
         let earnings = 0
         let monthlyROI = 0
         let netProfit = 0
+        let periodLabel = 'Bulan Ini'
 
         if (financial && config?.investorConfig?.type === 'slot_based') {
           const sc = config.investorConfig as SlotBasedConfig
-          const latestProfit = financial.profitData.at(-1)
-          netProfit = latestProfit?.aktual ?? 0
+          const latestActual = [...financial.profitData].reverse().find(r => r.aktual > 0)
+          const latestActualPeriod = latestActual?.month ?? financial.profitData.at(-1)?.month
+          netProfit = latestActual?.aktual ?? financial.profitData.at(-1)?.aktual ?? 0
+          if (latestActualPeriod) periodLabel = formatPeriod(latestActualPeriod)
 
           if (netProfit !== 0) {
             const roi = calculateInvestorROI(
@@ -92,7 +97,7 @@ export default function AdminInvestorDetail() {
           }
         }
 
-        return { allocation, financial, config, earnings, monthlyROI, netProfit }
+        return { allocation, financial, config, earnings, monthlyROI, netProfit, periodLabel }
       }),
     )
 
@@ -253,7 +258,7 @@ export default function AdminInvestorDetail() {
                     <th className="text-left py-2.5 px-3 font-medium">Portofolio</th>
                     <th className="text-center py-2.5 px-3 font-medium">Slot</th>
                     <th className="text-right py-2.5 px-3 font-medium">Investasi</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Earning Bulan Ini</th>
+                    <th className="text-right py-2.5 px-3 font-medium">Earning Terakhir</th>
                     <th className="text-right py-2.5 px-3 font-medium">ROI Bulanan</th>
                     <th className="text-right py-2.5 px-3 font-medium w-28">Aksi</th>
                   </tr>

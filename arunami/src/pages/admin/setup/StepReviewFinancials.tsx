@@ -15,10 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrencyExact } from '@/lib/utils'
+import { formatPeriod } from '@/lib/dateUtils'
 import { INDUSTRY_PRESETS } from '@/lib/industryPresets'
 import type { WizardFormData } from './PortfolioSetupWizard'
-import type { ClassifiedPnLData, ClassifiedProjectionData, SuggestedKpi, ClassifiedOpexItem } from '@/types'
+import type { ClassifiedPnLData, ClassifiedProjectionData, ClassifiedMonthlyProjectionRow, SuggestedKpi, ClassifiedOpexItem } from '@/types'
 
 interface StepReviewFinancialsProps {
   form: UseFormReturn<WizardFormData>
@@ -221,7 +222,16 @@ function PnLTab({
   )
 }
 
-// ─── Projection Tab ──────────────────────────────────────────────────────
+// ─── Projection Tab (Editable Horizontal Table) ─────────────────────────
+
+function recalcMonth(m: ClassifiedMonthlyProjectionRow, cogsPercent: number): ClassifiedMonthlyProjectionRow {
+  const revenue = Number(m.projectedRevenue) || 0
+  const projectedCogs = cogsPercent > 0 ? Math.round(revenue * cogsPercent / 100) : (Number(m.projectedCogs) || 0)
+  const projectedGrossProfit = revenue - projectedCogs
+  const opexBreakdown = m.opexBreakdown.map(o => ({ ...o, amount: Number(o.amount) || 0 }))
+  const totalOpex = opexBreakdown.reduce((s, o) => s + o.amount, 0)
+  return { ...m, projectedRevenue: revenue, projectedCogs, projectedGrossProfit, opexBreakdown, totalOpex, projectedNetProfit: projectedGrossProfit - totalOpex }
+}
 
 function ProjectionTab({
   data,
@@ -230,85 +240,229 @@ function ProjectionTab({
   data: ClassifiedProjectionData
   onChange: (d: ClassifiedProjectionData) => void
 }) {
-  const updateField = <K extends keyof ClassifiedProjectionData>(key: K, val: ClassifiedProjectionData[K]) => {
-    const next = { ...data, [key]: val }
-    if (next.projectedRevenue > 0 && next.projectedCogsPercent >= 0) {
-      next.projectedCogs = Math.round(next.projectedRevenue * next.projectedCogsPercent / 100)
-    }
-    next.projectedGrossProfit = next.projectedRevenue - next.projectedCogs
-    next.projectedTotalOpex = next.projectedOpex.reduce((s, o) => s + o.amount, 0)
-    next.projectedNetProfit = next.projectedGrossProfit - next.projectedTotalOpex
-    onChange(next)
+  const months = data.monthlyData
+
+  // Collect all unique opex names across all months
+  const opexNames = [...new Set(months.flatMap(m => m.opexBreakdown.map(o => o.name)))]
+
+  // Check if an opex name is non-standard (in any month)
+  const isDiscovered = (name: string) =>
+    months.some(m => m.opexBreakdown.some(o => o.name === name && !o.isStandard))
+
+  const updateMonthField = (monthIdx: number, key: 'projectedRevenue', val: number) => {
+    const updated = months.map((m, i) => {
+      if (i !== monthIdx) return m
+      return recalcMonth({ ...m, [key]: val }, data.cogsPercent)
+    })
+    onChange({ ...data, monthlyData: updated })
   }
 
-  const updateOpex = (idx: number, patch: Partial<ClassifiedOpexItem>) => {
-    const opex = data.projectedOpex.map((o, i) => i === idx ? { ...o, ...patch } : o)
-    updateField('projectedOpex', opex)
+  const updateOpexAmount = (monthIdx: number, opexName: string, amount: number) => {
+    const updated = months.map((m, i) => {
+      if (i !== monthIdx) return m
+      const opexBreakdown = m.opexBreakdown.map(o => o.name === opexName ? { ...o, amount } : o)
+      return recalcMonth({ ...m, opexBreakdown }, data.cogsPercent)
+    })
+    onChange({ ...data, monthlyData: updated })
+  }
+
+  const updateOpexLabel = (oldName: string, newName: string) => {
+    const updated = months.map(m => ({
+      ...m,
+      opexBreakdown: m.opexBreakdown.map(o => o.name === oldName ? { ...o, name: newName } : o),
+    }))
+    onChange({ ...data, monthlyData: updated })
   }
 
   const addOpex = () => {
-    updateField('projectedOpex', [...data.projectedOpex, { name: '', amount: 0, isStandard: false }])
+    const updated = months.map(m => recalcMonth({
+      ...m,
+      opexBreakdown: [...m.opexBreakdown, { name: '', amount: 0, isStandard: false }],
+    }, data.cogsPercent))
+    onChange({ ...data, monthlyData: updated })
   }
 
-  const removeOpex = (idx: number) => {
-    updateField('projectedOpex', data.projectedOpex.filter((_, i) => i !== idx))
+  const removeOpex = (opexName: string) => {
+    const updated = months.map(m => recalcMonth({
+      ...m,
+      opexBreakdown: m.opexBreakdown.filter(o => o.name !== opexName),
+    }, data.cogsPercent))
+    onChange({ ...data, monthlyData: updated })
   }
+
+  const updateCogsPercent = (pct: number) => {
+    const updated = months.map(m => recalcMonth(m, pct))
+    onChange({ ...data, cogsPercent: pct, monthlyData: updated })
+  }
+
+  // Totals
+  const getTotal = (key: keyof ClassifiedMonthlyProjectionRow): number =>
+    months.reduce((sum, m) => sum + (Number(m[key]) || 0), 0)
+  const getOpexTotal = (name: string): number =>
+    months.reduce((sum, m) => sum + (m.opexBreakdown.find(o => o.name === name)?.amount ?? 0), 0)
+
+  interface RowDef {
+    label: string
+    type: 'revenue' | 'calculated' | 'opex' | 'separator'
+    key?: keyof ClassifiedMonthlyProjectionRow
+    opexName?: string
+    isBold?: boolean
+    className?: string
+  }
+
+  const rows: RowDef[] = [
+    { label: 'Projected Revenue', type: 'revenue', key: 'projectedRevenue', isBold: true },
+    { label: 'COGS', type: 'calculated', key: 'projectedCogs', className: 'text-red-600' },
+    { label: 'Gross Profit', type: 'calculated', key: 'projectedGrossProfit', isBold: true, className: 'text-green-700' },
+    ...opexNames.map(name => ({
+      label: name,
+      type: 'opex' as const,
+      opexName: name,
+      className: 'text-muted-foreground text-xs',
+    })),
+    { label: 'Total Opex', type: 'calculated', key: 'totalOpex', className: 'text-red-600 font-medium' },
+    { label: 'Net Profit', type: 'calculated', key: 'projectedNetProfit', isBold: true },
+  ]
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Label className="w-16 text-sm">Periode:</Label>
-        <div className="w-64">
-          <MonthYearPicker value={data.period} onChange={(v) => onChange({ ...data, period: v })} />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <FinancialRow
-          label="Projected Revenue"
-          value={data.projectedRevenue}
-          onValueChange={v => updateField('projectedRevenue', v)}
-        />
-        <div className="flex items-center gap-3 rounded-md border px-3 py-2">
-          <span className="flex-1 text-sm">COGS %</span>
+      {/* Header controls */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm">COGS %:</Label>
           <Input
             type="number"
-            value={data.projectedCogsPercent}
-            onChange={e => updateField('projectedCogsPercent', Number(e.target.value))}
-            className="h-7 w-24 text-right text-sm"
+            value={data.cogsPercent}
+            onChange={e => updateCogsPercent(Number(e.target.value))}
+            className="h-8 w-20 text-right text-sm"
           />
-          <div className="w-28" />
-          <div className="w-8" />
         </div>
-        <FinancialRow label="Projected COGS" value={data.projectedCogs} isCalculated />
-        <FinancialRow label="Projected Gross Profit" value={data.projectedGrossProfit} isCalculated />
-
-        <div className="ml-2 mt-3 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Detail Projected Opex
-            </span>
-            <Button type="button" variant="ghost" size="sm" onClick={addOpex} className="h-6 text-xs">
-              <Plus className="mr-1 h-3 w-3" /> Tambah
-            </Button>
-          </div>
-          {data.projectedOpex.map((item, i) => (
-            <FinancialRow
-              key={i}
-              label={item.name}
-              value={item.amount}
-              isStandard={item.isStandard}
-              onLabelChange={v => updateOpex(i, { name: v })}
-              onValueChange={v => updateOpex(i, { amount: v })}
-              onRemove={() => removeOpex(i)}
-            />
-          ))}
-        </div>
-
-        <FinancialRow label="Projected Total Opex" value={data.projectedTotalOpex} isCalculated />
-        <FinancialRow label="Projected Net Profit" value={data.projectedNetProfit} isCalculated />
       </div>
 
+      {/* Scrollable table */}
+      <div className="rounded-lg border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-muted/50 border-b">
+                <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
+                  <div className="flex items-center justify-between">
+                    <span>Variable</span>
+                    <Button type="button" variant="ghost" size="sm" onClick={addOpex} className="h-6 text-xs">
+                      <Plus className="mr-1 h-3 w-3" /> Opex
+                    </Button>
+                  </div>
+                </th>
+                {months.map(m => (
+                  <th key={m.month} className="px-3 py-2.5 text-right font-medium whitespace-nowrap min-w-[140px]">
+                    {formatPeriod(m.month)}
+                  </th>
+                ))}
+                <th className="px-3 py-2.5 text-right font-semibold whitespace-nowrap min-w-[150px] border-l bg-muted/80">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((row, ri) => {
+                const isNetProfit = row.key === 'projectedNetProfit'
+                return (
+                  <tr key={ri} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
+                    {/* Label cell */}
+                    <td className={cn(
+                      'sticky left-0 z-10 bg-white px-4 py-1.5 border-r',
+                      row.isBold && 'font-semibold bg-muted/20',
+                      row.type === 'opex' && 'pl-8',
+                    )}>
+                      {row.type === 'opex' ? (
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            value={row.label}
+                            onChange={e => updateOpexLabel(row.opexName!, e.target.value)}
+                            className="h-6 border-none bg-transparent px-0 text-xs shadow-none focus-visible:ring-0 flex-1 min-w-0"
+                          />
+                          {isDiscovered(row.opexName!) && (
+                            <Badge variant="warning" className="text-[9px] shrink-0">
+                              <Sparkles className="mr-0.5 h-2.5 w-2.5" />
+                              Baru
+                            </Badge>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeOpex(row.opexName!)}
+                            className="rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 shrink-0"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={row.className?.includes('text-') ? row.className : ''}>
+                          {row.label}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Month cells */}
+                    {months.map((m, mi) => {
+                      const isEditable = row.type === 'revenue' || row.type === 'opex'
+                      let val: number
+
+                      if (row.type === 'opex') {
+                        val = m.opexBreakdown.find(o => o.name === row.opexName)?.amount ?? 0
+                      } else {
+                        val = Number(m[row.key!]) || 0
+                      }
+
+                      const colorClass = isNetProfit
+                        ? val >= 0 ? 'text-green-600' : 'text-red-600'
+                        : row.className ?? ''
+
+                      return (
+                        <td key={m.month} className={cn(
+                          'px-2 py-1.5 text-right whitespace-nowrap',
+                          !isEditable && 'tabular-nums',
+                          !isEditable && colorClass,
+                          row.isBold && 'font-semibold',
+                        )}>
+                          {isEditable ? (
+                            <Input
+                              type="number"
+                              value={val}
+                              onChange={e => {
+                                const v = Number(e.target.value)
+                                if (row.type === 'revenue') updateMonthField(mi, 'projectedRevenue', v)
+                                else updateOpexAmount(mi, row.opexName!, v)
+                              }}
+                              className="h-7 w-full text-right text-xs tabular-nums"
+                            />
+                          ) : (
+                            formatCurrencyExact(val)
+                          )}
+                        </td>
+                      )
+                    })}
+
+                    {/* Total column */}
+                    <td className={cn(
+                      'px-3 py-1.5 text-right whitespace-nowrap tabular-nums border-l font-semibold',
+                      isNetProfit
+                        ? (getTotal(row.key!) >= 0 ? 'text-green-600' : 'text-red-600')
+                        : row.className?.replace('text-xs', '') ?? '',
+                    )}>
+                      {row.type === 'opex'
+                        ? formatCurrencyExact(getOpexTotal(row.opexName!))
+                        : formatCurrencyExact(getTotal(row.key!))
+                      }
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Assumptions */}
       <div>
         <Label className="text-sm">Asumsi</Label>
         <textarea

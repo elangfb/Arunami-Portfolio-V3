@@ -29,6 +29,7 @@ export function buildPeriodKey(month: string, year: string): string {
 
 /** Parse month and year from a "YYYY-MM" string */
 export function parsePeriodKey(period: string): { month: string; year: string } | null {
+  if (!period) return null
   const match = period.match(/^(\d{4})-(\d{2})$/)
   if (!match) return null
   return { year: match[1], month: match[2] }
