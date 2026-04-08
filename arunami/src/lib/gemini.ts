@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import type {
   PnLExtractedData, ProjectionExtractedData, PortfolioConfig,
   ClassifiedPnLData, ClassifiedProjectionData, PortfolioSetupExtraction,
-  IndustryType,
+  IndustryType, ProjectionUploadPending,
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 
@@ -48,7 +48,7 @@ function buildPnLPrompt(config?: PortfolioConfig): string {
   return `
 Kamu adalah asisten keuangan. Ekstrak data PnL berikut dari dokumen dan kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
 {
-  "period": "string (contoh: Januari 2024)",
+  "period": "string format YYYY-MM (contoh: 2024-01 untuk Januari 2024)",
   "revenue": number,
   "cogs": number,
   "grossProfit": number,
@@ -67,7 +67,7 @@ Jika data untuk suatu kategori unit tidak ditemukan, isi dengan 0.
 const PROJECTION_PROMPT = `
 Kamu adalah asisten keuangan. Ekstrak data proyeksi keuangan berikut dan kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
 {
-  "period": "string",
+  "period": "string format YYYY-MM (contoh: 2024-01 untuk Januari 2024)",
   "projectedRevenue": number,
   "projectedCogs": number,
   "projectedGrossProfit": number,
@@ -107,7 +107,7 @@ Kamu adalah asisten keuangan untuk platform manajemen portofolio investasi Indon
 
 Analisis dokumen keuangan ini dan kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
 {
-  "period": "string (contoh: Januari 2024)",
+  "period": "string format YYYY-MM (contoh: 2024-01 untuk Januari 2024)",
   "revenue": number,
   "cogs": number,
   "grossProfit": number,
@@ -135,7 +135,7 @@ Kamu adalah asisten keuangan untuk platform manajemen portofolio investasi Indon
 
 Analisis dokumen proyeksi keuangan ini dan kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
 {
-  "period": "string",
+  "period": "string format YYYY-MM (contoh: 2024-01 untuk Januari 2024)",
   "projectedRevenue": number,
   "projectedCogsPercent": number,
   "projectedCogs": number,
@@ -261,6 +261,40 @@ export async function extractPortfolioSetup(
   }
 
   return { pnl, projection, discoveredVariables, suggestedKpis }
+}
+
+// ─── Monthly Projection Extraction (Analyst Review) ────────────────────
+
+const PROJECTION_MONTHLY_PROMPT = `
+Kamu adalah asisten keuangan. Ekstrak data proyeksi keuangan BULANAN dari dokumen berikut.
+Kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
+{
+  "period": "string (contoh: April 2026 - Maret 2027)",
+  "assumptions": "string",
+  "cogsPercent": number,
+  "monthlyData": [
+    {
+      "month": "string format YYYY-MM (contoh: 2026-04 untuk April 2026)",
+      "projectedRevenue": number,
+      "projectedCogs": number,
+      "projectedGrossProfit": number,
+      "opexBreakdown": [{"name": "string", "amount": number}],
+      "totalOpex": number,
+      "projectedNetProfit": number
+    }
+  ]
+}
+ATURAN:
+- Sertakan data untuk SETIAP bulan yang ada di dokumen (jangan diringkas/diaggregat)
+- Semua nilai moneter dalam IDR (angka saja, tanpa simbol Rp atau titik ribuan)
+- cogsPercent = rata-rata persentase COGS terhadap revenue dari seluruh bulan
+- Jika hanya ada data tahunan/total tanpa breakdown bulanan, buat satu entry saja
+`
+
+export async function extractProjectionMonthly(file: File): Promise<ProjectionUploadPending> {
+  const raw = await sendToGemini(file, PROJECTION_MONTHLY_PROMPT)
+  const parsed = JSON.parse(raw) as ProjectionUploadPending
+  return { ...parsed, status: 'pending_review' }
 }
 
 // ─── Legacy extraction functions (used by analyst pages) ─────────────────

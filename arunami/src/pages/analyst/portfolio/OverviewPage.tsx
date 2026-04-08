@@ -9,6 +9,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2, AlertTriangle } from 'lucide-react'
+import { formatPeriod } from '@/lib/dateUtils'
 import type { FinancialData, Portfolio } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -108,7 +109,7 @@ export default function OverviewPage() {
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={data.revenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
                 <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v) => formatCurrencyCompact(v as number)} />
                 <Legend />

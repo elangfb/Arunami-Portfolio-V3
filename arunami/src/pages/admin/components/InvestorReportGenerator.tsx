@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { saveCommunication } from '@/lib/firestore'
 import { calculateInvestorROI } from '@/lib/roi'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
+import { formatPeriod } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -46,7 +47,8 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
   const [sending, setSending] = useState(false)
   const reportRef = useRef<HTMLDivElement>(null)
 
-  const periodLabel = `${MONTH_NAMES_ID[Number(month)]} ${year}`
+  const periodKey = `${year}-${String(Number(month) + 1).padStart(2, '0')}`
+  const periodLabel = formatPeriod(periodKey)
 
   const togglePortfolio = (id: string) => {
     setSelectedPortfolios(prev => {
@@ -66,7 +68,7 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
 
       if (financial && config?.investorConfig?.type === 'slot_based') {
         const sc = config.investorConfig as SlotBasedConfig
-        const profitPoint = financial.profitData.find(d => d.month === periodLabel)
+        const profitPoint = financial.profitData.find(d => d.month === periodKey)
         netProfit = profitPoint?.aktual ?? 0
 
         if (netProfit !== 0) {

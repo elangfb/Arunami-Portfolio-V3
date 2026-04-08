@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { Plus, Trash2, Sparkles } from 'lucide-react'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
@@ -160,12 +161,9 @@ function PnLTab({
       {/* Period */}
       <div className="flex items-center gap-2">
         <Label className="w-16 text-sm">Periode:</Label>
-        <Input
-          value={data.period}
-          onChange={e => onChange({ ...data, period: e.target.value })}
-          className="w-48"
-          placeholder="contoh: Januari 2024"
-        />
+        <div className="w-64">
+          <MonthYearPicker value={data.period} onChange={(v) => onChange({ ...data, period: v })} />
+        </div>
       </div>
 
       {/* Main line items */}
@@ -260,12 +258,9 @@ function ProjectionTab({
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Label className="w-16 text-sm">Periode:</Label>
-        <Input
-          value={data.period}
-          onChange={e => onChange({ ...data, period: e.target.value })}
-          className="w-48"
-          placeholder="contoh: Februari 2024"
-        />
+        <div className="w-64">
+          <MonthYearPicker value={data.period} onChange={(v) => onChange({ ...data, period: v })} />
+        </div>
       </div>
 
       <div className="space-y-1.5">

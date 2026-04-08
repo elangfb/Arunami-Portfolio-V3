@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
+import { formatPeriod } from '@/lib/dateUtils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PlusCircle, Trash2 } from 'lucide-react'
 import type { ManagementReport, IssueSeverity, ActionStatus, ActionCategory, Portfolio } from '@/types'
@@ -34,7 +36,7 @@ export default function ManagementPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const { register, handleSubmit, control, reset, setValue } = useForm<FormData>({
+  const { register, handleSubmit, control, reset, setValue, watch } = useForm<FormData>({
     defaultValues: {
       period: '', businessSummary: '',
       issues: [{ id: crypto.randomUUID(), title: '', severity: 'medium', description: '' }],
@@ -92,7 +94,7 @@ export default function ManagementPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs">Periode</Label>
-                  <Input placeholder="Januari 2024" {...register('period')} />
+                  <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -186,7 +188,7 @@ export default function ManagementPage() {
             <Card key={r.id}>
               <CardHeader className="flex flex-row items-start justify-between pb-3">
                 <div>
-                  <CardTitle className="text-base">{r.period}</CardTitle>
+                  <CardTitle className="text-base">{formatPeriod(r.period)}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{r.businessSummary}</p>
                 </div>
                 <Button size="icon" variant="ghost" onClick={() => handleDelete(r.id)}>

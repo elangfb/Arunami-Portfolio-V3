@@ -12,6 +12,7 @@ import type {
   MonthlyDataPoint, CostItem, TransactionDataPoint, RevenueMixItem,
   PortfolioConfig, SlotsSummary, InvestorCommunication,
 } from '@/types'
+import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 
 // ─── Users ────────────────────────────────────────────────────────────────
 
@@ -336,9 +337,13 @@ export async function syncFinancialData(portfolioId: string) {
     getFinancialData(portfolioId),
   ])
 
-  // Sort reports by period for chronological order
+  // Normalize all periods to YYYY-MM for consistent matching
+  for (const r of pnlReports) r.period = normalizePeriod(r.period)
+  for (const r of projReports) r.period = normalizePeriod(r.period)
+
+  // Sort reports by period for chronological order (YYYY-MM sorts correctly)
   const sortByPeriod = (a: PortfolioReport, b: PortfolioReport) =>
-    a.period.localeCompare(b.period)
+    comparePeriods(a.period, b.period)
   const sortedPnl = pnlReports.sort(sortByPeriod)
   const sortedProj = projReports.sort(sortByPeriod)
 
@@ -348,13 +353,12 @@ export async function syncFinancialData(portfolioId: string) {
     projMap.set(r.period, r.extractedData as ProjectionExtractedData)
   }
 
-  // Collect all unique periods (from both PnL and projections)
+  // Collect all unique periods (from both PnL and projections), sorted chronologically
   const allPeriods = [...new Set([
     ...sortedPnl.map(r => r.period),
     ...sortedProj.map(r => r.period),
-  ])]
+  ])].sort(comparePeriods)
 
-  
   // Build a map of PnL data keyed by period
   const pnlMap = new Map<string, PnLExtractedData>()
   for (const r of sortedPnl) {

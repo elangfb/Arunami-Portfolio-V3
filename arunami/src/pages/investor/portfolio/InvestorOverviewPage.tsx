@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DollarSign, TrendingUp, BarChart2, PieChart } from 'lucide-react'
+import { formatPeriod } from '@/lib/dateUtils'
 import type { FinancialData, Portfolio, InvestorAllocation, SlotBasedConfig } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -112,7 +113,7 @@ export default function InvestorOverviewPage() {
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={revenueChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
               <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
               <Tooltip formatter={v => formatCurrencyCompact(v as number)} />
               <Bar dataKey="aktual" fill="#1e5f3f" name="Revenue" radius={[4,4,0,0]} />

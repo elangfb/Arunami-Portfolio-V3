@@ -7,6 +7,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie,
 } from 'recharts'
+import { formatPeriod } from '@/lib/dateUtils'
 import type { FinancialData, Portfolio } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -53,7 +54,7 @@ export default function RevenuePage() {
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={data.revenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
                 <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={v => formatCurrencyCompact(v as number)} />
                 <Legend />
@@ -70,7 +71,7 @@ export default function RevenuePage() {
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={data.profitData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
                 <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={v => formatCurrencyCompact(v as number)} />
                 <Legend />
@@ -132,7 +133,7 @@ export default function RevenuePage() {
             <tbody>
               {varianceData.map(row => (
                 <tr key={row.month} className="border-b hover:bg-muted/30">
-                  <td className="py-2 pr-4 font-medium">{row.month}</td>
+                  <td className="py-2 pr-4 font-medium">{formatPeriod(row.month)}</td>
                   <td className="text-right py-2 px-4">{formatCurrencyCompact(row.revenueAktual)}</td>
                   <td className="text-right py-2 px-4">{formatCurrencyCompact(row.revenueProyeksi)}</td>
                   <td className={`text-right py-2 px-4 font-medium ${row.revenueVar >= 0 ? 'text-green-600' : 'text-red-500'}`}>

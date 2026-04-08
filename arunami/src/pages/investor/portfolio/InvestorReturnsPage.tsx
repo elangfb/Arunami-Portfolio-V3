@@ -6,6 +6,7 @@ import { formatCurrencyExact, formatCurrencyCompact, formatPercent } from '@/lib
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { formatPeriod } from '@/lib/dateUtils'
 import type { FinancialData, Portfolio, InvestorAllocation, SlotBasedConfig } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -127,7 +128,7 @@ export default function InvestorReturnsPage() {
             <tbody>
               {monthlyBreakdown.map(row => (
                 <tr key={row.month} className="border-b hover:bg-muted/30">
-                  <td className="py-2.5 font-medium">{row.month}</td>
+                  <td className="py-2.5 font-medium">{formatPeriod(row.month)}</td>
                   <td className="text-right py-2.5">{formatCurrencyCompact(row.netProfit)}</td>
                   <td className="text-right py-2.5">{formatCurrencyCompact(row.myEarnings)}</td>
                   <td className={`text-right py-2.5 font-medium ${row.monthlyROI >= 0 ? 'text-green-600' : 'text-red-500'}`}>

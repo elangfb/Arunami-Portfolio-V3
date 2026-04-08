@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { extractProjection } from '@/lib/gemini'
+import { extractProjection, extractProjectionMonthly } from '@/lib/gemini'
 import { getReports, saveReport, updateReport, deleteReport, syncFinancialData } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact } from '@/lib/utils'
@@ -16,7 +16,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react'
-import type { ProjectionExtractedData, OpexItem, PortfolioReport, Portfolio } from '@/types'
+import { ProjectionReviewTable } from '@/components/ProjectionReviewTable'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
+import { formatPeriod, normalizePeriod } from '@/lib/dateUtils'
+import type { ProjectionExtractedData, ProjectionUploadPending, OpexItem, PortfolioReport, Portfolio } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -32,6 +35,8 @@ export default function ProjectionsPage() {
   const [editingReport, setEditingReport] = useState<PortfolioReport | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [pendingProjection, setPendingProjection] = useState<ProjectionUploadPending | null>(null)
+  const [isConfirming, setIsConfirming] = useState(false)
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<ProjectionExtractedData>({
     defaultValues: {
@@ -95,6 +100,8 @@ export default function ProjectionsPage() {
   }
 
   const populateForm = (data: ProjectionExtractedData) => {
+    // Normalize period to YYYY-MM format
+    data.period = normalizePeriod(data.period)
     // Derive cogsPercent if AI didn't provide it
     const cogsPercent = data.projectedCogsPercent ?? (data.projectedRevenue ? (data.projectedCogs / data.projectedRevenue) * 100 : 0)
     const enriched = { ...data, projectedCogsPercent: Math.round(cogsPercent * 10) / 10 }
@@ -116,16 +123,52 @@ export default function ProjectionsPage() {
     if (file.size > 10 * 1024 * 1024) { toast.error('File maksimal 10MB'); return }
     setMode('extracting')
     try {
-      const data = await extractProjection(file)
-      setEditingReport(null)
-      populateForm(data)
-      setDialogOpen(true)
-      toast.success('Data proyeksi berhasil diekstrak')
+      const data = await extractProjectionMonthly(file)
+      setPendingProjection(data)
+      toast.success('Data proyeksi berhasil diekstrak — silakan review sebelum konfirmasi')
     } catch {
       toast.error('Gagal mengekstrak data')
     } finally {
       setMode('idle')
       if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const handleConfirmProjection = async () => {
+    if (!portfolioId || !user || !pendingProjection) return
+    setIsConfirming(true)
+    try {
+      // Save each month as an individual projection report
+      for (const month of pendingProjection.monthlyData) {
+        const normalizedPeriod = normalizePeriod(month.month)
+        const extractedData: ProjectionExtractedData = {
+          period: normalizedPeriod,
+          projectedRevenue: month.projectedRevenue,
+          projectedCogsPercent: pendingProjection.cogsPercent,
+          projectedCogs: month.projectedCogs,
+          projectedGrossProfit: month.projectedGrossProfit,
+          projectedOpex: month.opexBreakdown,
+          projectedTotalOpex: month.totalOpex,
+          projectedNetProfit: month.projectedNetProfit,
+          assumptions: pendingProjection.assumptions,
+        }
+        await saveReport(portfolioId, {
+          type: 'projection',
+          fileName: fileRef.current?.files?.[0]?.name ?? 'Upload Proyeksi Bulanan',
+          fileUrl: '',
+          period: normalizedPeriod,
+          extractedData,
+          uploadedBy: user.uid,
+        })
+      }
+      await syncFinancialData(portfolioId)
+      setPendingProjection(null)
+      fetchReports()
+      toast.success(`${pendingProjection.monthlyData.length} bulan proyeksi berhasil disimpan`)
+    } catch {
+      toast.error('Gagal menyimpan proyeksi')
+    } finally {
+      setIsConfirming(false)
     }
   }
 
@@ -233,6 +276,20 @@ export default function ProjectionsPage() {
         </CardContent>
       </Card>
 
+      {/* Analyst Review Table */}
+      {pendingProjection && (
+        <Card>
+          <CardContent className="pt-6">
+            <ProjectionReviewTable
+              data={pendingProjection}
+              onConfirm={handleConfirmProjection}
+              onCancel={() => setPendingProjection(null)}
+              isConfirming={isConfirming}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* History */}
       <Card>
         <CardHeader><CardTitle className="text-base">Riwayat Proyeksi ({reports.length})</CardTitle></CardHeader>
@@ -260,7 +317,7 @@ export default function ProjectionsPage() {
                 return (
                   <div key={r.id} className="py-3 flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-sm">{r.period}</p>
+                      <p className="font-medium text-sm">{formatPeriod(r.period)}</p>
                       <p className="text-xs text-muted-foreground">{r.fileName}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -294,8 +351,8 @@ export default function ProjectionsPage() {
             {/* Period & Revenue */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs">Periode (cth: Januari 2024)</Label>
-                <Input {...register('period')} type="text" className="text-sm" />
+                <Label className="text-xs">Periode</Label>
+                <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Projected Revenue (IDR)</Label>

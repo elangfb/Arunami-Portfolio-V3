@@ -34,6 +34,8 @@ import InvestorPortfolioLayout from '@/pages/investor/portfolio/InvestorPortfoli
 import InvestorOverviewPage from '@/pages/investor/portfolio/InvestorOverviewPage'
 import InvestorReturnsPage from '@/pages/investor/portfolio/InvestorReturnsPage'
 import InvestorReportPage from '@/pages/investor/portfolio/InvestorReportPage'
+import InvestorManagementPage from '@/pages/investor/portfolio/InvestorManagementPage'
+import InvestorNotesPage from '@/pages/investor/portfolio/InvestorNotesPage'
 
 function RootRedirect() {
   const { user, loading } = useAuthStore()
@@ -120,7 +122,11 @@ export default function App() {
           >
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<InvestorOverviewPage />} />
+            <Route path="revenue" element={<RevenuePage />} />
+            <Route path="costs" element={<CostsPage />} />
             <Route path="returns" element={<InvestorReturnsPage />} />
+            <Route path="management" element={<InvestorManagementPage />} />
+            <Route path="notes" element={<InvestorNotesPage />} />
             <Route path="report" element={<InvestorReportPage />} />
           </Route>
 

@@ -16,6 +16,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
+import { formatPeriod, normalizePeriod } from '@/lib/dateUtils'
 import type { PnLExtractedData, OpexItem, PortfolioReport, Portfolio, PortfolioConfig, RevenueCategory } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -112,6 +114,8 @@ export default function PnLPage() {
 
   // Populate form from extracted data
   const populateForm = (data: PnLExtractedData) => {
+    // Normalize period to YYYY-MM format
+    data.period = normalizePeriod(data.period)
     Object.entries(data).forEach(([k, v]) => {
       if (k !== 'opex' && k !== 'unitBreakdown') {
         setValue(k as keyof PnLExtractedData, v as never)
@@ -261,7 +265,7 @@ export default function PnLPage() {
                 return (
                   <div key={r.id} className="py-3 flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-sm">{r.period}</p>
+                      <p className="font-medium text-sm">{formatPeriod(r.period)}</p>
                       <p className="text-xs text-muted-foreground">{r.fileName}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -293,8 +297,11 @@ export default function PnLPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit(onSave)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs">Periode</Label>
+                <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} />
+              </div>
               {([
-                ['period', 'Periode (cth: Januari 2024)', false],
                 ['revenue', 'Revenue (IDR)', false],
                 ['cogs', 'COGS (IDR)', false],
                 ['grossProfit', 'Gross Profit (IDR)', true],
@@ -308,8 +315,8 @@ export default function PnLPage() {
                 <div key={field} className="space-y-1">
                   <Label className="text-xs">{label}</Label>
                   <Input
-                    {...register(field, { valueAsNumber: field !== 'period' })}
-                    type={field === 'period' ? 'text' : 'number'}
+                    {...register(field, { valueAsNumber: true })}
+                    type="number"
                     readOnly={readOnly}
                     className={`text-sm ${readOnly ? 'bg-muted cursor-not-allowed' : ''}`}
                   />

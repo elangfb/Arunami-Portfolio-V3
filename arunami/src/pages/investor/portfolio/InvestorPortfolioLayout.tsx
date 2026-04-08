@@ -1,22 +1,41 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useParams, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useParams, useNavigate, Link } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
-import { getPortfolio, getAllocationsForInvestor } from '@/lib/firestore'
+import { getPortfolio } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
-import { useReportFilterStore } from '@/store/reportFilterStore'
 import { cn } from '@/lib/utils'
-import type { Portfolio, InvestorAllocation } from '@/types'
-import { TrendingUp, LayoutDashboard, TrendingDown, FileText, LogOut } from 'lucide-react'
+import type { Portfolio } from '@/types'
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectSeparator,
-} from '@/components/ui/select'
+  TrendingUp, LayoutDashboard, TrendingDown, BarChart2,
+  DollarSign, ClipboardList, StickyNote, FileText,
+  ChevronLeft, LogOut,
+} from 'lucide-react'
 
-const navItems = [
-  { to: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { to: 'returns', label: 'Return Saya', icon: TrendingDown },
-  { to: 'report', label: 'Laporan Investor', icon: FileText },
+const navGroups = [
+  {
+    label: 'Analisis Finansial',
+    items: [
+      { to: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { to: 'revenue', label: 'Revenue & Profit', icon: BarChart2 },
+      { to: 'costs', label: 'Struktur Biaya', icon: DollarSign },
+      { to: 'returns', label: 'Return Saya', icon: TrendingDown },
+    ],
+  },
+  {
+    label: 'Management & Notes',
+    items: [
+      { to: 'management', label: 'Management Report', icon: ClipboardList },
+      { to: 'notes', label: 'Arunami Notes', icon: StickyNote },
+    ],
+  },
+  {
+    label: 'Laporan',
+    items: [
+      { to: 'report', label: 'Laporan Investor', icon: FileText },
+    ],
+  },
 ]
 
 export default function InvestorPortfolioLayout() {
@@ -24,16 +43,10 @@ export default function InvestorPortfolioLayout() {
   const navigate = useNavigate()
   const { user, setUser } = useAuthStore()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
-  const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
-  const { selectedFilter, setSelectedFilter } = useReportFilterStore()
 
   useEffect(() => {
     if (id) getPortfolio(id).then(setPortfolio)
   }, [id])
-
-  useEffect(() => {
-    if (user) getAllocationsForInvestor(user.uid).then(setAllocations)
-  }, [user])
 
   const handleLogout = async () => {
     await signOut(auth); setUser(null)
@@ -43,7 +56,7 @@ export default function InvestorPortfolioLayout() {
 
   return (
     <div className="flex h-screen bg-background">
-      <aside className="flex w-60 flex-col flex-shrink-0" style={{ background: 'var(--sidebar-bg)' }}>
+      <aside className="flex w-64 flex-col flex-shrink-0" style={{ background: 'var(--sidebar-bg)' }}>
         <div className="flex h-16 items-center gap-3 px-4 border-b border-white/10">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38a169]">
             <TrendingUp className="h-5 w-5 text-white" />
@@ -51,43 +64,40 @@ export default function InvestorPortfolioLayout() {
           <span className="text-base font-bold text-white truncate">{portfolio?.name ?? 'ARUNAMI'}</span>
         </div>
 
-        {/* Project filter dropdown */}
-        <div className="px-3 pt-3">
-          <Select value={selectedFilter} onValueChange={setSelectedFilter}>
-            <SelectTrigger className="h-9 bg-white/5 border-white/10 text-white text-xs hover:bg-white/10 focus:ring-[#38a169]">
-              <SelectValue placeholder="Pilih Proyek" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Proyek</SelectItem>
-              {allocations.length > 0 && <SelectSeparator />}
-              {allocations.map((a) => (
-                <SelectItem key={a.portfolioId} value={a.portfolioId}>
-                  {a.portfolioName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Back link */}
+        <div className="px-4 pt-3">
+          <Link to="/investor" className="flex items-center gap-2 text-xs text-[#9ca3af] hover:text-white transition-colors">
+            <ChevronLeft className="h-3 w-3" /> Kembali ke Dashboard
+          </Link>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-[#38a169]/20 text-[#38a169]'
-                    : 'text-[#9ca3af] hover:bg-white/5 hover:text-white',
-                )
-              }
-            >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {label}
-            </NavLink>
+        {/* Grouped navigation */}
+        <div className="flex-1 overflow-y-auto py-4 space-y-4">
+          {navGroups.map(group => (
+            <div key={group.label} className="px-3">
+              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6b7280]">{group.label}</p>
+              <div className="space-y-0.5">
+                {group.items.map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-[#38a169]/20 text-[#38a169]'
+                          : 'text-[#9ca3af] hover:bg-white/5 hover:text-white',
+                      )
+                    }
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
-        </nav>
+        </div>
 
         <div className="border-t border-white/10 p-4">
           <div className="mb-3 flex items-center gap-3">

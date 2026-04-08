@@ -197,6 +197,28 @@ export interface PortfolioReport {
 
 // ─── AI Extraction with Classification ───────────────────────────────────
 
+// ─── Monthly Projection (Analyst Review) ────────────────────────────────
+
+export interface MonthlyProjectionRow {
+  month: string
+  projectedRevenue: number
+  projectedCogs: number
+  projectedGrossProfit: number
+  opexBreakdown: OpexItem[]
+  totalOpex: number
+  projectedNetProfit: number
+}
+
+export interface ProjectionUploadPending {
+  period: string
+  assumptions: string
+  cogsPercent: number
+  monthlyData: MonthlyProjectionRow[]
+  status: 'pending_review' | 'confirmed'
+}
+
+// ─── AI Extraction with Classification ───────────────────────────────────
+
 export interface ClassifiedOpexItem extends OpexItem {
   isStandard: boolean
 }

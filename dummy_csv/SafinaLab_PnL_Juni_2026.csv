@@ -1,0 +1,42 @@
+Laporan Laba Rugi - SafinaLab.id
+Periode: Juni 2026
+
+Bulan,Revenue,COGS,Gross Profit,Gaji & Tunjangan,Sewa Gedung,Listrik & Air,Internet & Cloud,Marketing Digital,Transportasi,Maintenance Alat,Perlengkapan,Asuransi,Total Opex,Net Profit
+Jun 2026,257800000,90730000,167070000,45000000,15000000,5050000,3200000,12500000,4350000,4200000,1550000,2500000,93350000,71920000
+
+Kategori,Jumlah (IDR)
+Pendapatan / Revenue,257800000
+  - Tes Darah Lengkap (CBC),103120000
+  - Panel Metabolik,56716000
+  - Tes Hormon & Tiroid,51560000
+  - Tes Alergi & Imunologi,25780000
+  - Layanan Home Visit,20624000
+
+Harga Pokok Penjualan (COGS),90730000
+  - Reagent & Bahan Lab,53500000
+  - Kit Pengujian,21600000
+  - Consumables (tabung, jarum, dll),15630000
+
+Laba Kotor / Gross Profit,167070000
+
+Beban Operasional (Opex):
+  Gaji & Tunjangan Staff,45000000
+  Sewa Gedung Lab,15000000
+  Listrik & Air,5050000
+  Internet & Cloud Server,3200000
+  Marketing Digital,12500000
+  Transportasi Home Visit,4350000
+  Maintenance Alat Lab,4200000
+  Perlengkapan Kantor (ATK),1550000
+  Asuransi,2500000
+Total Beban Operasional,93350000
+
+Laba Operasional / Operating Profit,73720000
+
+Bunga Bank,750000
+Pajak,1050000
+
+Laba Bersih / Net Profit,71920000
+
+Jumlah Transaksi: 1980
+Catatan: Revenue -1% dari proyeksi. Listrik naik karena AC lab berjalan lebih lama di musim kemarau. Maintenance alat lab sesuai jadwal investasi Q2.

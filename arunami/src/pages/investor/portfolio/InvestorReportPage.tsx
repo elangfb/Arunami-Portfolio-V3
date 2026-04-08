@@ -8,10 +8,12 @@ import {
 } from '@/lib/firestore'
 import { calculateInvestorROI } from '@/lib/roi'
 import { formatCurrencyExact, formatPercent } from '@/lib/utils'
+import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { useReportFilterStore } from '@/store/reportFilterStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Printer, TrendingUp, AlertTriangle } from 'lucide-react'
 import type {
   InvestorAllocation,
@@ -54,7 +56,7 @@ function computeSummary(data: PortfolioReportData[]): ReportSummary {
 
 export default function InvestorReportPage() {
   const { user } = useAuthStore()
-  const selectedFilter = useReportFilterStore((s) => s.selectedFilter)
+  const { selectedFilter, setSelectedFilter } = useReportFilterStore()
   const [allData, setAllData] = useState<PortfolioReportData[]>([])
   const [filteredData, setFilteredData] = useState<PortfolioReportData[]>([])
   const [summary, setSummary] = useState<ReportSummary>({ portfolioCount: 0, totalInvested: 0, totalEarnings: 0, avgMonthlyROI: 0 })
@@ -81,7 +83,7 @@ export default function InvestorReportPage() {
           ])
 
           // Find latest PnL by sorting reports by period
-          const sortedPnl = pnlReports.sort((a, b) => a.period.localeCompare(b.period))
+          const sortedPnl = pnlReports.sort((a, b) => comparePeriods(normalizePeriod(a.period), normalizePeriod(b.period)))
           const latestPnL = sortedPnl.at(-1)?.extractedData as PnLExtractedData | null ?? null
 
           // Calculate investor-specific ROI
@@ -162,10 +164,25 @@ export default function InvestorReportPage() {
       {/* Toolbar — hidden when printing */}
       <div className="sticky top-0 z-10 bg-background border-b px-6 py-3 flex items-center justify-between print:hidden">
         <h2 className="text-lg font-bold">Laporan Investor</h2>
-        <Button onClick={() => window.print()} size="sm">
-          <Printer className="mr-2 h-4 w-4" />
-          Print / Simpan PDF
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+            <SelectTrigger className="h-9 w-48 text-xs">
+              <SelectValue placeholder="Pilih Proyek" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Proyek</SelectItem>
+              {allData.map((d) => (
+                <SelectItem key={d.allocation.portfolioId} value={d.allocation.portfolioId}>
+                  {d.portfolio.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={() => window.print()} size="sm">
+            <Printer className="mr-2 h-4 w-4" />
+            Print / Simpan PDF
+          </Button>
+        </div>
       </div>
 
       {/* Report body — key forces full re-render on filter change */}
@@ -236,7 +253,7 @@ function PortfolioSection({ data, isFirst }: { data: PortfolioReportData; isFirs
   const { allocation, portfolio, financialData, latestPnL, managementReports, roi } = data
 
   // Sort management reports to get the latest
-  const sortedMgmt = [...managementReports].sort((a, b) => b.period.localeCompare(a.period))
+  const sortedMgmt = [...managementReports].sort((a, b) => comparePeriods(normalizePeriod(b.period), normalizePeriod(a.period)))
   const latestMgmt = sortedMgmt[0] ?? null
 
   const lastRevenue = financialData?.revenueData.at(-1)?.aktual ?? latestPnL?.revenue ?? 0
@@ -283,7 +300,7 @@ function PortfolioSection({ data, isFirst }: { data: PortfolioReportData; isFirs
               {latestPnL ? (
                 <InfoTable
                   rows={[
-                    ['Periode', latestPnL.period],
+                    ['Periode', formatPeriod(latestPnL.period)],
                     ['Revenue', formatCurrencyExact(latestPnL.revenue)],
                     ['COGS', formatCurrencyExact(latestPnL.cogs)],
                     ['Gross Profit', formatCurrencyExact(latestPnL.grossProfit)],
@@ -324,7 +341,7 @@ function PortfolioSection({ data, isFirst }: { data: PortfolioReportData; isFirs
           {latestMgmt && (
             <div className="report-no-break">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Ringkasan Manajemen — {latestMgmt.period}
+                Ringkasan Manajemen — {formatPeriod(latestMgmt.period)}
               </h4>
 
               {latestMgmt.businessSummary && (
