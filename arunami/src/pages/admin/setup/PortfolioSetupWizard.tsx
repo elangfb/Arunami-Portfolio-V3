@@ -45,7 +45,7 @@ const wizardSchema = z.object({
   industryType: z.enum(['retail', 'saas', 'fnb', 'jasa', 'manufaktur', 'lainnya']),
   stage: z.string().min(1, 'Tahap wajib diisi'),
   periode: z.string().min(1, 'Periode wajib diisi'),
-  investasiAwal: z.number().min(0, 'Investasi awal minimal 0'),
+  investasiAwal: z.number().min(0, 'Total investasi minimal 0'),
   description: z.string().optional().default(''),
   isGracePeriod: z.boolean().default(false),
 
@@ -122,7 +122,7 @@ export default function PortfolioSetupWizard() {
       investorSharePercent: 70,
       arunamiFeePercent: 10,
       totalSlots: 10,
-      nominalPerSlot: 5000000,
+      nominalPerSlot: 0,
       kpiMetrics: INDUSTRY_PRESETS.retail.kpiMetrics,
     },
     mode: 'onBlur',

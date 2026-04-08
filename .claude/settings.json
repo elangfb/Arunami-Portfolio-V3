@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm install:*)",
       "Read(//d/Work/Arunami Portfolio/**)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "mcp__claude_ai_Figma__generate_diagram"
     ]
   }
 }

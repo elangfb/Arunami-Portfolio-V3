@@ -92,7 +92,7 @@ export default function StepBasicInfo({ form }: Props) {
             {errors.periode && <p className="text-xs text-red-500">{errors.periode.message}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="investasiAwal">Investasi Awal (IDR) *</Label>
+            <Label htmlFor="investasiAwal">Total Investasi (IDR) *</Label>
             <Input
               id="investasiAwal"
               type="number"

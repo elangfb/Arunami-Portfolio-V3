@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,6 +32,18 @@ export default function StepInvestorModel({ form }: Props) {
   const { register, formState: { errors }, setValue, watch } = form
   const returnModel = watch('returnModel')
   const reportingFrequency = watch('reportingFrequency')
+  const investasiAwal = watch('investasiAwal')
+  const totalSlots = watch('totalSlots')
+
+  const nominalPerSlot = totalSlots && totalSlots > 0
+    ? Math.floor(investasiAwal / totalSlots)
+    : 0
+
+  useEffect(() => {
+    if (returnModel === 'slot_based') {
+      setValue('nominalPerSlot', nominalPerSlot)
+    }
+  }, [returnModel, nominalPerSlot, setValue])
 
   return (
     <Card>
@@ -120,16 +133,15 @@ export default function StepInvestorModel({ form }: Props) {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nominalPerSlot">Nominal per Slot (IDR) *</Label>
-              <Input
-                id="nominalPerSlot"
-                type="number"
-                placeholder="5000000"
-                {...register('nominalPerSlot', { valueAsNumber: true })}
-              />
-              {errors.nominalPerSlot && (
-                <p className="text-xs text-red-500">{errors.nominalPerSlot.message}</p>
-              )}
+              <Label>Nominal per Slot (IDR)</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm">
+                {nominalPerSlot > 0
+                  ? `Rp ${nominalPerSlot.toLocaleString('id-ID')}`
+                  : '-'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Otomatis: Total Investasi / Total Slot
+              </p>
             </div>
           </div>
         )}
