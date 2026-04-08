@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   getAllocationsForInvestor,
   getPortfolio,
@@ -8,9 +8,16 @@ import {
 } from '@/lib/firestore'
 import { calculateInvestorROI } from '@/lib/roi'
 import { formatCurrencyExact, formatPercent } from '@/lib/utils'
-import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
+import {
+  formatPeriod,
+  normalizePeriod,
+  comparePeriods,
+  extractAvailablePeriods,
+  getMonthsForPeriod,
+  formatPeriodLabel,
+} from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
-import { useReportFilterStore } from '@/store/reportFilterStore'
+import { useReportFilterStore, type PeriodType } from '@/store/reportFilterStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -31,7 +38,11 @@ interface PortfolioReportData {
   portfolio: Portfolio
   financialData: FinancialData | null
   managementReports: ManagementReport[]
-  latestPnL: PnLExtractedData | null
+  pnlByPeriod: Map<string, PnLExtractedData>
+}
+
+interface PortfolioViewData extends PortfolioReportData {
+  aggregatedPnL: PnLExtractedData | null
   roi: ReturnType<typeof calculateInvestorROI> | null
 }
 
@@ -42,7 +53,70 @@ interface ReportSummary {
   avgMonthlyROI: number
 }
 
-function computeSummary(data: PortfolioReportData[]): ReportSummary {
+// ─── Aggregation ─────────────────────────────────────────────────────────
+
+function aggregatePnLForPeriod(
+  pnlByPeriod: Map<string, PnLExtractedData>,
+  periodType: PeriodType,
+  selectedPeriod: string,
+  allAvailableMonths: string[],
+): PnLExtractedData | null {
+  const months = getMonthsForPeriod(periodType, selectedPeriod, allAvailableMonths)
+  const entries = months
+    .map((m) => pnlByPeriod.get(m))
+    .filter((e): e is PnLExtractedData => e != null)
+
+  if (entries.length === 0) return null
+  if (entries.length === 1) return entries[0]
+
+  // Sum numeric fields
+  const summed: PnLExtractedData = {
+    period: selectedPeriod,
+    revenue: 0,
+    cogs: 0,
+    grossProfit: 0,
+    opex: [],
+    totalOpex: 0,
+    operatingProfit: 0,
+    interest: 0,
+    taxes: 0,
+    netProfit: 0,
+    transactionCount: 0,
+    unitBreakdown: {},
+    notes: '',
+  }
+
+  const opexMap = new Map<string, number>()
+
+  for (const e of entries) {
+    summed.revenue += e.revenue
+    summed.cogs += e.cogs
+    summed.grossProfit += e.grossProfit
+    summed.totalOpex += e.totalOpex
+    summed.operatingProfit += e.operatingProfit
+    summed.interest += e.interest
+    summed.taxes += e.taxes
+    summed.netProfit += e.netProfit
+    summed.transactionCount += e.transactionCount ?? 0
+    if (e.unitBreakdown) {
+      for (const [key, val] of Object.entries(e.unitBreakdown)) {
+        summed.unitBreakdown[key] = (summed.unitBreakdown[key] ?? 0) + val
+      }
+    }
+    if (e.notes) {
+      summed.notes = summed.notes ? `${summed.notes}; ${e.notes}` : e.notes
+    }
+    for (const item of e.opex) {
+      opexMap.set(item.name, (opexMap.get(item.name) ?? 0) + item.amount)
+    }
+  }
+
+  summed.opex = [...opexMap.entries()].map(([name, amount]) => ({ name, amount }))
+
+  return summed
+}
+
+function computeSummary(data: PortfolioViewData[]): ReportSummary {
   const totalInvested = data.reduce((s, d) => s + d.allocation.investedAmount, 0)
   const totalEarnings = data.reduce((s, d) => s + (d.roi?.earnings ?? 0), 0)
   const weightedROI =
@@ -56,10 +130,8 @@ function computeSummary(data: PortfolioReportData[]): ReportSummary {
 
 export default function InvestorReportPage() {
   const { user } = useAuthStore()
-  const { selectedFilter, setSelectedFilter } = useReportFilterStore()
+  const { periodType, selectedPeriod, setPeriodType, setSelectedPeriod } = useReportFilterStore()
   const [allData, setAllData] = useState<PortfolioReportData[]>([])
-  const [filteredData, setFilteredData] = useState<PortfolioReportData[]>([])
-  const [summary, setSummary] = useState<ReportSummary>({ portfolioCount: 0, totalInvested: 0, totalEarnings: 0, avgMonthlyROI: 0 })
   const [loading, setLoading] = useState(true)
 
   // Fetch all portfolio data once on mount
@@ -82,23 +154,14 @@ export default function InvestorReportPage() {
             getReports(alloc.portfolioId, 'pnl'),
           ])
 
-          // Find latest PnL by sorting reports by period
-          const sortedPnl = pnlReports.sort((a, b) => comparePeriods(normalizePeriod(a.period), normalizePeriod(b.period)))
-          const latestPnL = sortedPnl.at(-1)?.extractedData as PnLExtractedData | null ?? null
-
-          // Calculate investor-specific ROI
-          let roi: ReturnType<typeof calculateInvestorROI> | null = null
-          if (finData?.investorConfig) {
-            const lastProfit = finData.profitData.at(-1)?.aktual ?? 0
-            const cfg = finData.investorConfig
-            roi = calculateInvestorROI(
-              lastProfit,
-              alloc.slots,
-              cfg.totalSlots,
-              cfg.investorSharePercent,
-              cfg.arunamiFeePercent,
-              cfg.nominalPerSlot,
-            )
+          // Build map of all PnL reports keyed by normalized period
+          const pnlByPeriod = new Map<string, PnLExtractedData>()
+          for (const report of pnlReports) {
+            const key = normalizePeriod(report.period)
+            const extracted = report.extractedData as PnLExtractedData | null
+            if (extracted) {
+              pnlByPeriod.set(key, { ...extracted, period: key })
+            }
           }
 
           return {
@@ -106,8 +169,7 @@ export default function InvestorReportPage() {
             portfolio: portfolio!,
             financialData: finData,
             managementReports: mgmtReports,
-            latestPnL,
-            roi,
+            pnlByPeriod,
           } satisfies PortfolioReportData
         }),
       )
@@ -124,14 +186,65 @@ export default function InvestorReportPage() {
     loadReport()
   }, [user])
 
-  // Re-filter whenever the dropdown selection or source data changes
-  useEffect(() => {
-    const filtered = selectedFilter === 'all'
-      ? allData
-      : allData.filter((d) => d.allocation.portfolioId === selectedFilter)
-    setFilteredData(filtered)
-    setSummary(computeSummary(filtered))
-  }, [allData, selectedFilter])
+  // Collect all available periods across all portfolios
+  const allAvailableMonths = useMemo(() => {
+    const set = new Set<string>()
+    for (const d of allData) {
+      for (const key of d.pnlByPeriod.keys()) set.add(key)
+    }
+    return [...set].sort((a, b) => b.localeCompare(a))
+  }, [allData])
+
+  const availablePeriods = useMemo(
+    () => extractAvailablePeriods(allAvailableMonths),
+    [allAvailableMonths],
+  )
+
+  // Auto-select latest period when selectedPeriod is empty
+  const effectivePeriod = useMemo(() => {
+    if (periodType === 'all') return 'all'
+    if (selectedPeriod) return selectedPeriod
+    const options =
+      periodType === 'monthly'
+        ? availablePeriods.monthly
+        : periodType === 'quarterly'
+          ? availablePeriods.quarterly
+          : availablePeriods.yearly
+    return options[0]?.value ?? ''
+  }, [periodType, selectedPeriod, availablePeriods])
+
+  // Derive period-filtered view data
+  const portfolioViewData = useMemo<PortfolioViewData[]>(() => {
+    if (!effectivePeriod) return allData.map((d) => ({ ...d, aggregatedPnL: null, roi: null }))
+
+    return allData.map((d) => {
+      const aggregatedPnL = aggregatePnLForPeriod(
+        d.pnlByPeriod,
+        periodType,
+        effectivePeriod,
+        allAvailableMonths,
+      )
+
+      let roi: ReturnType<typeof calculateInvestorROI> | null = null
+      if (d.financialData?.investorConfig && aggregatedPnL) {
+        const cfg = d.financialData.investorConfig
+        roi = calculateInvestorROI(
+          aggregatedPnL.netProfit,
+          d.allocation.slots,
+          cfg.totalSlots,
+          cfg.investorSharePercent,
+          cfg.arunamiFeePercent,
+          cfg.nominalPerSlot,
+        )
+      }
+
+      return { ...d, aggregatedPnL, roi }
+    })
+  }, [allData, periodType, effectivePeriod, allAvailableMonths])
+
+  const summary = useMemo(() => computeSummary(portfolioViewData), [portfolioViewData])
+
+  const periodLabel = effectivePeriod ? formatPeriodLabel(periodType, effectivePeriod) : '-'
 
   if (loading) {
     return (
@@ -159,25 +272,47 @@ export default function InvestorReportPage() {
     minute: '2-digit',
   })
 
+  // Period options for the second dropdown
+  const periodOptions =
+    periodType === 'monthly'
+      ? availablePeriods.monthly
+      : periodType === 'quarterly'
+        ? availablePeriods.quarterly
+        : periodType === 'yearly'
+          ? availablePeriods.yearly
+          : []
+
   return (
     <div className="min-h-screen">
       {/* Toolbar — hidden when printing */}
       <div className="sticky top-0 z-10 bg-background border-b px-6 py-3 flex items-center justify-between print:hidden">
         <h2 className="text-lg font-bold">Laporan Investor</h2>
         <div className="flex items-center gap-3">
-          <Select value={selectedFilter} onValueChange={setSelectedFilter}>
-            <SelectTrigger className="h-9 w-48 text-xs">
-              <SelectValue placeholder="Pilih Proyek" />
+          <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
+            <SelectTrigger className="h-9 w-36 text-xs">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Proyek</SelectItem>
-              {allData.map((d) => (
-                <SelectItem key={d.allocation.portfolioId} value={d.allocation.portfolioId}>
-                  {d.portfolio.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="monthly">Bulanan</SelectItem>
+              <SelectItem value="quarterly">Kuartalan</SelectItem>
+              <SelectItem value="yearly">Tahunan</SelectItem>
+              <SelectItem value="all">Semua Waktu</SelectItem>
             </SelectContent>
           </Select>
+          {periodType !== 'all' && periodOptions.length > 0 && (
+            <Select value={effectivePeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger className="h-9 w-52 text-xs">
+                <SelectValue placeholder="Pilih Periode" />
+              </SelectTrigger>
+              <SelectContent>
+                {periodOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button onClick={() => window.print()} size="sm">
             <Printer className="mr-2 h-4 w-4" />
             Print / Simpan PDF
@@ -185,14 +320,20 @@ export default function InvestorReportPage() {
         </div>
       </div>
 
-      {/* Report body — key forces full re-render on filter change */}
-      <div key={selectedFilter} className="max-w-4xl mx-auto p-8 space-y-8 print:max-w-none print:p-0">
+      {/* Report body */}
+      <div key={effectivePeriod} className="max-w-4xl mx-auto p-8 space-y-8 print:max-w-none print:p-0">
         <ReportHeader investorName={user?.displayName ?? '-'} date={now} />
 
-        <ReportSummarySection summary={summary} />
+        <ReportSummarySection summary={summary} periodType={periodType} periodLabel={periodLabel} />
 
-        {filteredData.map((data, idx) => (
-          <PortfolioSection key={data.allocation.id} data={data} isFirst={idx === 0} />
+        {portfolioViewData.map((data, idx) => (
+          <PortfolioSection
+            key={data.allocation.id}
+            data={data}
+            isFirst={idx === 0}
+            periodLabel={periodLabel}
+            periodType={periodType}
+          />
         ))}
 
         <ReportFooter date={now} />
@@ -225,12 +366,38 @@ function ReportHeader({ investorName, date }: { investorName: string; date: stri
 
 // ─── Report Summary ──────────────────────────────────────────────────────
 
-function ReportSummarySection({ summary }: { summary: ReportSummary }) {
+function ReportSummarySection({
+  summary,
+  periodType,
+  periodLabel,
+}: {
+  summary: ReportSummary
+  periodType: PeriodType
+  periodLabel: string
+}) {
+  const earningLabel =
+    periodType === 'monthly'
+      ? `Earning (${periodLabel})`
+      : periodType === 'quarterly'
+        ? `Earning (${periodLabel})`
+        : periodType === 'yearly'
+          ? `Earning (${periodLabel})`
+          : 'Earning (Total)'
+
+  const roiLabel =
+    periodType === 'monthly'
+      ? 'ROI Bulanan'
+      : periodType === 'quarterly'
+        ? 'ROI Kuartal'
+        : periodType === 'yearly'
+          ? 'ROI Tahunan'
+          : 'ROI Total'
+
   const stats = [
     { label: 'Total Portofolio', value: String(summary.portfolioCount) },
     { label: 'Total Investasi', value: formatCurrencyExact(summary.totalInvested) },
-    { label: 'Estimasi Earning (Bln Ini)', value: formatCurrencyExact(summary.totalEarnings) },
-    { label: 'Rata-rata ROI Bulanan', value: formatPercent(summary.avgMonthlyROI, true) },
+    { label: earningLabel, value: formatCurrencyExact(summary.totalEarnings) },
+    { label: roiLabel, value: formatPercent(summary.avgMonthlyROI, true) },
   ]
 
   return (
@@ -249,15 +416,35 @@ function ReportSummarySection({ summary }: { summary: ReportSummary }) {
 
 // ─── Portfolio Section ───────────────────────────────────────────────────
 
-function PortfolioSection({ data, isFirst }: { data: PortfolioReportData; isFirst: boolean }) {
-  const { allocation, portfolio, financialData, latestPnL, managementReports, roi } = data
+function PortfolioSection({
+  data,
+  isFirst,
+  periodLabel,
+  periodType,
+}: {
+  data: PortfolioViewData
+  isFirst: boolean
+  periodLabel: string
+  periodType: PeriodType
+}) {
+  const { allocation, portfolio, financialData, managementReports, aggregatedPnL, roi } = data
 
-  // Sort management reports to get the latest
-  const sortedMgmt = [...managementReports].sort((a, b) => comparePeriods(normalizePeriod(b.period), normalizePeriod(a.period)))
+  // Find management report within selected period range
+  const sortedMgmt = [...managementReports].sort((a, b) =>
+    comparePeriods(normalizePeriod(b.period), normalizePeriod(a.period)),
+  )
   const latestMgmt = sortedMgmt[0] ?? null
 
-  const lastRevenue = financialData?.revenueData.at(-1)?.aktual ?? latestPnL?.revenue ?? 0
-  const lastProfit = financialData?.profitData.at(-1)?.aktual ?? latestPnL?.netProfit ?? 0
+  const roiPeriodLabel =
+    periodType === 'monthly'
+      ? 'ROI Bulanan'
+      : periodType === 'quarterly'
+        ? 'ROI Kuartal'
+        : periodType === 'yearly'
+          ? 'ROI Tahunan'
+          : 'ROI Total'
+
+  const showAnnualROI = periodType === 'monthly'
 
   return (
     <div className={isFirst ? '' : 'report-portfolio-section'}>
@@ -292,33 +479,25 @@ function PortfolioSection({ data, isFirst }: { data: PortfolioReportData; isFirs
           </div>
 
           {/* Financial Performance */}
-          {financialData || latestPnL ? (
+          {aggregatedPnL ? (
             <div className="report-no-break">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Kinerja Keuangan (Bulan Terakhir)
+                Kinerja Keuangan — {periodLabel}
               </h4>
-              {latestPnL ? (
-                <InfoTable
-                  rows={[
-                    ['Periode', formatPeriod(latestPnL.period)],
-                    ['Revenue', formatCurrencyExact(latestPnL.revenue)],
-                    ['COGS', formatCurrencyExact(latestPnL.cogs)],
-                    ['Gross Profit', formatCurrencyExact(latestPnL.grossProfit)],
-                    ['Total Opex', formatCurrencyExact(latestPnL.totalOpex)],
-                    ['Net Profit', formatCurrencyExact(latestPnL.netProfit)],
-                  ]}
-                />
-              ) : (
-                <InfoTable
-                  rows={[
-                    ['Revenue', formatCurrencyExact(lastRevenue)],
-                    ['Net Profit', formatCurrencyExact(lastProfit)],
-                  ]}
-                />
-              )}
+              <InfoTable
+                rows={[
+                  ['Revenue', formatCurrencyExact(aggregatedPnL.revenue)],
+                  ['COGS', formatCurrencyExact(aggregatedPnL.cogs)],
+                  ['Gross Profit', formatCurrencyExact(aggregatedPnL.grossProfit)],
+                  ['Total Opex', formatCurrencyExact(aggregatedPnL.totalOpex)],
+                  ['Net Profit', formatCurrencyExact(aggregatedPnL.netProfit)],
+                ]}
+              />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground italic">Data keuangan belum tersedia.</p>
+            <p className="text-sm text-muted-foreground italic">
+              Data keuangan belum tersedia untuk periode ini.
+            </p>
           )}
 
           {/* Return Calculation */}
@@ -330,8 +509,10 @@ function PortfolioSection({ data, isFirst }: { data: PortfolioReportData; isFirs
               <InfoTable
                 rows={[
                   ['Bagian Investor (Earning)', formatCurrencyExact(roi.earnings)],
-                  ['Monthly ROI', formatPercent(roi.monthlyROI, true)],
-                  ['Annual ROI (Est.)', formatPercent(roi.annualROI, true)],
+                  [roiPeriodLabel, formatPercent(roi.monthlyROI, true)],
+                  ...(showAnnualROI
+                    ? [['Annual ROI (Est.)', formatPercent(roi.annualROI, true)] as [string, string]]
+                    : []),
                 ]}
               />
             </div>
@@ -341,7 +522,7 @@ function PortfolioSection({ data, isFirst }: { data: PortfolioReportData; isFirs
           {latestMgmt && (
             <div className="report-no-break">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Ringkasan Manajemen — {formatPeriod(latestMgmt.period)}
+                Ringkasan Manajemen — {formatPeriod(normalizePeriod(latestMgmt.period))}
               </h4>
 
               {latestMgmt.businessSummary && (

@@ -74,3 +74,110 @@ export function normalizePeriod(period: string): string {
 export function comparePeriods(a: string, b: string): number {
   return a.localeCompare(b) // YYYY-MM sorts correctly with string comparison
 }
+
+// ─── Period Grouping Helpers ────────────────────────────────────────────
+
+import type { PeriodType } from '@/store/reportFilterStore'
+
+const QUARTER_LABELS = ['Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Okt-Des'] as const
+
+/** Get quarter number (1-4) from a month string "01"-"12" */
+export function getQuarterFromMonth(month: string): number {
+  return Math.ceil(parseInt(month, 10) / 3)
+}
+
+/** Build quarter key like "2026-Q1" */
+export function buildQuarterKey(year: string, quarter: number): string {
+  return `${year}-Q${quarter}`
+}
+
+/**
+ * Given a list of YYYY-MM periods, return grouped options for each period type.
+ * All lists are sorted descending (most recent first).
+ */
+export function extractAvailablePeriods(allPeriods: string[]): {
+  monthly: { value: string; label: string }[]
+  quarterly: { value: string; label: string }[]
+  yearly: { value: string; label: string }[]
+} {
+  const unique = [...new Set(allPeriods)].sort((a, b) => b.localeCompare(a))
+
+  const monthly = unique.map((p) => ({ value: p, label: formatPeriod(p) }))
+
+  const quarterSet = new Set<string>()
+  for (const p of unique) {
+    const parsed = parsePeriodKey(p)
+    if (parsed) {
+      const q = getQuarterFromMonth(parsed.month)
+      quarterSet.add(buildQuarterKey(parsed.year, q))
+    }
+  }
+  const quarterly = [...quarterSet]
+    .sort((a, b) => b.localeCompare(a))
+    .map((qk) => {
+      const [year, qPart] = qk.split('-')
+      const qNum = parseInt(qPart.replace('Q', ''), 10)
+      return { value: qk, label: `Q${qNum} ${year} (${QUARTER_LABELS[qNum - 1]})` }
+    })
+
+  const yearSet = new Set<string>()
+  for (const p of unique) {
+    const parsed = parsePeriodKey(p)
+    if (parsed) yearSet.add(parsed.year)
+  }
+  const yearly = [...yearSet]
+    .sort((a, b) => b.localeCompare(a))
+    .map((y) => ({ value: y, label: y }))
+
+  return { monthly, quarterly, yearly }
+}
+
+/**
+ * Returns the list of YYYY-MM months covered by a period selection.
+ * For "all", pass all available months.
+ */
+export function getMonthsForPeriod(
+  periodType: PeriodType,
+  selectedPeriod: string,
+  allAvailableMonths?: string[],
+): string[] {
+  switch (periodType) {
+    case 'monthly':
+      return [selectedPeriod]
+    case 'quarterly': {
+      const match = selectedPeriod.match(/^(\d{4})-Q(\d)$/)
+      if (!match) return []
+      const [, year, q] = match
+      const startMonth = (parseInt(q, 10) - 1) * 3 + 1
+      return [0, 1, 2].map(
+        (offset) => `${year}-${String(startMonth + offset).padStart(2, '0')}`,
+      )
+    }
+    case 'yearly': {
+      return Array.from({ length: 12 }, (_, i) =>
+        `${selectedPeriod}-${String(i + 1).padStart(2, '0')}`,
+      )
+    }
+    case 'all':
+      return allAvailableMonths ?? []
+  }
+}
+
+/** Format a period selection for display labels */
+export function formatPeriodLabel(periodType: PeriodType, selectedPeriod: string): string {
+  switch (periodType) {
+    case 'monthly':
+      return formatPeriod(selectedPeriod)
+    case 'quarterly': {
+      const match = selectedPeriod.match(/^(\d{4})-Q(\d)$/)
+      if (!match) return selectedPeriod
+      const [, year, q] = match
+      const qNum = parseInt(q, 10)
+      return `Q${qNum} ${year} (${QUARTER_LABELS[qNum - 1]})`
+    }
+    case 'yearly':
+      return selectedPeriod
+    case 'all':
+      return 'Seluruh Periode'
+  }
+}

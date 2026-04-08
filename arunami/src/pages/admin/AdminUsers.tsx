@@ -19,12 +19,12 @@ const createSchema = z.object({
   displayName: z.string().min(2, 'Nama minimal 2 karakter'),
   email: z.string().email('Email tidak valid'),
   password: z.string().min(6, 'Password minimal 6 karakter'),
-  role: z.enum(['analyst', 'investor']),
+  role: z.enum(['admin', 'analyst', 'investor']),
 })
 
 const editSchema = z.object({
   displayName: z.string().min(2, 'Nama minimal 2 karakter'),
-  role: z.enum(['analyst', 'investor']),
+  role: z.enum(['admin', 'analyst', 'investor']),
 })
 
 type CreateFormData = z.infer<typeof createSchema>
@@ -75,7 +75,7 @@ export default function AdminUsers() {
 
   const openEdit = (u: AppUser) => {
     setEditTarget(u)
-    editForm.reset({ displayName: u.displayName, role: u.role as 'analyst' | 'investor' })
+    editForm.reset({ displayName: u.displayName, role: u.role as 'admin' | 'analyst' | 'investor' })
     setEditOpen(true)
   }
 
@@ -143,9 +143,10 @@ export default function AdminUsers() {
               </div>
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Select defaultValue="analyst" onValueChange={(v) => createForm.setValue('role', v as 'analyst' | 'investor')}>
+                <Select defaultValue="analyst" onValueChange={(v) => createForm.setValue('role', v as 'admin' | 'analyst' | 'investor')}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="analyst">Analis</SelectItem>
                     <SelectItem value="investor">Investor</SelectItem>
                   </SelectContent>
@@ -222,10 +223,11 @@ export default function AdminUsers() {
               <Label>Role</Label>
               <Select
                 value={editForm.watch('role')}
-                onValueChange={(v) => editForm.setValue('role', v as 'analyst' | 'investor')}
+                onValueChange={(v) => editForm.setValue('role', v as 'admin' | 'analyst' | 'investor')}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="analyst">Analis</SelectItem>
                   <SelectItem value="investor">Investor</SelectItem>
                 </SelectContent>
