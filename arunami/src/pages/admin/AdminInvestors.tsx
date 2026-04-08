@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { Search, Eye, Users, Wallet, Layers } from 'lucide-react'
-import type { AppUser, InvestorAllocation, InvestorSummary } from '@/types'
+import type { InvestorAllocation, InvestorSummary } from '@/types'
 
 export default function AdminInvestors() {
   const navigate = useNavigate()

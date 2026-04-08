@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { extractProjection, extractProjectionMonthly } from '@/lib/gemini'
+import { extractProjectionMonthly } from '@/lib/gemini'
 import { getReports, saveReport, updateReport, deleteReport, syncFinancialData } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact } from '@/lib/utils'
@@ -97,24 +97,6 @@ export default function ProjectionsPage() {
     }))
     setOpexItems(opex)
     setDialogOpen(true)
-  }
-
-  const populateForm = (data: ProjectionExtractedData) => {
-    // Normalize period to YYYY-MM format
-    data.period = normalizePeriod(data.period)
-    // Derive cogsPercent if AI didn't provide it
-    const cogsPercent = data.projectedCogsPercent ?? (data.projectedRevenue ? (data.projectedCogs / data.projectedRevenue) * 100 : 0)
-    const enriched = { ...data, projectedCogsPercent: Math.round(cogsPercent * 10) / 10 }
-    Object.entries(enriched).forEach(([k, v]) => {
-      if (k !== 'projectedOpex') {
-        setValue(k as keyof ProjectionExtractedData, v as never)
-      }
-    })
-    const opex = (data.projectedOpex ?? []).map(item => ({
-      ...item,
-      percentage: item.percentage ?? (data.projectedRevenue ? Math.round((item.amount / data.projectedRevenue) * 1000) / 10 : 0),
-    }))
-    setOpexItems(opex)
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
