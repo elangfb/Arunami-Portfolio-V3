@@ -7,12 +7,11 @@ import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatPeriod } from '@/lib/dateUtils'
-import type { FinancialData, Portfolio, InvestorAllocation, SlotBasedConfig } from '@/types'
-
-interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
+import type { FinancialData, InvestorAllocation, SlotBasedConfig } from '@/types'
+import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
 
 export default function InvestorReturnsPage() {
-  const { portfolioId } = useOutletContext<Context>()
+  const { portfolioId, selectedPeriod, availablePeriods } = useOutletContext<InvestorPortfolioOutletContext>()
   const { user } = useAuthStore()
   const [data, setData] = useState<FinancialData | null>(null)
   const [allocation, setAllocation] = useState<InvestorAllocation | null>(null)
@@ -37,6 +36,16 @@ export default function InvestorReturnsPage() {
 
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
   if (!data) return <div className="p-8 text-muted-foreground">Data return belum tersedia.</div>
+  if (availablePeriods.length === 0) {
+    return (
+      <div className="p-8">
+        <div className="rounded-lg border p-6 text-center text-muted-foreground">
+          <p className="font-medium">Belum ada laporan yang diterbitkan.</p>
+          <p className="mt-1 text-sm">Return akan muncul setelah analyst mempublikasikan laporan untuk akun Anda.</p>
+        </div>
+      </div>
+    )
+  }
 
   const mySlots = allocation?.slots ?? 0
   const totalSlots = slotConfig?.totalSlots ?? data.investorConfig.totalSlots
@@ -44,17 +53,20 @@ export default function InvestorReturnsPage() {
   const investorSharePct = slotConfig?.investorSharePercent ?? data.investorConfig.investorSharePercent
   const arunamiFeePct = slotConfig?.arunamiFeePercent ?? data.investorConfig.arunamiFeePercent
 
-  const latestActual = [...data.profitData].reverse().find(r => r.aktual > 0)
-  const latestActualPeriod = latestActual?.month ?? data.profitData.at(-1)?.month
-  const lastProfit = latestActual?.aktual ?? data.profitData.at(-1)?.aktual ?? 0
-  const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Ini'
+  const activePeriod = selectedPeriod || availablePeriods[0]
+  const activeEntry = data.profitData.find(p => p.month === activePeriod)
+  const lastProfit = activeEntry?.aktual ?? 0
+  const periodLabel = formatPeriod(activePeriod)
   const myRoi = calculateInvestorROI(lastProfit, mySlots, totalSlots, investorSharePct, arunamiFeePct, nominalPerSlot)
 
-  // Monthly breakdown — personalized per-investor
-  const monthlyBreakdown = data.profitData.map(p => {
-    const r = calculateInvestorROI(p.aktual, mySlots, totalSlots, investorSharePct, arunamiFeePct, nominalPerSlot)
-    return { month: p.month, netProfit: p.aktual, myEarnings: r.earnings, monthlyROI: r.monthlyROI }
-  })
+  // Monthly breakdown — gated to only published periods
+  const publishedSet = new Set(availablePeriods)
+  const monthlyBreakdown = data.profitData
+    .filter(p => publishedSet.has(p.month))
+    .map(p => {
+      const r = calculateInvestorROI(p.aktual, mySlots, totalSlots, investorSharePct, arunamiFeePct, nominalPerSlot)
+      return { month: p.month, netProfit: p.aktual, myEarnings: r.earnings, monthlyROI: r.monthlyROI }
+    })
 
   // Cumulative earnings
   const totalEarnings = monthlyBreakdown.reduce((sum, m) => sum + m.myEarnings, 0)
@@ -143,7 +155,7 @@ export default function InvestorReturnsPage() {
             <tfoot className="bg-muted/30 font-medium">
               <tr>
                 <td className="py-2.5">Total</td>
-                <td className="text-right py-2.5">{formatCurrencyCompact(data.profitData.reduce((s, p) => s + p.aktual, 0))}</td>
+                <td className="text-right py-2.5">{formatCurrencyCompact(monthlyBreakdown.reduce((s, p) => s + p.netProfit, 0))}</td>
                 <td className="text-right py-2.5">{formatCurrencyCompact(totalEarnings)}</td>
                 <td className="text-right py-2.5">—</td>
               </tr>

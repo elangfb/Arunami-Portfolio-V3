@@ -1,6 +1,6 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
-  updateDoc, deleteDoc, query, where, serverTimestamp,
+  updateDoc, deleteDoc, deleteField, query, where, serverTimestamp,
   writeBatch,
 } from 'firebase/firestore'
 import { createUserWithEmailAndPassword, signOut } from 'firebase/auth'
@@ -11,6 +11,7 @@ import type {
   PnLExtractedData, ProjectionExtractedData,
   MonthlyDataPoint, CostItem, TransactionDataPoint, RevenueMixItem,
   PortfolioConfig, SlotsSummary, InvestorCommunication,
+  InvestorReportDoc,
 } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 
@@ -70,6 +71,12 @@ export async function getPortfolio(id: string): Promise<Portfolio | null> {
 
 export async function getInvestorPortfolios(uid: string): Promise<Portfolio[]> {
   const q = query(collection(db, 'portfolios'), where('assignedInvestors', 'array-contains', uid))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio)
+}
+
+export async function getAnalystPortfolios(uid: string): Promise<Portfolio[]> {
+  const q = query(collection(db, 'portfolios'), where('assignedAnalysts', 'array-contains', uid))
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio)
 }
@@ -281,7 +288,7 @@ export async function createAllocation(
 
 export async function updateAllocation(
   allocationId: string,
-  data: Pick<InvestorAllocation, 'slots' | 'investedAmount'>,
+  data: Partial<Pick<InvestorAllocation, 'slots' | 'investedAmount' | 'ownershipPercent'>>,
   portfolioId: string,
   totalSlots: number,
 ) {
@@ -457,4 +464,154 @@ export async function syncFinancialData(portfolioId: string) {
   }
 
   await saveFinancialData(portfolioId, financialData)
+}
+
+// ─── Investor Reports (per-investor draft / published) ───────────────────
+
+export async function getInvestorReportsForPortfolio(
+  portfolioId: string,
+  period: string,
+): Promise<InvestorReportDoc[]> {
+  const q = query(
+    collection(db, 'portfolios', portfolioId, 'investorReports'),
+    where('period', '==', period),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorReportDoc)
+}
+
+export async function getPublishedInvestorReports(
+  investorUid: string,
+): Promise<InvestorReportDoc[]> {
+  const q = query(
+    collection(db, 'investorReports'),
+    where('investorUid', '==', investorUid),
+    where('status', '==', 'published'),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorReportDoc)
+}
+
+/**
+ * Upsert a draft investor report for a single (portfolio × investor × period).
+ * Writes to BOTH the nested portfolio subcollection (fast listing for analyst)
+ * AND the top-level `investorReports` collection (fast query for investor).
+ * The top-level doc uses the same id for easy linking.
+ */
+export async function upsertInvestorReportDraft(data: {
+  portfolioId: string
+  portfolioName: string
+  investorUid: string
+  investorName: string
+  period: string
+  htmlContent: string
+}): Promise<string> {
+  const id = `${data.portfolioId}_${data.investorUid}_${data.period}`
+  const payload = {
+    ...data,
+    status: 'draft' as const,
+    updatedAt: serverTimestamp(),
+  }
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'portfolios', data.portfolioId, 'investorReports', id), payload, { merge: true })
+  batch.set(doc(db, 'investorReports', id), payload, { merge: true })
+  await batch.commit()
+  return id
+}
+
+export async function publishInvestorReport(params: {
+  portfolioId: string
+  reportId: string
+  publishedBy: string
+}): Promise<void> {
+  const payload = {
+    status: 'published' as const,
+    publishedAt: serverTimestamp(),
+    publishedBy: params.publishedBy,
+    updatedAt: serverTimestamp(),
+  }
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'portfolios', params.portfolioId, 'investorReports', params.reportId), payload)
+  batch.update(doc(db, 'investorReports', params.reportId), payload)
+  await batch.commit()
+}
+
+/**
+ * Bulk-publish every draft for a (portfolio × period).
+ * Upserts draft docs first for any investors passed in `reports` so the batch
+ * always has a target, then flips all to published in one batch write.
+ */
+export async function publishAllInvestorReports(params: {
+  portfolioId: string
+  period: string
+  reports: {
+    portfolioName: string
+    investorUid: string
+    investorName: string
+    htmlContent: string
+  }[]
+  publishedBy: string
+}): Promise<void> {
+  const batch = writeBatch(db)
+  for (const r of params.reports) {
+    const id = `${params.portfolioId}_${r.investorUid}_${params.period}`
+    const payload = {
+      portfolioId: params.portfolioId,
+      portfolioName: r.portfolioName,
+      investorUid: r.investorUid,
+      investorName: r.investorName,
+      period: params.period,
+      htmlContent: r.htmlContent,
+      status: 'published' as const,
+      publishedAt: serverTimestamp(),
+      publishedBy: params.publishedBy,
+      updatedAt: serverTimestamp(),
+    }
+    batch.set(doc(db, 'portfolios', params.portfolioId, 'investorReports', id), payload, { merge: true })
+    batch.set(doc(db, 'investorReports', id), payload, { merge: true })
+  }
+  await batch.commit()
+}
+
+export async function unpublishInvestorReport(params: {
+  portfolioId: string
+  reportId: string
+}): Promise<void> {
+  const payload = {
+    status: 'draft' as const,
+    publishedAt: deleteField(),
+    publishedBy: deleteField(),
+    updatedAt: serverTimestamp(),
+  }
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'portfolios', params.portfolioId, 'investorReports', params.reportId), payload)
+  batch.update(doc(db, 'investorReports', params.reportId), payload)
+  await batch.commit()
+}
+
+/**
+ * Bulk-unpublish every published report for a (portfolio × period).
+ * Flips status back to draft so investors no longer see it.
+ */
+export async function unpublishAllInvestorReports(params: {
+  portfolioId: string
+  period: string
+}): Promise<number> {
+  const existing = await getInvestorReportsForPortfolio(params.portfolioId, params.period)
+  const published = existing.filter(r => r.status === 'published')
+  if (published.length === 0) return 0
+
+  const batch = writeBatch(db)
+  const payload = {
+    status: 'draft' as const,
+    publishedAt: deleteField(),
+    publishedBy: deleteField(),
+    updatedAt: serverTimestamp(),
+  }
+  for (const r of published) {
+    batch.update(doc(db, 'portfolios', params.portfolioId, 'investorReports', r.id), payload)
+    batch.update(doc(db, 'investorReports', r.id), payload)
+  }
+  await batch.commit()
+  return published.length
 }

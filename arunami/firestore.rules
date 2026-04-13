@@ -1,0 +1,173 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ─────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function userRole() {
+      return userDoc().role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && userRole() == 'admin';
+    }
+
+    function isAnalyst() {
+      return isSignedIn() && userRole() == 'analyst';
+    }
+
+    function isInvestor() {
+      return isSignedIn() && userRole() == 'investor';
+    }
+
+    function isStaff() {
+      return isAdmin() || isAnalyst();
+    }
+
+    // Inline (resource.data) variants — used inside /portfolios/{id} where
+    // `resource` IS the portfolio doc. Avoids recursive get() during list.
+    function isAssignedAnalystResource() {
+      return isAnalyst() && request.auth.uid in resource.data.assignedAnalysts;
+    }
+
+    function isAssignedInvestorResource() {
+      return isInvestor() && request.auth.uid in resource.data.assignedInvestors;
+    }
+
+    function canReadPortfolioResource() {
+      return isAdmin() || isAssignedAnalystResource() || isAssignedInvestorResource();
+    }
+
+    function canWritePortfolioResource() {
+      return isAdmin() || isAssignedAnalystResource();
+    }
+
+    // Lookup variants — used inside subcollections where the rule needs to
+    // fetch the parent portfolio to check membership.
+    function lookupPortfolio(portfolioId) {
+      return get(/databases/$(database)/documents/portfolios/$(portfolioId)).data;
+    }
+
+    function isAssignedAnalystOf(portfolioId) {
+      return isAnalyst() && request.auth.uid in lookupPortfolio(portfolioId).assignedAnalysts;
+    }
+
+    function isAssignedInvestorOf(portfolioId) {
+      return isInvestor() && request.auth.uid in lookupPortfolio(portfolioId).assignedInvestors;
+    }
+
+    function canReadPortfolio(portfolioId) {
+      return isAdmin() || isAssignedAnalystOf(portfolioId) || isAssignedInvestorOf(portfolioId);
+    }
+
+    function canWritePortfolio(portfolioId) {
+      return isAdmin() || isAssignedAnalystOf(portfolioId);
+    }
+
+    // ─── Users ───────────────────────────────────────────────────────────
+    // Admin manages all users; signed-in users can read their own profile so
+    // role lookup works on the client without leaking other users' data.
+    match /users/{uid} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Portfolios + nested collections ─────────────────────────────────
+    // Both `read` and `list` use the resource-based check (no recursive get())
+    // so list operations succeed when the client query filters by
+    // `where('assignedAnalysts','array-contains', uid)` (or assignedInvestors).
+    // An unfiltered list from a non-admin fails on the first non-matching doc.
+    match /portfolios/{portfolioId} {
+      allow read: if canReadPortfolioResource();
+      allow list: if canReadPortfolioResource();
+      allow create: if isAdmin();
+      allow update: if canWritePortfolioResource();
+      allow delete: if isAdmin();
+
+      // Portfolio config: investors read, staff write
+      match /config/{configId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
+      // Aggregated financial data snapshot
+      match /financialData/{docId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
+      // P&L + Projection reports + Management report HTML snapshots
+      match /reports/{reportId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
+      // Analyst-authored management reports (issues, action items)
+      match /managementReports/{reportId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
+      // Arunami Notes (free-text, fed to AI)
+      match /notes/{noteId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
+      // Per-investor draft + published reports (nested mirror)
+      match /investorReports/{reportId} {
+        allow read: if isStaff() ||
+          (isInvestor() && resource.data.investorUid == request.auth.uid && resource.data.status == 'published');
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
+      // Transfer proofs (analyst confirms payouts to investors)
+      match /transferProofs/{proofId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+    }
+
+    // ─── Top-level investor reports mirror ───────────────────────────────
+    // The investor side queries this collection by (investorUid, status) to
+    // avoid having to know which portfolios they belong to up front.
+    match /investorReports/{reportId} {
+      allow read: if isAdmin() ||
+        (isInvestor() && resource.data.investorUid == request.auth.uid && resource.data.status == 'published');
+      allow list: if isAdmin() ||
+        (isInvestor() && request.query.limit <= 200);
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Investor allocations ────────────────────────────────────────────
+    // Admin manages; staff read all; investors read only their own.
+    match /investorAllocations/{allocationId} {
+      allow read: if isStaff() ||
+        (isInvestor() && resource.data.investorUid == request.auth.uid);
+      allow list: if isStaff() ||
+        (isInvestor() && request.query.limit <= 200);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Investor communications log ─────────────────────────────────────
+    match /investorCommunications/{commId} {
+      allow read: if isStaff() ||
+        (isInvestor() && resource.data.investorUid == request.auth.uid);
+      allow list: if isStaff() ||
+        (isInvestor() && request.query.limit <= 200);
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+  }
+}

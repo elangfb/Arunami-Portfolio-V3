@@ -9,12 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DollarSign, TrendingUp, BarChart2, PieChart } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
-import type { FinancialData, Portfolio, InvestorAllocation, SlotBasedConfig } from '@/types'
-
-interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
+import type { FinancialData, InvestorAllocation, SlotBasedConfig } from '@/types'
+import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
 
 export default function InvestorOverviewPage() {
-  const { portfolioId } = useOutletContext<Context>()
+  const { portfolioId, selectedPeriod, availablePeriods } = useOutletContext<InvestorPortfolioOutletContext>()
   const { user } = useAuthStore()
   const [data, setData] = useState<FinancialData | null>(null)
   const [allocation, setAllocation] = useState<InvestorAllocation | null>(null)
@@ -39,15 +38,24 @@ export default function InvestorOverviewPage() {
 
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
   if (!data) return <div className="p-8 text-muted-foreground">Data belum tersedia.</div>
+  if (availablePeriods.length === 0) {
+    return (
+      <div className="p-8">
+        <div className="rounded-lg border p-6 text-center text-muted-foreground">
+          <p className="font-medium">Belum ada laporan yang diterbitkan.</p>
+          <p className="mt-1 text-sm">KPI akan muncul setelah analyst mempublikasikan laporan untuk akun Anda.</p>
+        </div>
+      </div>
+    )
+  }
 
-  // Find the latest period that has actual PnL data (aktual > 0), not just projections
-  const latestActual = [...data.revenueData].reverse().find(r => r.aktual > 0)
-  const latestActualPeriod = latestActual?.month ?? data.revenueData.at(-1)?.month
-  const latestRevEntry = latestActualPeriod ? data.revenueData.find(r => r.month === latestActualPeriod) : data.revenueData.at(-1)
-  const latestProfEntry = latestActualPeriod ? data.profitData.find(r => r.month === latestActualPeriod) : data.profitData.at(-1)
-  const lastRevenue = latestRevEntry?.aktual ?? 0
-  const lastProfit = latestProfEntry?.aktual ?? 0
-  const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Ini'
+  // Use period chosen in the sidebar; fall back to first available
+  const activePeriod = selectedPeriod || availablePeriods[0]
+  const revEntry = data.revenueData.find(r => r.month === activePeriod)
+  const profEntry = data.profitData.find(r => r.month === activePeriod)
+  const lastRevenue = revEntry?.aktual ?? 0
+  const lastProfit = profEntry?.aktual ?? 0
+  const periodLabel = formatPeriod(activePeriod)
   const roi = calculateROI(lastProfit, data.investorConfig)
 
   const mySlots = allocation?.slots ?? 0
@@ -67,7 +75,10 @@ export default function InvestorOverviewPage() {
     { label: `Earning Saya (${periodLabel})`, value: myRoi ? formatCurrencyCompact(myRoi.earnings) : formatCurrencyCompact(roi.returnPerSlot), icon: BarChart2 },
   ]
 
-  const revenueChartData = data.revenueData.map(r => ({ month: r.month, aktual: r.aktual }))
+  const publishedSet = new Set(availablePeriods)
+  const revenueChartData = data.revenueData
+    .filter(r => publishedSet.has(r.month))
+    .map(r => ({ month: r.month, aktual: r.aktual }))
 
   return (
     <div className="p-6 space-y-6">

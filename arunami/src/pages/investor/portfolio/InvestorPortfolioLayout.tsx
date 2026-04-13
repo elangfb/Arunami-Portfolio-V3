@@ -1,17 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useParams, useNavigate, Link } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
-import { getPortfolio } from '@/lib/firestore'
+import { getPortfolio, getPublishedInvestorReports } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
-import type { Portfolio } from '@/types'
+import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
+import type { Portfolio, InvestorReportDoc } from '@/types'
 import {
   TrendingUp, LayoutDashboard, TrendingDown, BarChart2,
   DollarSign, ClipboardList, StickyNote, FileText,
   ChevronLeft, LogOut,
 } from 'lucide-react'
+
+export interface InvestorPortfolioOutletContext {
+  portfolio: Portfolio | null
+  portfolioId: string | undefined
+  selectedPeriod: string
+  setSelectedPeriod: (p: string) => void
+  availablePeriods: string[]
+  publishedReports: InvestorReportDoc[]
+}
 
 const navGroups = [
   {
@@ -26,7 +36,7 @@ const navGroups = [
   {
     label: 'Management & Notes',
     items: [
-      { to: 'management', label: 'Management Report', icon: ClipboardList },
+      { to: 'management', label: 'Portfolio Management', icon: ClipboardList },
       { to: 'notes', label: 'Arunami Notes', icon: StickyNote },
     ],
   },
@@ -43,15 +53,46 @@ export default function InvestorPortfolioLayout() {
   const navigate = useNavigate()
   const { user, setUser } = useAuthStore()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
+  const [publishedReports, setPublishedReports] = useState<InvestorReportDoc[]>([])
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('')
 
   useEffect(() => {
     if (id) getPortfolio(id).then(setPortfolio)
   }, [id])
 
+  // Fetch this investor's published reports for this portfolio
+  useEffect(() => {
+    if (!id || !user) return
+    ;(async () => {
+      const all = await getPublishedInvestorReports(user.uid)
+      const forPortfolio = all
+        .filter(r => r.portfolioId === id)
+        .sort((a, b) => comparePeriods(b.period, a.period))
+      setPublishedReports(forPortfolio)
+      if (forPortfolio.length > 0) {
+        setSelectedPeriod(prev => prev || forPortfolio[0].period)
+      }
+    })()
+  }, [id, user])
+
+  const availablePeriods = useMemo(
+    () => [...new Set(publishedReports.map(r => r.period))],
+    [publishedReports],
+  )
+
   const handleLogout = async () => {
     await signOut(auth); setUser(null)
     navigate('/login', { replace: true })
     toast.success('Berhasil keluar')
+  }
+
+  const outletContext: InvestorPortfolioOutletContext = {
+    portfolio,
+    portfolioId: id,
+    selectedPeriod,
+    setSelectedPeriod,
+    availablePeriods,
+    publishedReports,
   }
 
   return (
@@ -62,6 +103,24 @@ export default function InvestorPortfolioLayout() {
             <TrendingUp className="h-5 w-5 text-white" />
           </div>
           <span className="text-base font-bold text-white truncate">{portfolio?.name ?? 'ARUNAMI'}</span>
+        </div>
+
+        {/* Period Selector */}
+        <div className="px-4 pt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7280] mb-1">Periode Laporan</p>
+          {availablePeriods.length > 0 ? (
+            <select
+              value={selectedPeriod}
+              onChange={e => setSelectedPeriod(e.target.value)}
+              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#38a169]"
+            >
+              {availablePeriods.map(p => (
+                <option key={p} value={p} className="text-black">{formatPeriod(p)}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-xs text-[#6b7280] italic">Belum ada laporan diterbitkan</p>
+          )}
         </div>
 
         {/* Back link */}
@@ -116,7 +175,7 @@ export default function InvestorPortfolioLayout() {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        <Outlet context={{ portfolio, portfolioId: id }} />
+        <Outlet context={outletContext} />
       </main>
     </div>
   )

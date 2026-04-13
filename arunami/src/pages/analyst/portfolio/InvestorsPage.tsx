@@ -2,26 +2,23 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   getFinancialData, getTransferProofs,
-  getAllocationsForPortfolio, getPortfolioConfig,
+  getAllocationsForPortfolio,
 } from '@/lib/firestore'
-import { calculateROI, calculateInvestorROI } from '@/lib/roi'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatPeriod } from '@/lib/dateUtils'
 import type {
-  FinancialData, TransferProof, Portfolio,
-  InvestorAllocation, SlotBasedConfig,
+  FinancialData, TransferProof, Portfolio, InvestorAllocation,
 } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
 export default function InvestorsPage() {
-  const { portfolioId } = useOutletContext<Context>()
+  const { portfolio, portfolioId } = useOutletContext<Context>()
   const [data, setData] = useState<FinancialData | null>(null)
   const [proofs, setProofs] = useState<TransferProof[]>([])
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
-  const [slotConfig, setSlotConfig] = useState<{ totalSlots: number; nominalPerSlot: number; investorSharePercent: number; arunamiFeePercent: number } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,21 +27,10 @@ export default function InvestorsPage() {
       getFinancialData(portfolioId),
       getTransferProofs(portfolioId),
       getAllocationsForPortfolio(portfolioId),
-      getPortfolioConfig(portfolioId),
-    ]).then(([d, p, allocs, config]) => {
+    ]).then(([d, p, allocs]) => {
       setData(d)
       setProofs(p)
       setAllocations(allocs)
-
-      if (config?.investorConfig?.type === 'slot_based') {
-        const sc = config.investorConfig as SlotBasedConfig
-        setSlotConfig({
-          totalSlots: sc.totalSlots,
-          nominalPerSlot: sc.nominalPerSlot,
-          investorSharePercent: sc.investorSharePercent,
-          arunamiFeePercent: sc.arunamiFeePercent,
-        })
-      }
       setLoading(false)
     })
   }, [portfolioId])
@@ -55,27 +41,27 @@ export default function InvestorsPage() {
   const latestActual = [...data.profitData].reverse().find(r => r.aktual > 0)
   const latestActualPeriod = latestActual?.month ?? data.profitData.at(-1)?.month
   const lastProfit = latestActual?.aktual ?? data.profitData.at(-1)?.aktual ?? 0
-  const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Ini'
-  const roi = calculateROI(lastProfit, data.investorConfig)
+  const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Terakhir'
 
-  const allocatedSlots = allocations.reduce((sum, a) => sum + a.slots, 0)
-  const totalInvested = allocations.reduce((sum, a) => sum + a.investedAmount, 0)
+  const cfg = data.investorConfig
+  const investorShare = lastProfit * (cfg.investorSharePercent / 100)
+  const arunamiFee = investorShare * (cfg.arunamiFeePercent / 100)
+  const netForInvestor = investorShare - arunamiFee
+  const totalInvestment = portfolio?.investasiAwal ?? 0
+  const monthlyROI = totalInvestment > 0 ? (netForInvestor / totalInvestment) * 100 : 0
+  const annualROI = monthlyROI * 12
 
   return (
     <div className="p-6 space-y-6">
-      <h2 className="text-xl font-bold">Cap Table & Return Investor</h2>
+      <h2 className="text-xl font-bold">Laporan Investor</h2>
 
-      {/* Summary Cards */}
+      {/* Summary — 4 metrics per spec */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Investor', value: allocations.length.toString() },
-          { label: 'Slot Terisi', value: `${allocatedSlots} / ${slotConfig?.totalSlots ?? data.investorConfig.totalSlots}` },
-          { label: 'Total Investasi', value: formatCurrencyCompact(totalInvested) },
-          { label: 'Nominal / Slot', value: formatCurrencyCompact(slotConfig?.nominalPerSlot ?? data.investorConfig.nominalPerSlot) },
-          { label: 'Net untuk Investor', value: formatCurrencyCompact(roi.netForInvestor) },
-          { label: 'Return / Slot', value: formatCurrencyCompact(roi.returnPerSlot) },
-          { label: 'Monthly ROI', value: formatPercent(roi.monthlyROI, true) },
-          { label: 'Annual ROI', value: formatPercent(roi.annualROI, true) },
+          { label: `Net Profit (${periodLabel})`, value: formatCurrencyExact(lastProfit) },
+          { label: 'Net untuk Investor', value: formatCurrencyExact(netForInvestor) },
+          { label: 'Monthly ROI', value: formatPercent(monthlyROI, true) },
+          { label: 'Annual ROI (×12 Forecast)', value: formatPercent(annualROI, true) },
         ].map(({ label, value }) => (
           <Card key={label}>
             <CardContent className="pt-4">
@@ -86,10 +72,10 @@ export default function InvestorsPage() {
         ))}
       </div>
 
-      {/* Cap Table */}
+      {/* Per-investor breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Cap Table — Distribusi Slot & Profit Sharing</CardTitle>
+          <CardTitle className="text-sm">Per Investor</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {allocations.length === 0 ? (
@@ -99,94 +85,44 @@ export default function InvestorsPage() {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="text-left py-2.5 px-3 font-medium">Investor</th>
-                  <th className="text-center py-2.5 px-3 font-medium">Slot</th>
-                  <th className="text-center py-2.5 px-3 font-medium">Kepemilikan</th>
                   <th className="text-right py-2.5 px-3 font-medium">Investasi</th>
-                  <th className="text-right py-2.5 px-3 font-medium">Earning ({periodLabel})</th>
-                  <th className="text-right py-2.5 px-3 font-medium">ROI Bulanan</th>
+                  <th className="text-right py-2.5 px-3 font-medium">Net untuk Investor</th>
+                  <th className="text-right py-2.5 px-3 font-medium">Monthly ROI</th>
+                  <th className="text-right py-2.5 px-3 font-medium">Annual ROI</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {allocations.map(alloc => {
-                  const invRoi = slotConfig
-                    ? calculateInvestorROI(
-                        lastProfit,
-                        alloc.slots,
-                        slotConfig.totalSlots,
-                        slotConfig.investorSharePercent,
-                        slotConfig.arunamiFeePercent,
-                        slotConfig.nominalPerSlot,
-                      )
-                    : null
-
+                  const ownership = totalInvestment > 0 ? alloc.investedAmount / totalInvestment : 0
+                  const investorNet = netForInvestor * ownership
+                  const investorMonthly = alloc.investedAmount > 0 ? (investorNet / alloc.investedAmount) * 100 : 0
+                  const investorAnnual = investorMonthly * 12
                   return (
                     <tr key={alloc.id} className="hover:bg-muted/30">
                       <td className="py-2.5 px-3">
                         <p className="font-medium">{alloc.investorName}</p>
-                        <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
+                        {alloc.investorEmail && (
+                          <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
+                        )}
                       </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <Badge variant="secondary">{alloc.slots}</Badge>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        {invRoi ? `${invRoi.ownershipPct.toFixed(1)}%` : '—'}
+                      <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(alloc.investedAmount)}</td>
+                      <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(investorNet)}</td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className={investorMonthly >= 0 ? 'text-green-600' : 'text-red-500'}>
+                          {formatPercent(investorMonthly, true)}
+                        </span>
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        {formatCurrencyCompact(alloc.investedAmount)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        {invRoi ? formatCurrencyCompact(invRoi.earnings) : '—'}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        {invRoi ? (
-                          <span className={invRoi.monthlyROI >= 0 ? 'text-green-600' : 'text-red-500'}>
-                            {formatPercent(invRoi.monthlyROI, true)}
-                          </span>
-                        ) : '—'}
+                        <span className={investorAnnual >= 0 ? 'text-green-600' : 'text-red-500'}>
+                          {formatPercent(investorAnnual, true)}
+                        </span>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
-              <tfoot className="bg-muted/30 font-medium">
-                <tr>
-                  <td className="py-2.5 px-3">Total</td>
-                  <td className="py-2.5 px-3 text-center">{allocatedSlots}</td>
-                  <td className="py-2.5 px-3 text-center">
-                    {slotConfig ? `${((allocatedSlots / slotConfig.totalSlots) * 100).toFixed(1)}%` : '—'}
-                  </td>
-                  <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(totalInvested)}</td>
-                  <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(roi.netForInvestor)}</td>
-                  <td className="py-2.5 px-3 text-right">{formatPercent(roi.monthlyROI, true)}</td>
-                </tr>
-              </tfoot>
             </table>
           )}
-        </CardContent>
-      </Card>
-
-      {/* ROI Calculation breakdown */}
-      <Card>
-        <CardHeader><CardTitle className="text-sm">Rincian Perhitungan ROI</CardTitle></CardHeader>
-        <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <tbody className="divide-y">
-              {[
-                ['Net Profit (Bulan Terakhir)', formatCurrencyExact(lastProfit)],
-                [`Investor Share (${data.investorConfig.investorSharePercent}%)`, formatCurrencyExact(roi.investorShare)],
-                [`Arunami Fee (${data.investorConfig.arunamiFeePercent}%)`, `(${formatCurrencyExact(roi.arunamiFee)})`],
-                ['Net untuk Investor', formatCurrencyExact(roi.netForInvestor)],
-                [`Return per Slot (÷${data.investorConfig.totalSlots})`, formatCurrencyExact(roi.returnPerSlot)],
-                ['Monthly ROI', formatPercent(roi.monthlyROI, true)],
-                ['Annual ROI (×12)', formatPercent(roi.annualROI, true)],
-              ].map(([label, value]) => (
-                <tr key={label} className="hover:bg-muted/30">
-                  <td className="py-2.5 text-muted-foreground">{label}</td>
-                  <td className="py-2.5 text-right font-medium">{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </CardContent>
       </Card>
 

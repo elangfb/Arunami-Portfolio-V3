@@ -53,6 +53,7 @@ export interface PortfolioConfig {
   investorConfig: InvestorConfigUnion
   reportingFrequency: ReportingFrequency
   kpiMetrics: KpiMetric[]
+  configEnrichedAt?: Timestamp
   createdAt: Timestamp
 }
 
@@ -70,6 +71,7 @@ export interface AppUser {
 export interface Portfolio {
   id: string
   name: string
+  brandName: string
   code: string
   stage: string
   periode: string
@@ -190,9 +192,27 @@ export interface PortfolioReport {
   fileName: string
   fileUrl: string
   period: string
-  extractedData: PnLExtractedData | ProjectionExtractedData | Record<string, never>
+  extractedData: PnLExtractedData | ProjectionExtractedData | Record<string, unknown>
+  htmlContent?: string
+  publishedAt?: Timestamp
   uploadedBy: string
   createdAt: Timestamp
+}
+
+export type InvestorReportStatus = 'draft' | 'published'
+
+export interface InvestorReportDoc {
+  id: string
+  portfolioId: string
+  portfolioName: string
+  investorUid: string
+  investorName: string
+  period: string
+  status: InvestorReportStatus
+  htmlContent: string
+  publishedAt?: Timestamp
+  publishedBy?: string
+  updatedAt: Timestamp
 }
 
 // ─── AI Extraction with Classification ───────────────────────────────────
@@ -358,6 +378,8 @@ export interface InvestorAllocation {
   portfolioCode: string
   slots: number
   investedAmount: number
+  ownershipPercent?: number
+  isManual?: boolean
   joinedAt: Timestamp
   updatedAt: Timestamp
 }

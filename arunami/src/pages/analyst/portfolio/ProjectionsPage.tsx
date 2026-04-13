@@ -4,13 +4,13 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { extractProjectionMonthly } from '@/lib/gemini'
 import { getReports, saveReport, updateReport, deleteReport, syncFinancialData } from '@/lib/firestore'
+import { enrichConfigFromFirstUpload } from '@/lib/portfolioEnrichment'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -18,7 +18,7 @@ import {
 import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react'
 import { ProjectionReviewTable } from '@/components/ProjectionReviewTable'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
-import { formatPeriod, normalizePeriod } from '@/lib/dateUtils'
+import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 import type { ProjectionExtractedData, ProjectionUploadPending, OpexItem, PortfolioReport, Portfolio } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -103,11 +103,31 @@ export default function ProjectionsPage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 10 * 1024 * 1024) { toast.error('File maksimal 10MB'); return }
+    if (!portfolioId || !portfolio) { toast.error('Portofolio belum siap'); return }
     setMode('extracting')
     try {
       const data = await extractProjectionMonthly(file)
       setPendingProjection(data)
       toast.success('Data proyeksi berhasil diekstrak — silakan review sebelum konfirmasi')
+
+      // One-shot enrichment on the very first upload — discovers custom revenue
+      // categories and KPI metrics from this file and merges into PortfolioConfig.
+      try {
+        const result = await enrichConfigFromFirstUpload({
+          portfolioId,
+          file,
+          kind: 'projection',
+          industryType: portfolio.industryType,
+        })
+        if (result.ranEnrichment && (result.newCategories.length > 0 || result.newKpis.length > 0)) {
+          const parts: string[] = []
+          if (result.newCategories.length > 0) parts.push(`${result.newCategories.length} kategori revenue`)
+          if (result.newKpis.length > 0) parts.push(`${result.newKpis.length} metrik KPI`)
+          toast.success(`Konfigurasi portofolio diperbarui: ${parts.join(' & ')} ditemukan dari laporan.`)
+        }
+      } catch (err) {
+        console.warn('Config enrichment failed:', err)
+      }
     } catch {
       toast.error('Gagal mengekstrak data')
     } finally {
@@ -264,6 +284,7 @@ export default function ProjectionsPage() {
           <CardContent className="pt-6">
             <ProjectionReviewTable
               data={pendingProjection}
+              onDataChange={setPendingProjection}
               onConfirm={handleConfirmProjection}
               onCancel={() => setPendingProjection(null)}
               isConfirming={isConfirming}
@@ -272,7 +293,7 @@ export default function ProjectionsPage() {
         </Card>
       )}
 
-      {/* History */}
+      {/* History — horizontal table */}
       <Card>
         <CardHeader><CardTitle className="text-base">Riwayat Proyeksi ({reports.length})</CardTitle></CardHeader>
         <CardContent>
@@ -293,32 +314,82 @@ export default function ProjectionsPage() {
               <p className="text-sm text-muted-foreground">Belum ada dokumen proyeksi</p>
             )
           ) : (
-            <div className="divide-y">
-              {reports.map(r => {
+            (() => {
+              const sorted = [...reports].sort((a, b) => comparePeriods(a.period, b.period))
+              const opexNames = [...new Set(sorted.flatMap(r => {
                 const d = r.extractedData as ProjectionExtractedData
-                return (
-                  <div key={r.id} className="py-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{formatPeriod(r.period)}</p>
-                      <p className="text-xs text-muted-foreground">{r.fileName}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Proyeksi: {formatCurrencyExact(d.projectedNetProfit)}</Badge>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
-                        disabled={deleteId === r.id}
-                        onClick={() => handleDelete(r.id)}
-                      >
-                        {deleteId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      </Button>
-                    </div>
+                return (d.projectedOpex ?? []).map(o => o.name)
+              }))]
+              const getCell = (r: PortfolioReport, key: string): number => {
+                const d = r.extractedData as ProjectionExtractedData
+                if (key.startsWith('opex:')) {
+                  const name = key.slice(5)
+                  return d.projectedOpex?.find(o => o.name === name)?.amount ?? 0
+                }
+                return (d[key as keyof ProjectionExtractedData] as number) ?? 0
+              }
+              const rows: { label: string; key: string; bold?: boolean; className?: string }[] = [
+                { label: 'Projected Revenue', key: 'projectedRevenue', bold: true },
+                { label: 'COGS', key: 'projectedCogs', className: 'text-red-600' },
+                { label: 'Gross Profit', key: 'projectedGrossProfit', bold: true, className: 'text-green-700' },
+                ...opexNames.map(n => ({ label: n, key: `opex:${n}`, className: 'text-xs text-muted-foreground' })),
+                { label: 'Total Opex', key: 'projectedTotalOpex', className: 'text-red-600' },
+                { label: 'Net Profit', key: 'projectedNetProfit', bold: true },
+              ]
+              return (
+                <div className="rounded-lg border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
+                            Variable
+                          </th>
+                          {sorted.map(r => (
+                            <th key={r.id} className="px-3 py-2 text-right font-medium whitespace-nowrap min-w-[150px]">
+                              <div>{formatPeriod(r.period)}</div>
+                              <div className="flex justify-end gap-1 mt-1">
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(r)}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive"
+                                  disabled={deleteId === r.id}
+                                  onClick={() => handleDelete(r.id)}
+                                >
+                                  {deleteId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                </Button>
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {rows.map(row => (
+                          <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
+                            <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''} ${row.className?.includes('text-xs') ? 'pl-8' : ''}`}>
+                              {row.label}
+                            </td>
+                            {sorted.map(r => {
+                              const val = getCell(r, row.key)
+                              const isNet = row.key === 'projectedNetProfit'
+                              const colorClass = isNet
+                                ? val >= 0 ? 'text-green-600' : 'text-red-600'
+                                : row.className ?? ''
+                              return (
+                                <td key={r.id} className={`px-3 py-2 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
+                                  {formatCurrencyExact(val)}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                )
-              })}
-            </div>
+                </div>
+              )
+            })()
           )}
         </CardContent>
       </Card>

@@ -26,6 +26,7 @@ import RevenuePage from '@/pages/analyst/portfolio/RevenuePage'
 import CostsPage from '@/pages/analyst/portfolio/CostsPage'
 import InvestorsPage from '@/pages/analyst/portfolio/InvestorsPage'
 import ManagementPage from '@/pages/analyst/portfolio/ManagementPage'
+import PublishingPage from '@/pages/analyst/portfolio/PublishingPage'
 import NotesPage from '@/pages/analyst/portfolio/NotesPage'
 
 // Investor
@@ -101,6 +102,7 @@ export default function App() {
             <Route path="investors" element={<InvestorsPage />} />
             <Route path="management" element={<ManagementPage />} />
             <Route path="notes" element={<NotesPage />} />
+            <Route path="publishing" element={<PublishingPage />} />
           </Route>
 
           {/* Investor routes */}

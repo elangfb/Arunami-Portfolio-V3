@@ -1,5 +1,4 @@
 import type { UseFormReturn } from 'react-hook-form'
-import { AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,7 +22,6 @@ export default function StepBasicInfo({ form }: Props) {
   const { register, formState: { errors }, setValue, watch } = form
   const industryType = watch('industryType')
   const stage = watch('stage')
-  const isGracePeriod = watch('isGracePeriod')
 
   return (
     <Card>
@@ -43,6 +41,12 @@ export default function StepBasicInfo({ form }: Props) {
             <Input id="code" placeholder="ARN-01" {...register('code')} />
             {errors.code && <p className="text-xs text-red-500">{errors.code.message}</p>}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="brandName">Brand Name *</Label>
+          <Input id="brandName" placeholder="Contoh Brand" {...register('brandName')} />
+          {errors.brandName && <p className="text-xs text-red-500">{errors.brandName.message}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -110,30 +114,6 @@ export default function StepBasicInfo({ form }: Props) {
             placeholder="Deskripsi singkat tentang perusahaan..."
             {...register('description')}
           />
-        </div>
-
-        {/* Grace Period Toggle */}
-        <div
-          className={`rounded-lg border p-4 transition-colors ${isGracePeriod ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}
-        >
-          <label className="flex cursor-pointer items-start gap-3">
-            <input
-              type="checkbox"
-              checked={isGracePeriod}
-              onChange={e => setValue('isGracePeriod', e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 accent-amber-600"
-            />
-            <div className="space-y-1">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Proyek dalam Grace Period
-              </span>
-              <p className="text-xs text-muted-foreground">
-                Aktifkan jika proyek belum memiliki laporan PnL dan Proyeksi.
-                Sistem akan meminta upload <strong>Management Report</strong> dan <strong>Arunami Note</strong> sebagai gantinya.
-              </p>
-            </div>
-          </label>
         </div>
       </CardContent>
     </Card>

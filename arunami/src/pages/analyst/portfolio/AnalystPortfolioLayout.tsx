@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import type { Portfolio } from '@/types'
 import {
   TrendingUp, LayoutDashboard, FileText, BarChart2,
-  DollarSign, Users, ClipboardList, StickyNote,
+  DollarSign, Users, ClipboardList, StickyNote, Send,
   ChevronLeft, LogOut, PieChart,
 } from 'lucide-react'
 
@@ -33,8 +33,14 @@ const navGroups = [
   {
     label: 'Management & Notes',
     items: [
-      { to: 'management', label: 'Management Report', icon: ClipboardList },
+      { to: 'management', label: 'Portfolio Management', icon: ClipboardList },
       { to: 'notes', label: 'Arunami Notes', icon: StickyNote },
+    ],
+  },
+  {
+    label: 'Publishing',
+    items: [
+      { to: 'publishing', label: 'Review & Publish', icon: Send },
     ],
   },
 ]

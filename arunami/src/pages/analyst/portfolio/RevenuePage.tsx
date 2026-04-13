@@ -4,17 +4,22 @@ import { getFinancialData } from '@/lib/firestore'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie,
 } from 'recharts'
 import { formatPeriod } from '@/lib/dateUtils'
 import type { FinancialData, Portfolio } from '@/types'
 
-interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
+interface Context {
+  portfolio: Portfolio | null
+  portfolioId: string | undefined
+  selectedPeriod?: string
+  availablePeriods?: string[]
+}
 const COLORS = ['#1e5f3f', '#38a169', '#48bb78', '#68d391', '#9ae6b4']
 
 export default function RevenuePage() {
-  const { portfolioId } = useOutletContext<Context>()
+  const { portfolioId, selectedPeriod, availablePeriods } = useOutletContext<Context>()
   const [data, setData] = useState<FinancialData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -25,9 +30,22 @@ export default function RevenuePage() {
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
   if (!data) return <div className="p-8 text-muted-foreground">Data finansial belum tersedia.</div>
 
+  // Investor route gates time-series to published periods only. Analyst route
+  // doesn't pass these context fields so we show everything.
+  const publishedSet = availablePeriods && availablePeriods.length > 0
+    ? new Set(availablePeriods)
+    : null
+  const filteredRevenue = publishedSet
+    ? data.revenueData.filter(r => publishedSet.has(r.month))
+    : data.revenueData
+  const filteredProfit = publishedSet
+    ? data.profitData.filter(p => publishedSet.has(p.month))
+    : data.profitData
+  void selectedPeriod // currently used only to trigger re-render; KPIs gated above
+
   // Variance table
-  const varianceData = data.revenueData.map((r, i) => {
-    const profit = data.profitData[i]
+  const varianceData = filteredRevenue.map((r, i) => {
+    const profit = filteredProfit[i]
     const revenueVar = r.aktual - r.proyeksi
     const profitVar = (profit?.aktual ?? 0) - (profit?.proyeksi ?? 0)
     return {
@@ -52,15 +70,15 @@ export default function RevenuePage() {
           <CardHeader><CardTitle className="text-sm">Revenue — Proyeksi vs Aktual</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={data.revenueData}>
+              <BarChart data={filteredRevenue}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
                 <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={v => formatCurrencyCompact(v as number)} />
                 <Legend />
-                <Line type="monotone" dataKey="proyeksi" stroke={COLORS[2]} strokeDasharray="4 4" name="Proyeksi" dot={false} />
-                <Line type="monotone" dataKey="aktual" stroke={COLORS[0]} strokeWidth={2} name="Aktual" />
-              </LineChart>
+                <Bar dataKey="proyeksi" fill={COLORS[2]} name="Proyeksi" radius={[4,4,0,0]} />
+                <Bar dataKey="aktual" fill={COLORS[0]} name="Aktual" radius={[4,4,0,0]} />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -69,7 +87,7 @@ export default function RevenuePage() {
           <CardHeader><CardTitle className="text-sm">Profit — Proyeksi vs Aktual</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={data.profitData}>
+              <BarChart data={filteredProfit}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
                 <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />

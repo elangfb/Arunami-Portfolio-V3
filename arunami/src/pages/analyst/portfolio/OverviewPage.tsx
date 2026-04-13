@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getFinancialData } from '@/lib/firestore'
 import { formatCurrencyCompact, formatPercent, calcMoM } from '@/lib/utils'
-import { calculateROI } from '@/lib/roi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
+  ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2, AlertTriangle } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
@@ -55,7 +54,13 @@ export default function OverviewPage() {
   const prevTx = data.transactionData.at(-2)
   const prevTotalTx = prevTx ? Object.values(prevTx.categories).reduce((s, v) => s + v, 0) : 0
 
-  const roi = calculateROI(lastProfit, data.investorConfig)
+  // Total Investment ROI: net-for-investor / total investment
+  const cfg = data.investorConfig
+  const investorShare = lastProfit * (cfg.investorSharePercent / 100)
+  const arunamiFee = investorShare * (cfg.arunamiFeePercent / 100)
+  const netForInvestor = investorShare - arunamiFee
+  const totalInvestment = portfolio?.investasiAwal ?? 0
+  const totalInvestmentROI = totalInvestment > 0 ? (netForInvestor / totalInvestment) * 100 : 0
 
   const kpis = [
     {
@@ -71,7 +76,7 @@ export default function OverviewPage() {
       change: calcMoM(totalTx, prevTotalTx), icon: ShoppingCart,
     },
     {
-      label: 'ROI/Slot', value: formatPercent(roi.monthlyROI),
+      label: 'Total Investment ROI', value: formatPercent(totalInvestmentROI),
       change: null, icon: BarChart2,
     },
   ]
@@ -101,39 +106,41 @@ export default function OverviewPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Revenue Bar Chart */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Revenue — Proyeksi vs Aktual</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={data.revenueData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
-                <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => formatCurrencyCompact(v as number)} />
-                <Legend />
-                <Bar dataKey="proyeksi" fill={GREEN_PALETTE[2]} name="Proyeksi" radius={[4,4,0,0]} />
-                <Bar dataKey="aktual" fill={GREEN_PALETTE[0]} name="Aktual" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* Revenue Bar Chart */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm">Revenue — Proyeksi vs Aktual</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={data.revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
+              <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v) => formatCurrencyCompact(v as number)} />
+              <Legend />
+              <Bar dataKey="proyeksi" fill={GREEN_PALETTE[2]} name="Proyeksi" radius={[4,4,0,0]} />
+              <Bar dataKey="aktual" fill={GREEN_PALETTE[0]} name="Aktual" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
-        {/* Radar Chart */}
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Performa Radar</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <RadarChart data={data.radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
-                <Radar name="Nilai" dataKey="value" stroke={GREEN_PALETTE[0]} fill={GREEN_PALETTE[0]} fillOpacity={0.3} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Profit Chart — full width */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm">Profit — Proyeksi vs Aktual</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data.profitData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
+              <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v) => formatCurrencyCompact(v as number)} />
+              <Legend />
+              <Bar dataKey="proyeksi" fill={GREEN_PALETTE[2]} name="Proyeksi" radius={[4,4,0,0]} />
+              <Bar dataKey="aktual" fill={GREEN_PALETTE[0]} name="Aktual" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
-import { getAllPortfolios } from '@/lib/firestore'
+import { getAnalystPortfolios } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,8 +18,9 @@ export default function AnalystDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getAllPortfolios().then(data => { setPortfolios(data); setLoading(false) })
-  }, [])
+    if (!user) return
+    getAnalystPortfolios(user.uid).then(data => { setPortfolios(data); setLoading(false) })
+  }, [user])
 
   const handleLogout = async () => {
     await signOut(auth); setUser(null)

@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 import {
   getAllPortfolios, getAllUsers, updatePortfolio, deletePortfolio,
   getAllocationsForPortfolio, createAllocation, updateAllocation, deleteAllocation,
-  getPortfolioConfig,
 } from '@/lib/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,11 +16,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
-import { PlusCircle, Users, Pencil, Trash2, UserPlus, Minus } from 'lucide-react'
-import type { Portfolio, AppUser, InvestorAllocation, SlotBasedConfig } from '@/types'
+import { PlusCircle, Users, Pencil, Trash2, UserPlus, Minus, UserCog } from 'lucide-react'
+import type { Portfolio, InvestorAllocation, AppUser } from '@/types'
 
 const portfolioSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
+  brandName: z.string().min(1, 'Brand Name wajib diisi'),
   code: z.string().min(1, 'Kode wajib diisi'),
   stage: z.string().min(1, 'Tahap wajib diisi'),
   periode: z.string().min(1, 'Periode wajib diisi'),
@@ -35,31 +35,39 @@ export default function AdminPortfolios() {
   const navigate = useNavigate()
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [investors, setInvestors] = useState<AppUser[]>([])
+  const [analysts, setAnalysts] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Portfolio | null>(null)
 
-  // Allocation dialog state
+  // Assign Analyst dialog
+  const [analystDialogOpen, setAnalystDialogOpen] = useState(false)
+  const [analystTarget, setAnalystTarget] = useState<Portfolio | null>(null)
+  const [selectedAnalystUids, setSelectedAnalystUids] = useState<Set<string>>(new Set())
+  const [savingAnalysts, setSavingAnalysts] = useState(false)
+
   const [allocOpen, setAllocOpen] = useState(false)
   const [allocPortfolio, setAllocPortfolio] = useState<Portfolio | null>(null)
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
   const [allocLoading, setAllocLoading] = useState(false)
-  const [slotConfig, setSlotConfig] = useState<{ totalSlots: number; nominalPerSlot: number } | null>(null)
 
-  // Add investor form within allocation dialog
-  const [addInvestorUid, setAddInvestorUid] = useState('')
-  const [addSlots, setAddSlots] = useState(1)
+  const [newInvestorUid, setNewInvestorUid] = useState('')
+  const [newAmount, setNewAmount] = useState('')
+  const [newPercent, setNewPercent] = useState('')
+
   const [editAllocId, setEditAllocId] = useState<string | null>(null)
-  const [editSlots, setEditSlots] = useState(1)
+  const [editAmount, setEditAmount] = useState('')
+  const [editPercent, setEditPercent] = useState('')
 
   const editForm = useForm<PortfolioFormData>({
     resolver: zodResolver(portfolioSchema) as never,
   })
 
   const fetchData = async () => {
-    const [p, u] = await Promise.all([getAllPortfolios(), getAllUsers()])
+    const [p, users] = await Promise.all([getAllPortfolios(), getAllUsers()])
     setPortfolios(p)
-    setInvestors(u.filter(u => u.role === 'investor'))
+    setInvestors(users.filter(u => u.role === 'investor'))
+    setAnalysts(users.filter(u => u.role === 'analyst'))
     setLoading(false)
   }
 
@@ -69,6 +77,7 @@ export default function AdminPortfolios() {
     setEditTarget(p)
     editForm.reset({
       name: p.name,
+      brandName: p.brandName ?? '',
       code: p.code,
       stage: p.stage,
       periode: p.periode,
@@ -94,6 +103,38 @@ export default function AdminPortfolios() {
     }
   }
 
+  const openAnalystDialog = (p: Portfolio) => {
+    setAnalystTarget(p)
+    setSelectedAnalystUids(new Set(p.assignedAnalysts ?? []))
+    setAnalystDialogOpen(true)
+  }
+
+  const toggleAnalyst = (uid: string) => {
+    setSelectedAnalystUids(prev => {
+      const next = new Set(prev)
+      if (next.has(uid)) next.delete(uid)
+      else next.add(uid)
+      return next
+    })
+  }
+
+  const saveAssignedAnalysts = async () => {
+    if (!analystTarget) return
+    setSavingAnalysts(true)
+    try {
+      await updatePortfolio(analystTarget.id, {
+        assignedAnalysts: [...selectedAnalystUids],
+      })
+      toast.success('Analis berhasil diperbarui')
+      setAnalystDialogOpen(false)
+      fetchData()
+    } catch {
+      toast.error('Gagal memperbarui analis')
+    } finally {
+      setSavingAnalysts(false)
+    }
+  }
+
   const onDelete = async (p: Portfolio) => {
     if (!window.confirm(`Hapus portofolio "${p.name}"? Tindakan ini tidak dapat dibatalkan.`)) return
     try {
@@ -105,47 +146,30 @@ export default function AdminPortfolios() {
     }
   }
 
-  // ─── Allocation Dialog ─────────────────────────────────────────────────
-
   const openAllocDialog = async (portfolio: Portfolio) => {
     setAllocPortfolio(portfolio)
     setAllocLoading(true)
     setAllocOpen(true)
-    setAddInvestorUid('')
-    setAddSlots(1)
-    setEditAllocId(null)
+    setNewInvestorUid('')
+    setNewAmount('')
+    setNewPercent('')
 
-    const [allocs, config] = await Promise.all([
-      getAllocationsForPortfolio(portfolio.id),
-      getPortfolioConfig(portfolio.id),
-    ])
+    const allocs = await getAllocationsForPortfolio(portfolio.id)
     setAllocations(allocs)
-
-    if (config?.investorConfig && config.investorConfig.type === 'slot_based') {
-      const sc = config.investorConfig as SlotBasedConfig
-      setSlotConfig({ totalSlots: sc.totalSlots, nominalPerSlot: sc.nominalPerSlot })
-    } else {
-      setSlotConfig(null)
-    }
     setAllocLoading(false)
   }
 
-  const allocatedSlots = allocations.reduce((sum, a) => sum + a.slots, 0)
-  const remainingSlots = (slotConfig?.totalSlots ?? 0) - allocatedSlots
+  const availableInvestors = investors.filter(
+    inv => !allocations.some(a => a.investorUid === inv.uid),
+  )
 
   const handleAddAllocation = async () => {
-    if (!allocPortfolio || !slotConfig || !addInvestorUid) return
-    if (addSlots <= 0 || addSlots > remainingSlots) {
-      toast.error(`Slot tidak valid. Tersisa ${remainingSlots} slot.`)
-      return
-    }
-
-    const investor = investors.find(i => i.uid === addInvestorUid)
-    if (!investor) return
-
-    // Check if this investor already has an allocation
-    if (allocations.some(a => a.investorUid === addInvestorUid)) {
-      toast.error('Investor ini sudah memiliki alokasi di portofolio ini.')
+    if (!allocPortfolio) return
+    const investor = investors.find(i => i.uid === newInvestorUid)
+    const amount = Number(newAmount)
+    const percent = Number(newPercent)
+    if (!investor || !Number.isFinite(amount) || amount <= 0 || !Number.isFinite(percent) || percent <= 0) {
+      toast.error('Pilih Investor dan isi Jumlah Investasi & Persentase dengan benar.')
       return
     }
 
@@ -158,45 +182,55 @@ export default function AdminPortfolios() {
           portfolioId: allocPortfolio.id,
           portfolioName: allocPortfolio.name,
           portfolioCode: allocPortfolio.code,
-          slots: addSlots,
-          investedAmount: addSlots * slotConfig.nominalPerSlot,
+          slots: 0,
+          investedAmount: amount,
+          ownershipPercent: percent,
         },
-        slotConfig.totalSlots,
+        0,
       )
-      toast.success(`${investor.displayName} ditambahkan (${addSlots} slot)`)
-
-      // Refresh
+      toast.success(`${investor.displayName} ditambahkan`)
       const allocs = await getAllocationsForPortfolio(allocPortfolio.id)
       setAllocations(allocs)
-      setAddInvestorUid('')
-      setAddSlots(1)
+      setNewInvestorUid('')
+      setNewAmount('')
+      setNewPercent('')
       fetchData()
     } catch {
-      toast.error('Gagal menambahkan alokasi')
+      toast.error('Gagal menambahkan investor')
     }
   }
 
-  const handleUpdateAllocation = async (alloc: InvestorAllocation) => {
-    if (!allocPortfolio || !slotConfig) return
-    const otherAllocated = allocatedSlots - alloc.slots
-    const maxForThis = slotConfig.totalSlots - otherAllocated
-    if (editSlots <= 0 || editSlots > maxForThis) {
-      toast.error(`Slot tidak valid. Maksimal ${maxForThis} slot untuk investor ini.`)
+  const startEditAllocation = (alloc: InvestorAllocation) => {
+    setEditAllocId(alloc.id)
+    setEditAmount(String(alloc.investedAmount))
+    setEditPercent(String(alloc.ownershipPercent ?? ''))
+  }
+
+  const cancelEditAllocation = () => {
+    setEditAllocId(null)
+    setEditAmount('')
+    setEditPercent('')
+  }
+
+  const handleSaveEditAllocation = async (alloc: InvestorAllocation) => {
+    if (!allocPortfolio) return
+    const amount = Number(editAmount)
+    const percent = Number(editPercent)
+    if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(percent) || percent <= 0) {
+      toast.error('Jumlah Investasi dan Persentase harus valid.')
       return
     }
-
     try {
       await updateAllocation(
         alloc.id,
-        { slots: editSlots, investedAmount: editSlots * slotConfig.nominalPerSlot },
+        { investedAmount: amount, ownershipPercent: percent },
         allocPortfolio.id,
-        slotConfig.totalSlots,
+        0,
       )
       toast.success('Alokasi berhasil diperbarui')
-
       const allocs = await getAllocationsForPortfolio(allocPortfolio.id)
       setAllocations(allocs)
-      setEditAllocId(null)
+      cancelEditAllocation()
       fetchData()
     } catch {
       toast.error('Gagal memperbarui alokasi')
@@ -204,13 +238,12 @@ export default function AdminPortfolios() {
   }
 
   const handleDeleteAllocation = async (alloc: InvestorAllocation) => {
-    if (!allocPortfolio || !slotConfig) return
+    if (!allocPortfolio) return
     if (!window.confirm(`Hapus alokasi ${alloc.investorName}?`)) return
 
     try {
-      await deleteAllocation(alloc.id, allocPortfolio.id, slotConfig.totalSlots)
+      await deleteAllocation(alloc.id, allocPortfolio.id, 0)
       toast.success('Alokasi berhasil dihapus')
-
       const allocs = await getAllocationsForPortfolio(allocPortfolio.id)
       setAllocations(allocs)
       fetchData()
@@ -218,11 +251,6 @@ export default function AdminPortfolios() {
       toast.error('Gagal menghapus alokasi')
     }
   }
-
-  // Investors not yet allocated to this portfolio
-  const availableInvestors = investors.filter(
-    inv => !allocations.some(a => a.investorUid === inv.uid),
-  )
 
   return (
     <div className="p-8">
@@ -245,46 +273,48 @@ export default function AdminPortfolios() {
         <Card><CardContent className="py-12 text-center text-muted-foreground">Belum ada portofolio</CardContent></Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {portfolios.map(p => {
-            const summary = p.slotsSummary
-            return (
-              <Card key={p.id} className="relative">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <CardTitle className="text-base truncate">{p.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1">{p.code} · {p.stage}</p>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Badge variant="outline">{p.periode}</Badge>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(p)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+          {portfolios.map(p => (
+            <Card key={p.id} className="relative">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base truncate">{p.name}</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {p.brandName ? `${p.brandName} · ` : ''}{p.code} · {p.stage}
+                    </p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{p.description || 'Tidak ada deskripsi'}</p>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Investasi Awal</p>
-                      <p className="font-semibold text-sm">{formatCurrencyCompact(p.investasiAwal)}</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => openAllocDialog(p)}>
-                      <Users className="mr-1 h-3 w-3" />
-                      {summary
-                        ? `${summary.investorCount} Investor · ${summary.allocatedSlots}/${summary.totalSlots} Slot`
-                        : `${p.assignedInvestors.length} Investor`
-                      }
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Badge variant="outline">{p.periode}</Badge>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(p)}>
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{p.description || 'Tidak ada deskripsi'}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Investasi Awal</p>
+                    <p className="font-semibold text-sm">{formatCurrencyCompact(p.investasiAwal)}</p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Button size="sm" variant="outline" onClick={() => openAllocDialog(p)}>
+                      <Users className="mr-1 h-3 w-3" />
+                      {p.assignedInvestors.length} Investor
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openAnalystDialog(p)}>
+                      <UserCog className="mr-1 h-3 w-3" />
+                      {(p.assignedAnalysts?.length ?? 0)} Analis
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -310,6 +340,13 @@ export default function AdminPortfolios() {
                   <p className="text-xs text-destructive">{String(editForm.formState.errors.code.message)}</p>
                 )}
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Brand Name</Label>
+              <Input placeholder="Contoh Brand" {...editForm.register('brandName')} />
+              {editForm.formState.errors.brandName && (
+                <p className="text-xs text-destructive">{String(editForm.formState.errors.brandName.message)}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -339,182 +376,200 @@ export default function AdminPortfolios() {
         </DialogContent>
       </Dialog>
 
-      {/* Slot Allocation Dialog */}
+      {/* Manual Investor Allocation Dialog */}
       <Dialog open={allocOpen} onOpenChange={setAllocOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Alokasi Investor — {allocPortfolio?.name}</DialogTitle>
+            <DialogTitle>Investor — {allocPortfolio?.name}</DialogTitle>
           </DialogHeader>
 
           {allocLoading ? (
             <div className="py-8 text-center">
               <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-[#1e5f3f] border-t-transparent" />
             </div>
-          ) : !slotConfig ? (
-            <div className="py-8 text-center text-muted-foreground">
-              <p>Portofolio ini belum dikonfigurasi dengan model slot-based.</p>
-              <p className="text-xs mt-1">Konfigurasi return model sebagai "Slot Based" di setup wizard terlebih dahulu.</p>
-            </div>
           ) : (
             <div className="space-y-4 mt-2">
-              {/* Slot Summary Bar */}
-              <div className="rounded-lg border p-4">
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Alokasi Slot</span>
-                  <span className="font-medium">
-                    {allocatedSlots} / {slotConfig.totalSlots} slot terisi
-                    {remainingSlots > 0 && (
-                      <span className="text-muted-foreground ml-1">({remainingSlots} tersisa)</span>
-                    )}
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[#1e5f3f] transition-all"
-                    style={{ width: `${slotConfig.totalSlots > 0 ? (allocatedSlots / slotConfig.totalSlots) * 100 : 0}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Nominal per slot: {formatCurrencyCompact(slotConfig.nominalPerSlot)}
-                </p>
-              </div>
-
-              {/* Current Allocations Table */}
               {allocations.length > 0 && (
                 <div className="rounded-lg border overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                       <tr>
-                        <th className="text-left py-2 px-3 font-medium">Investor</th>
-                        <th className="text-center py-2 px-3 font-medium">Slot</th>
-                        <th className="text-right py-2 px-3 font-medium">Investasi</th>
-                        <th className="text-center py-2 px-3 font-medium">Kepemilikan</th>
-                        <th className="text-right py-2 px-3 font-medium w-24">Aksi</th>
+                        <th className="text-left py-2 px-3 font-medium">Nama Investor</th>
+                        <th className="text-right py-2 px-3 font-medium">Jumlah Investasi</th>
+                        <th className="text-center py-2 px-3 font-medium">Persentase</th>
+                        <th className="text-right py-2 px-3 font-medium w-16">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {allocations.map(alloc => (
-                        <tr key={alloc.id} className="hover:bg-muted/30">
-                          <td className="py-2.5 px-3">
-                            <p className="font-medium">{alloc.investorName}</p>
-                            <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            {editAllocId === alloc.id ? (
-                              <Input
-                                type="number"
-                                min={1}
-                                max={slotConfig.totalSlots - (allocatedSlots - alloc.slots)}
-                                value={editSlots}
-                                onChange={e => setEditSlots(Number(e.target.value))}
-                                className="w-20 mx-auto h-8 text-center"
-                              />
-                            ) : (
-                              <Badge variant="secondary">{alloc.slots}</Badge>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            {editAllocId === alloc.id
-                              ? formatCurrencyCompact(editSlots * slotConfig.nominalPerSlot)
-                              : formatCurrencyCompact(alloc.investedAmount)
-                            }
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            {slotConfig.totalSlots > 0
-                              ? `${((editAllocId === alloc.id ? editSlots : alloc.slots) / slotConfig.totalSlots * 100).toFixed(1)}%`
-                              : '—'
-                            }
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            {editAllocId === alloc.id ? (
-                              <div className="flex justify-end gap-1">
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditAllocId(null)}>
-                                  Batal
-                                </Button>
-                                <Button size="sm" className="h-7 text-xs" onClick={() => handleUpdateAllocation(alloc)}>
-                                  Simpan
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7"
-                                  onClick={() => { setEditAllocId(alloc.id); setEditSlots(alloc.slots) }}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-destructive hover:text-destructive"
-                                  onClick={() => handleDeleteAllocation(alloc)}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {allocations.map(alloc => {
+                        const isEditing = editAllocId === alloc.id
+                        return (
+                          <tr key={alloc.id} className="hover:bg-muted/30">
+                            <td className="py-2.5 px-3">
+                              <p className="font-medium">{alloc.investorName}</p>
+                              {alloc.investorEmail && (
+                                <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              {isEditing ? (
+                                <Input
+                                  type="number"
+                                  value={editAmount}
+                                  onChange={e => setEditAmount(e.target.value)}
+                                  className="h-8 w-32 text-right ml-auto"
+                                />
+                              ) : (
+                                formatCurrencyCompact(alloc.investedAmount)
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {isEditing ? (
+                                <Input
+                                  type="number"
+                                  value={editPercent}
+                                  onChange={e => setEditPercent(e.target.value)}
+                                  className="h-8 w-20 text-center mx-auto"
+                                />
+                              ) : (
+                                alloc.ownershipPercent != null ? `${alloc.ownershipPercent}%` : '—'
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              {isEditing ? (
+                                <div className="flex justify-end gap-1">
+                                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={cancelEditAllocation}>
+                                    Batal
+                                  </Button>
+                                  <Button size="sm" className="h-7 text-xs" onClick={() => handleSaveEditAllocation(alloc)}>
+                                    Simpan
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7"
+                                    onClick={() => startEditAllocation(alloc)}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteAllocation(alloc)}
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
 
-              {/* Add Investor Row */}
-              {remainingSlots > 0 && availableInvestors.length > 0 && (
-                <div className="rounded-lg border p-4 space-y-3">
-                  <p className="text-sm font-medium">Tambah Investor</p>
-                  <div className="flex items-end gap-3">
-                    <div className="flex-1 space-y-1">
-                      <Label className="text-xs">Investor</Label>
-                      <select
-                        value={addInvestorUid}
-                        onChange={e => setAddInvestorUid(e.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">Pilih investor...</option>
-                        {availableInvestors.map(inv => (
-                          <option key={inv.uid} value={inv.uid}>
-                            {inv.displayName} ({inv.email})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-24 space-y-1">
-                      <Label className="text-xs">Slot</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={remainingSlots}
-                        value={addSlots}
-                        onChange={e => setAddSlots(Number(e.target.value))}
-                        className="h-9"
-                      />
-                    </div>
-                    <Button onClick={handleAddAllocation} disabled={!addInvestorUid || addSlots <= 0}>
-                      <UserPlus className="mr-1 h-4 w-4" />Tambah
-                    </Button>
+              {/* Add Form — pick investor account, manual amount & % */}
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm font-medium">Tambah Investor</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Investor</Label>
+                    <select
+                      value={newInvestorUid}
+                      onChange={e => setNewInvestorUid(e.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">Pilih investor...</option>
+                      {availableInvestors.map(inv => (
+                        <option key={inv.uid} value={inv.uid}>
+                          {inv.displayName} ({inv.email})
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  {addInvestorUid && addSlots > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Investasi: {formatCurrencyCompact(addSlots * slotConfig.nominalPerSlot)} · Kepemilikan: {((addSlots / slotConfig.totalSlots) * 100).toFixed(1)}%
-                    </p>
-                  )}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Jumlah Investasi (IDR)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={newAmount}
+                      onChange={e => setNewAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Persentase (%)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={newPercent}
+                      onChange={e => setNewPercent(e.target.value)}
+                    />
+                  </div>
                 </div>
-              )}
-
-              {remainingSlots <= 0 && (
-                <p className="text-sm text-center text-muted-foreground py-2">Semua slot telah teralokasi.</p>
-              )}
-
-              {availableInvestors.length === 0 && remainingSlots > 0 && (
-                <p className="text-sm text-center text-muted-foreground py-2">Semua investor sudah memiliki alokasi.</p>
-              )}
+                {availableInvestors.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Semua investor sudah memiliki alokasi di portofolio ini.</p>
+                )}
+                <div className="flex justify-end">
+                  <Button onClick={handleAddAllocation} disabled={!newInvestorUid}>
+                    <UserPlus className="mr-1 h-4 w-4" />Tambah
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Analyst Dialog */}
+      <Dialog open={analystDialogOpen} onOpenChange={setAnalystDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Analis — {analystTarget?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 space-y-3">
+            {analysts.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Belum ada akun analis terdaftar. Buat di halaman Manajemen Pengguna.
+              </p>
+            ) : (
+              <ul className="divide-y rounded-lg border">
+                {analysts.map(a => {
+                  const checked = selectedAnalystUids.has(a.uid)
+                  return (
+                    <li key={a.uid}>
+                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-muted/40">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleAnalyst(a.uid)}
+                          className="h-4 w-4 rounded border-gray-300 accent-[#1e5f3f]"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{a.displayName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{a.email}</p>
+                        </div>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Hanya analis yang dipilih yang dapat membuka dan mengedit portofolio ini.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setAnalystDialogOpen(false)}>Batal</Button>
+              <Button onClick={saveAssignedAnalysts} disabled={savingAnalysts}>
+                {savingAnalysts ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
