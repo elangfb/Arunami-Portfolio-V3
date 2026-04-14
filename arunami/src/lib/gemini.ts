@@ -1,4 +1,8 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+// NOTE: This file is still named `gemini.ts` for import-path compatibility,
+// but now uses the Anthropic Claude API. All exported function signatures are
+// unchanged so callers (PnLPage, ProjectionsPage, StepUploadDocuments,
+// portfolioEnrichment) don't need to change their imports.
+import Anthropic from '@anthropic-ai/sdk'
 import * as XLSX from 'xlsx'
 import type {
   PnLExtractedData, ProjectionExtractedData, PortfolioConfig,
@@ -7,7 +11,12 @@ import type {
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY)
+const anthropic = new Anthropic({
+  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+  dangerouslyAllowBrowser: true,
+})
+const CLAUDE_MODEL = 'claude-sonnet-4-5'
+const MAX_TOKENS = 8192
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -80,26 +89,7 @@ Semua nilai moneter dalam IDR (angka saja, tanpa simbol).
 `
 
 export async function extractPnL(file: File, config?: PortfolioConfig): Promise<PnLExtractedData> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: { responseMimeType: 'application/json' },
-  })
-  const ext = file.name.split('.').pop()?.toLowerCase()
-  const prompt = buildPnLPrompt(config)
-
-  let result
-  if (ext === 'pdf') {
-    const base64 = await fileToBase64(file)
-    result = await model.generateContent([
-      prompt,
-      { inlineData: { mimeType: 'application/pdf', data: base64 } },
-    ])
-  } else {
-    const text = await parseSpreadsheetToText(file)
-    result = await model.generateContent([prompt, text])
-  }
-
-  const raw = result.response.text().replace(/```json|```/g, '').trim()
+  const raw = await sendToClaude(file, buildPnLPrompt(config))
   return safeParseJSON<PnLExtractedData>(raw)
 }
 
@@ -189,26 +179,81 @@ function safeParseJSON<T>(raw: string): T {
   }
 }
 
-async function sendToGemini(file: File, prompt: string): Promise<string> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: { responseMimeType: 'application/json' },
-  })
+/**
+ * Core helper: sends a file + prompt to Claude and returns the raw JSON string.
+ * Handles both PDF (document content block) and spreadsheet (parsed to text).
+ * The prompt is split so the static instruction portion is sent as a cached
+ * system message — ~90% cheaper on repeat uploads.
+ */
+async function sendToClaude(file: File, prompt: string): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase()
 
-  let result
+  // Build the user content blocks: file payload + a tiny nudge.
+  const userContent: Anthropic.Messages.ContentBlockParam[] = []
+
   if (ext === 'pdf') {
     const base64 = await fileToBase64(file)
-    result = await model.generateContent([
-      prompt,
-      { inlineData: { mimeType: 'application/pdf', data: base64 } },
-    ])
+    userContent.push({
+      type: 'document',
+      source: {
+        type: 'base64',
+        media_type: 'application/pdf',
+        data: base64,
+      },
+    })
   } else {
     const text = await parseSpreadsheetToText(file)
-    result = await model.generateContent([prompt, text])
+    userContent.push({
+      type: 'text',
+      text: `Dokumen (CSV/spreadsheet):\n\n${text}`,
+    })
   }
+  userContent.push({
+    type: 'text',
+    text: 'Ekstrak sekarang dan balas HANYA dengan JSON valid sesuai skema di instruksi. Jangan menyertakan markdown fence atau penjelasan.',
+  })
 
-  return result.response.text().replace(/```json|```/g, '').trim()
+  const response = await withRetry(() =>
+    anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: MAX_TOKENS,
+      system: [
+        {
+          type: 'text',
+          text: prompt,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: userContent }],
+    }),
+  )
+
+  const first = response.content[0]
+  if (!first || first.type !== 'text') {
+    throw new Error('Claude response did not contain text content')
+  }
+  return first.text.replace(/```json|```/g, '').trim()
+}
+
+/**
+ * Retry transient failures (5xx, 429, network) up to 3 times with backoff.
+ * Does NOT retry on 4xx client errors (bad key, malformed request).
+ */
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  const delays = [500, 1500, 4000]
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      const status = (err as { status?: number })?.status
+      const retriable = status === undefined || status >= 500 || status === 429
+      if (!retriable || i === attempts - 1) throw err
+      await new Promise(r => setTimeout(r, delays[i]))
+    }
+  }
+  throw lastErr
 }
 
 /** Ensure all numeric fields are valid numbers (replace NaN/undefined with 0) */
@@ -304,7 +349,7 @@ export async function extractPortfolioSetup(
   const pnlPromise = pnlFile
     ? (async () => {
         onStage?.('reading_pnl')
-        const raw = await sendToGemini(pnlFile, SETUP_PNL_PROMPT)
+        const raw = await sendToClaude(pnlFile, SETUP_PNL_PROMPT)
         onStage?.('extracting_pnl')
         return safeParseJSON<ClassifiedPnLData>(raw)
       })()
@@ -313,7 +358,7 @@ export async function extractPortfolioSetup(
   const projPromise = projectionFile
     ? (async () => {
         onStage?.('reading_projection')
-        const raw = await sendToGemini(projectionFile, SETUP_PROJECTION_PROMPT)
+        const raw = await sendToClaude(projectionFile, SETUP_PROJECTION_PROMPT)
         onStage?.('extracting_projection')
         return safeParseJSON<ClassifiedProjectionData>(raw)
       })()
@@ -455,7 +500,7 @@ ATURAN:
 `
 
 export async function extractProjectionMonthly(file: File): Promise<ProjectionUploadPending> {
-  const raw = await sendToGemini(file, PROJECTION_MONTHLY_PROMPT)
+  const raw = await sendToClaude(file, PROJECTION_MONTHLY_PROMPT)
   const parsed = safeParseJSON<ProjectionUploadPending>(raw)
   return { ...parsed, status: 'pending_review' }
 }
@@ -463,24 +508,153 @@ export async function extractProjectionMonthly(file: File): Promise<ProjectionUp
 // ─── Legacy extraction functions (used by analyst pages) ─────────────────
 
 export async function extractProjection(file: File): Promise<ProjectionExtractedData> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: { responseMimeType: 'application/json' },
-  })
-  const ext = file.name.split('.').pop()?.toLowerCase()
+  const raw = await sendToClaude(file, PROJECTION_PROMPT)
+  return safeParseJSON<ProjectionExtractedData>(raw)
+}
 
-  let result
-  if (ext === 'pdf') {
-    const base64 = await fileToBase64(file)
-    result = await model.generateContent([
-      PROJECTION_PROMPT,
-      { inlineData: { mimeType: 'application/pdf', data: base64 } },
-    ])
+// ─── AI-generated Management Report ──────────────────────────────────────
+
+export interface GeneratedManagementReport {
+  businessSummary: string
+  issues: { title: string; severity: 'high' | 'medium' | 'low'; description: string }[]
+  actionItems: { title: string; category: 'business' | 'operational' | 'financial'; description: string }[]
+}
+
+const MGMT_REPORT_SYSTEM = `
+Kamu adalah seorang financial analyst senior yang membuat laporan manajemen bulanan untuk investor di Indonesia.
+
+Tugasmu: menganalisis data PnL aktual vs proyeksi untuk satu bulan, lalu menghasilkan laporan terstruktur dalam Bahasa Indonesia yang berisi:
+
+1. **businessSummary** — narasi 2-4 kalimat yang menjelaskan kinerja bulan ini secara keseluruhan. Sebutkan angka revenue, net profit, dan variance utama vs proyeksi. Nada profesional namun mudah dipahami investor non-teknis.
+
+2. **issues** — array isu yang kamu identifikasi dari data. Fokus pada:
+   - Revenue di bawah proyeksi (missed target)
+   - COGS di atas rencana (margin compression)
+   - Opex overrun pada kategori tertentu
+   - Net profit jauh di bawah proyeksi
+   - Efisiensi operasional yang menurun
+   Tiap isu: { title (singkat), severity (high/medium/low), description (1-2 kalimat yang menjelaskan akar masalah dan angka pendukung) }
+
+3. **actionItems** — array rekomendasi solusi untuk isu di atas. Tiap action item harus konkret dan actionable, bukan platitude. Tiap item: { title (imperatif, misal "Negosiasi ulang harga supplier utama"), category (business/operational/financial), description (1-2 kalimat yang menjelaskan langkah spesifik dan dampak yang diharapkan) }
+
+PENTING:
+- Gunakan Bahasa Indonesia formal namun tidak kaku
+- Jangan buat isu atau action item yang tidak didukung data — jika tidak ada masalah serius, output issues bisa pendek atau kosong
+- Jangan gunakan markdown atau formatting lain di dalam string
+- Angka selalu dalam IDR (tanpa simbol Rp, tanpa titik ribuan di dalam string, cukup sebut "Rp 48 juta" atau "Rp 48jt")
+- Severity: high = masalah yang dapat merusak kinerja jika tidak ditangani bulan ini, medium = memerlukan perhatian namun tidak urgent, low = observasi/early warning
+`.trim()
+
+const MGMT_REPORT_SCHEMA = `
+Kembalikan HANYA JSON valid dengan struktur berikut (tanpa penjelasan tambahan, tanpa markdown fence):
+{
+  "businessSummary": "string",
+  "issues": [
+    { "title": "string", "severity": "high" | "medium" | "low", "description": "string" }
+  ],
+  "actionItems": [
+    { "title": "string", "category": "business" | "operational" | "financial", "description": "string" }
+  ]
+}
+`.trim()
+
+interface GenerateArgs {
+  period: string // YYYY-MM
+  pnl: PnLExtractedData
+  projection?: ProjectionExtractedData | null
+  previousPnl?: PnLExtractedData | null
+  portfolioName?: string
+  arunamiNotes?: string[]
+}
+
+/**
+ * Generate an investor-ready management report in Bahasa Indonesia using
+ * Claude. Analyzes actual P&L vs projection for the given period and produces
+ * business summary, detected issues, and recommended action items.
+ */
+export async function generateManagementReport(args: GenerateArgs): Promise<GeneratedManagementReport> {
+  const { period, pnl, projection, previousPnl, portfolioName, arunamiNotes } = args
+
+  // Build a compact data snapshot that Claude reasons over.
+  const lines: string[] = []
+  lines.push(`PORTOFOLIO: ${portfolioName ?? '(tidak diketahui)'}`)
+  lines.push(`PERIODE: ${period}`)
+  lines.push('')
+  lines.push('═══ PnL AKTUAL BULAN INI ═══')
+  lines.push(`Revenue: ${pnl.revenue}`)
+  lines.push(`COGS: ${pnl.cogs}`)
+  lines.push(`Gross Profit: ${pnl.grossProfit}`)
+  lines.push(`Total Opex: ${pnl.totalOpex}`)
+  lines.push(`Operating Profit: ${pnl.operatingProfit}`)
+  lines.push(`Interest: ${pnl.interest}`)
+  lines.push(`Taxes: ${pnl.taxes}`)
+  lines.push(`Net Profit: ${pnl.netProfit}`)
+  lines.push(`Jumlah Transaksi: ${pnl.transactionCount}`)
+  if (pnl.opex?.length) {
+    lines.push('Detail Opex:')
+    for (const o of pnl.opex) lines.push(`  - ${o.name}: ${o.amount}`)
+  }
+  if (pnl.notes) lines.push(`Catatan PnL: ${pnl.notes}`)
+  lines.push('')
+
+  if (projection) {
+    lines.push('═══ PROYEKSI UNTUK BULAN INI ═══')
+    lines.push(`Projected Revenue: ${projection.projectedRevenue}`)
+    lines.push(`Projected COGS: ${projection.projectedCogs}`)
+    lines.push(`Projected Gross Profit: ${projection.projectedGrossProfit}`)
+    lines.push(`Projected Total Opex: ${projection.projectedTotalOpex}`)
+    lines.push(`Projected Net Profit: ${projection.projectedNetProfit}`)
+    if (projection.projectedOpex?.length) {
+      lines.push('Detail Projected Opex:')
+      for (const o of projection.projectedOpex) lines.push(`  - ${o.name}: ${o.amount}`)
+    }
+    if (projection.assumptions) lines.push(`Asumsi Proyeksi: ${projection.assumptions}`)
+    lines.push('')
   } else {
-    const text = await parseSpreadsheetToText(file)
-    result = await model.generateContent([PROJECTION_PROMPT, text])
+    lines.push('═══ PROYEKSI: tidak tersedia untuk bulan ini ═══')
+    lines.push('')
   }
 
-  const raw = result.response.text().replace(/```json|```/g, '').trim()
-  return safeParseJSON<ProjectionExtractedData>(raw)
+  if (previousPnl) {
+    lines.push('═══ PnL BULAN SEBELUMNYA (untuk konteks MoM) ═══')
+    lines.push(`Revenue: ${previousPnl.revenue}`)
+    lines.push(`Net Profit: ${previousPnl.netProfit}`)
+    lines.push(`Total Opex: ${previousPnl.totalOpex}`)
+    lines.push('')
+  }
+
+  if (arunamiNotes?.length) {
+    lines.push('═══ ARUNAMI NOTES (konteks kualitatif dari analyst) ═══')
+    for (const n of arunamiNotes) lines.push(`- ${n}`)
+    lines.push('')
+  }
+
+  lines.push(MGMT_REPORT_SCHEMA)
+
+  const response = await withRetry(() =>
+    anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: MAX_TOKENS,
+      system: [
+        {
+          type: 'text',
+          text: MGMT_REPORT_SYSTEM,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: lines.join('\n') }],
+        },
+      ],
+    }),
+  )
+
+  const first = response.content[0]
+  if (!first || first.type !== 'text') {
+    throw new Error('Claude response did not contain text content')
+  }
+  const raw = first.text.replace(/```json|```/g, '').trim()
+  return safeParseJSON<GeneratedManagementReport>(raw)
 }

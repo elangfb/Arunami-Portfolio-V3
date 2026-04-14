@@ -49,6 +49,10 @@ export type InvestorConfigUnion = SlotBasedConfig | PercentageBasedConfig | Fixe
 export interface PortfolioConfig {
   industryType: IndustryType
   revenueCategories: RevenueCategory[]
+  // Unit categories specifically for the P&L unit-breakdown section. Empty by
+  // default — the analyst seeds them on the first upload via the "+" button,
+  // and they persist for subsequent uploads so the analyst only edits numbers.
+  pnlUnitCategories?: RevenueCategory[]
   returnModel: ReturnModelType
   investorConfig: InvestorConfigUnion
   reportingFrequency: ReportingFrequency

@@ -1,0 +1,25 @@
+Laporan PnL Bulanan (Aktual)
+Periode,2026-03
+Bulan,Maret 2026
+
+Kategori,Nilai (IDR)
+Revenue,53000000
+COGS,22260000
+Gross Profit,30740000
+
+Operating Expenses
+Gaji,8200000
+Sewa,3000000
+Marketing,2500000
+Utilitas,1560000
+Lain-lain,1100000
+Total Opex,16360000
+
+Operating Profit,14380000
+Interest,300000
+Taxes,1410000
+Net Profit,12670000
+
+Jumlah Transaksi,1750
+
+Catatan: Revenue Maret di bawah proyeksi (-3.6%) karena traffic Ramadan lebih lambat dari ekspektasi. COGS naik ke 42% karena supply chain disruption. Marketing overspend untuk push late-month recovery.

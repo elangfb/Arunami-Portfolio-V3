@@ -4,8 +4,9 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { toast } from 'sonner'
 import {
   getManagementReports, saveManagementReport, deleteManagementReport,
-  getReports, getNotes, saveReport,
+  getReports, getNotes,
 } from '@/lib/firestore'
+import { generateManagementReport } from '@/lib/gemini'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,10 +17,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
-import { formatCurrencyExact } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle, Trash2, FileText } from 'lucide-react'
-import { serverTimestamp } from 'firebase/firestore'
+import { PlusCircle, Trash2, Sparkles } from 'lucide-react'
 import type {
   ManagementReport, IssueSeverity, ActionStatus, ActionCategory, Portfolio,
   PnLExtractedData, ProjectionExtractedData,
@@ -41,7 +40,7 @@ export default function ManagementPage() {
   const [reports, setReports] = useState<ManagementReport[]>([])
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [publishing, setPublishing] = useState(false)
+  const [generating, setGenerating] = useState(false)
 
   const { register, handleSubmit, control, reset, setValue, watch } = useForm<FormData>({
     defaultValues: {
@@ -87,136 +86,71 @@ export default function ManagementPage() {
     }
   }
 
-  const buildHtml = (
-    pnlReports: PnLExtractedData[],
-    projReports: ProjectionExtractedData[],
-    mgmtReports: ManagementReport[],
-    notes: { content: string; createdAt?: { seconds: number } }[],
-  ): { html: string; period: string } => {
-    const sortedPnl = [...pnlReports].sort((a, b) => comparePeriods(a.period, b.period))
-    const latestPnl = sortedPnl.at(-1)
-    const latestMgmt = [...mgmtReports].sort((a, b) => comparePeriods(a.period, b.period)).at(-1)
-    const latestProj = [...projReports].sort((a, b) => comparePeriods(a.period, b.period)).at(-1)
-    const period = latestPnl?.period ?? latestMgmt?.period ?? new Date().toISOString().slice(0, 7)
-
-    const pnlRow = (label: string, val: number) =>
-      `<tr><td>${label}</td><td style="text-align:right">${formatCurrencyExact(val)}</td></tr>`
-
-    const pnlSection = latestPnl ? `
-      <h2>Laporan Keuangan — ${formatPeriod(latestPnl.period)}</h2>
-      <table class="data">
-        ${pnlRow('Revenue', latestPnl.revenue)}
-        ${pnlRow('COGS', latestPnl.cogs)}
-        ${pnlRow('Gross Profit', latestPnl.grossProfit)}
-        ${pnlRow('Total Opex', latestPnl.totalOpex)}
-        ${pnlRow('Operating Profit', latestPnl.operatingProfit)}
-        ${pnlRow('Net Profit', latestPnl.netProfit)}
-      </table>
-    ` : '<p><em>Belum ada data P&amp;L.</em></p>'
-
-    const projSection = latestProj ? `
-      <h2>Proyeksi — ${formatPeriod(latestProj.period)}</h2>
-      <table class="data">
-        ${pnlRow('Projected Revenue', latestProj.projectedRevenue)}
-        ${pnlRow('Projected COGS', latestProj.projectedCogs)}
-        ${pnlRow('Projected Gross Profit', latestProj.projectedGrossProfit)}
-        ${pnlRow('Projected Total Opex', latestProj.projectedTotalOpex)}
-        ${pnlRow('Projected Net Profit', latestProj.projectedNetProfit)}
-      </table>
-    ` : ''
-
-    const costSection = latestPnl && latestPnl.opex?.length ? `
-      <h2>Struktur Biaya</h2>
-      <table class="data">
-        <tr><th>Item</th><th style="text-align:right">Jumlah</th></tr>
-        ${latestPnl.opex.map(o => `<tr><td>${o.name}</td><td style="text-align:right">${formatCurrencyExact(o.amount)}</td></tr>`).join('')}
-      </table>
-    ` : ''
-
-    const issuesSection = latestMgmt && latestMgmt.issues?.length ? `
-      <h2>Isu</h2>
-      <ul>${latestMgmt.issues.map(i => `<li><strong>[${i.severity.toUpperCase()}]</strong> ${i.title}${i.description ? ` — ${i.description}` : ''}</li>`).join('')}</ul>
-    ` : ''
-
-    const actionsSection = latestMgmt && latestMgmt.actionItems?.length ? `
-      <h2>Action Items</h2>
-      <ul>${latestMgmt.actionItems.map(a => `<li><strong>[${a.status}]</strong> ${a.title}${a.assignee ? ` — ${a.assignee}` : ''}</li>`).join('')}</ul>
-    ` : ''
-
-    const summarySection = latestMgmt?.businessSummary
-      ? `<h2>Business Summary</h2><p>${latestMgmt.businessSummary.replace(/\n/g, '<br/>')}</p>`
-      : ''
-
-    const notesSection = notes.length ? `
-      <h2>Arunami Notes</h2>
-      ${[...notes]
-        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
-        .map(n => `<div class="note">${n.content.replace(/\n/g, '<br/>')}</div>`)
-        .join('')}
-    ` : ''
-
-    const html = `<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8" />
-<title>Portfolio Management — ${portfolio?.name ?? ''} — ${formatPeriod(period)}</title>
-<style>
-  body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #1a1a1a; max-width: 820px; margin: 0 auto; padding: 40px 24px; }
-  h1 { color: #1e5f3f; font-size: 22px; margin-bottom: 4px; }
-  h2 { font-size: 15px; color: #1e5f3f; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-top: 28px; }
-  p, li { font-size: 13px; line-height: 1.55; }
-  table.data { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  table.data td, table.data th { padding: 6px 10px; font-size: 13px; border-bottom: 1px solid #eee; }
-  table.data th { background: #f5f5f5; text-align: left; }
-  .note { background: #f9fafb; border-left: 3px solid #38a169; padding: 10px 12px; margin: 8px 0; font-size: 13px; }
-  .footer { margin-top: 40px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 12px; }
-</style>
-</head>
-<body>
-  <h1>Portfolio Management Report</h1>
-  <p><strong>${portfolio?.name ?? 'Portfolio'}</strong>${portfolio?.brandName ? ` · ${portfolio.brandName}` : ''} — Periode ${formatPeriod(period)}</p>
-  ${summarySection}
-  ${pnlSection}
-  ${projSection}
-  ${costSection}
-  ${issuesSection}
-  ${actionsSection}
-  ${notesSection}
-  <div class="footer">Diterbitkan oleh Tim Arunami — ${new Date().toLocaleString('id-ID')}</div>
-</body>
-</html>`
-    return { html, period }
-  }
-
-  const handlePublishReport = async () => {
-    if (!portfolioId || !user) return
-    setPublishing(true)
+  /**
+   * AI-generate a Portfolio Management report for the latest P&L period.
+   * Analyzes P&L vs projection and produces business summary, issues, and
+   * action items in Bahasa Indonesia, then saves as a ManagementReport.
+   */
+  const handleGenerateReport = async () => {
+    if (!portfolioId || !user || !portfolio) return
+    setGenerating(true)
     try {
-      const [pnls, projs, mgmts, notes] = await Promise.all([
+      const [pnls, projs, notes] = await Promise.all([
         getReports(portfolioId, 'pnl'),
         getReports(portfolioId, 'projection'),
-        getManagementReports(portfolioId),
         getNotes(portfolioId),
       ])
-      const pnlData = pnls.map(r => r.extractedData as PnLExtractedData)
-      const projData = projs.map(r => r.extractedData as ProjectionExtractedData)
-      const { html, period } = buildHtml(pnlData, projData, mgmts, notes)
-      await saveReport(portfolioId, {
-        type: 'management_report',
-        fileName: `Portfolio Management — ${formatPeriod(period)}`,
-        fileUrl: '',
-        period,
-        extractedData: {},
-        htmlContent: html,
-        publishedAt: serverTimestamp() as never,
-        uploadedBy: user.uid,
+      if (pnls.length === 0) {
+        toast.error('Belum ada data PnL. Upload PnL terlebih dahulu.')
+        setGenerating(false)
+        return
+      }
+
+      // Pick the latest P&L period
+      const sortedPnl = [...pnls].sort((a, b) => comparePeriods(a.period, b.period))
+      const latestPnl = sortedPnl.at(-1)!
+      const prevPnl = sortedPnl.at(-2)
+      const matchingProj = projs.find(p => p.period === latestPnl.period)
+
+      toast.info('AI sedang menganalisis data...')
+      const generated = await generateManagementReport({
+        period: latestPnl.period,
+        pnl: latestPnl.extractedData as PnLExtractedData,
+        projection: matchingProj ? (matchingProj.extractedData as ProjectionExtractedData) : null,
+        previousPnl: prevPnl ? (prevPnl.extractedData as PnLExtractedData) : null,
+        portfolioName: portfolio.name,
+        arunamiNotes: notes.map(n => n.content).filter(Boolean),
       })
-      toast.success('Portfolio Management report dipublikasikan')
+
+      // Save the AI output as a ManagementReport so it shows up in the
+      // existing list + is picked up by the Review & Publishing flow.
+      await saveManagementReport(portfolioId, {
+        period: latestPnl.period,
+        businessSummary: generated.businessSummary,
+        issues: generated.issues.map(i => ({
+          id: crypto.randomUUID(),
+          title: i.title,
+          severity: i.severity,
+          description: i.description,
+        })),
+        actionItems: generated.actionItems.map(a => ({
+          id: crypto.randomUUID(),
+          title: a.title,
+          status: 'pending' as ActionStatus,
+          assignee: '',
+          dueDate: '',
+          category: a.category,
+        })),
+        createdBy: user.uid,
+      })
+
+      toast.success(`Report untuk ${formatPeriod(latestPnl.period)} berhasil dibuat oleh AI`)
+      fetchReports()
     } catch (err) {
       console.error(err)
-      toast.error('Gagal mempublikasikan report')
+      toast.error('Gagal membuat report dengan AI')
     } finally {
-      setPublishing(false)
+      setGenerating(false)
     }
   }
 
@@ -225,9 +159,9 @@ export default function ManagementPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Portfolio Management</h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handlePublishReport} disabled={publishing}>
-            <FileText className="mr-2 h-4 w-4" />
-            {publishing ? 'Memublikasikan...' : 'Publish HTML Report'}
+          <Button size="sm" variant="outline" onClick={handleGenerateReport} disabled={generating}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            {generating ? 'Menganalisis...' : 'Generate Report with AI'}
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

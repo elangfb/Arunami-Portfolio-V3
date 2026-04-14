@@ -1,0 +1,25 @@
+Laporan PnL Bulanan (Aktual)
+Periode,2026-01
+Bulan,Januari 2026
+
+Kategori,Nilai (IDR)
+Revenue,48000000
+COGS,19680000
+Gross Profit,28320000
+
+Operating Expenses
+Gaji,8000000
+Sewa,3000000
+Marketing,2150000
+Utilitas,1520000
+Lain-lain,1100000
+Total Opex,15770000
+
+Operating Profit,12550000
+Interest,250000
+Taxes,1230000
+Net Profit,11070000
+
+Jumlah Transaksi,1650
+
+Catatan: Revenue Januari di bawah proyeksi (-4%) karena momentum post holiday yang lambat. COGS sedikit di atas rencana (41%) akibat harga supplier yang naik. Marketing overspend ringan untuk menstabilkan traffic.

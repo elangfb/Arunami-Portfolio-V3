@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { extractPnL } from '@/lib/gemini'
-import { getReports, saveReport, updateReport, deleteReport, syncFinancialData, getPortfolioConfigOrDefault } from '@/lib/firestore'
+import { getReports, saveReport, updateReport, deleteReport, syncFinancialData, getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
 import { enrichConfigFromFirstUpload } from '@/lib/portfolioEnrichment'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact } from '@/lib/utils'
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
+import { PnLReviewTable } from '@/components/PnLReviewTable'
 import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 import type { PnLExtractedData, OpexItem, PortfolioReport, Portfolio, PortfolioConfig, RevenueCategory } from '@/types'
 
@@ -36,6 +37,9 @@ export default function PnLPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
   const [categories, setCategories] = useState<RevenueCategory[]>([])
+  const [pendingPnl, setPendingPnl] = useState<PnLExtractedData | null>(null)
+  const [pendingUnits, setPendingUnits] = useState<RevenueCategory[]>([])
+  const [isConfirming, setIsConfirming] = useState(false)
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<PnLExtractedData>({
     defaultValues: {
@@ -112,24 +116,7 @@ export default function PnLPage() {
     setDialogOpen(true)
   }
 
-  // Populate form from extracted data
-  const populateForm = (data: PnLExtractedData) => {
-    // Normalize period to YYYY-MM format
-    data.period = normalizePeriod(data.period)
-    Object.entries(data).forEach(([k, v]) => {
-      if (k !== 'opex' && k !== 'unitBreakdown') {
-        setValue(k as keyof PnLExtractedData, v as never)
-      }
-    })
-    if (data.unitBreakdown) {
-      for (const cat of categories) {
-        setValue(`unitBreakdown.${cat.id}` as `unitBreakdown.${string}`, data.unitBreakdown[cat.id] ?? 0)
-      }
-    }
-    setOpexItems(data.opex ?? [])
-  }
-
-  // File upload → extract → open dialog
+  // File upload → extract → show inline review table
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -138,10 +125,34 @@ export default function PnLPage() {
     setMode('extracting')
     try {
       const data = await extractPnL(file, portfolioConfig ?? undefined)
-      setEditingReport(null)
-      populateForm(data)
-      setDialogOpen(true)
-      toast.success('Data berhasil diekstrak. Silakan review sebelum menyimpan.')
+
+      // Unit breakdown: use only the units the analyst has previously saved
+      // (from PortfolioConfig.pnlUnitCategories). First upload → empty list.
+      // Analyst adds/removes via + and X buttons in the review table.
+      const savedUnits = portfolioConfig?.pnlUnitCategories ?? []
+      setPendingUnits(savedUnits)
+      const filteredBreakdown: Record<string, number> = {}
+      for (const u of savedUnits) {
+        filteredBreakdown[u.id] = data.unitBreakdown?.[u.id] ?? 0
+      }
+
+      // Normalize period and ensure all fields exist for the review table
+      setPendingPnl({
+        period: normalizePeriod(data.period),
+        revenue: data.revenue ?? 0,
+        cogs: data.cogs ?? 0,
+        grossProfit: data.grossProfit ?? 0,
+        opex: data.opex ?? [],
+        totalOpex: data.totalOpex ?? 0,
+        operatingProfit: data.operatingProfit ?? 0,
+        interest: data.interest ?? 0,
+        taxes: data.taxes ?? 0,
+        netProfit: data.netProfit ?? 0,
+        transactionCount: data.transactionCount ?? 0,
+        unitBreakdown: filteredBreakdown,
+        notes: data.notes ?? '',
+      })
+      toast.success('Data berhasil diekstrak — silakan review sebelum konfirmasi')
 
       // One-shot enrichment on the very first upload — discovers custom revenue
       // categories and KPI metrics from this file and merges into PortfolioConfig.
@@ -170,7 +181,50 @@ export default function PnLPage() {
     }
   }
 
-  // Save (create or update)
+  // Confirm & save from the inline review table (upload flow)
+  const handleConfirmPnl = async () => {
+    if (!portfolioId || !user || !pendingPnl) return
+    if (!pendingPnl.period) {
+      toast.error('Periode wajib diisi')
+      return
+    }
+    setIsConfirming(true)
+    try {
+      await saveReport(portfolioId, {
+        type: 'pnl',
+        fileName: fileRef.current?.files?.[0]?.name ?? 'Upload PnL',
+        fileUrl: '',
+        period: pendingPnl.period,
+        extractedData: pendingPnl,
+        uploadedBy: user.uid,
+      })
+
+      // Persist the unit category list so the next upload pre-populates it.
+      // Only writes when the list has actually changed to avoid noisy config writes.
+      const existingUnits = portfolioConfig?.pnlUnitCategories ?? []
+      const unitsChanged =
+        existingUnits.length !== pendingUnits.length ||
+        existingUnits.some((u, i) => u.id !== pendingUnits[i]?.id || u.name !== pendingUnits[i]?.name)
+      if (portfolioConfig && unitsChanged) {
+        const { createdAt: _ignored, ...rest } = portfolioConfig
+        void _ignored
+        await savePortfolioConfig(portfolioId, { ...rest, pnlUnitCategories: pendingUnits })
+      }
+
+      await syncFinancialData(portfolioId)
+      setPendingPnl(null)
+      setPendingUnits([])
+      fetchReports()
+      fetchConfig()
+      toast.success('Laporan PnL berhasil disimpan')
+    } catch {
+      toast.error('Gagal menyimpan laporan')
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
+  // Save (create or update) — used by the manual-input / edit-existing dialog
   const onSave = async (data: PnLExtractedData) => {
     if (!portfolioId || !user) return
     setIsSaving(true)
@@ -258,6 +312,23 @@ export default function PnLPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Analyst Review Table — shown after a successful upload */}
+      {pendingPnl && (
+        <Card>
+          <CardContent className="pt-6">
+            <PnLReviewTable
+              data={pendingPnl}
+              onDataChange={setPendingPnl}
+              onConfirm={handleConfirmPnl}
+              onCancel={() => { setPendingPnl(null); setPendingUnits([]) }}
+              isConfirming={isConfirming}
+              units={pendingUnits}
+              onUnitsChange={setPendingUnits}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* History */}
       <Card>
