@@ -136,6 +136,14 @@ service cloud.firestore {
         allow read: if canReadPortfolio(portfolioId);
         allow write: if canWritePortfolio(portfolioId);
       }
+
+      // Profit sharing change history (append-only audit trail).
+      // Staff read/create; no updates or deletes so the trail stays immutable.
+      match /equityHistory/{entryId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow create: if canWritePortfolio(portfolioId);
+        allow update, delete: if false;
+      }
     }
 
     // ─── Top-level investor reports mirror ───────────────────────────────

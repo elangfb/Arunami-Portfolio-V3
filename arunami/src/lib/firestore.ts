@@ -11,7 +11,7 @@ import type {
   PnLExtractedData, ProjectionExtractedData,
   MonthlyDataPoint, CostItem, TransactionDataPoint, RevenueMixItem,
   PortfolioConfig, SlotsSummary, InvestorCommunication,
-  InvestorReportDoc,
+  InvestorReportDoc, EquityChangeEntry, EquityReasonCategory,
 } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 
@@ -141,6 +141,70 @@ export async function savePortfolioConfig(portfolioId: string, config: Omit<Port
     ...config,
     createdAt: serverTimestamp(),
   })
+}
+
+// ─── Equity History (Profit Sharing change trail) ───────────────────────
+
+/**
+ * Updates the investor share on the portfolio config AND appends an
+ * immutable history row in a single batch. The history row captures who
+ * changed it, when, why, and the period the change takes effect in.
+ */
+export async function updateInvestorShare(params: {
+  portfolioId: string
+  currentConfig: PortfolioConfig
+  newInvestorPercent: number
+  newArunamiPercent: number
+  reasonCategory: EquityReasonCategory
+  reasonNote?: string
+  effectiveFromPeriod: string
+  changedByUid: string
+  changedByName: string
+}): Promise<void> {
+  const {
+    portfolioId, currentConfig, newInvestorPercent, newArunamiPercent,
+    reasonCategory, reasonNote, effectiveFromPeriod, changedByUid, changedByName,
+  } = params
+
+  const batch = writeBatch(db)
+  const configRef = doc(db, 'portfolios', portfolioId, 'config', 'current')
+  batch.set(
+    configRef,
+    {
+      ...currentConfig,
+      investorConfig: {
+        ...currentConfig.investorConfig,
+        investorSharePercent: newInvestorPercent,
+        arunamiFeePercent: newArunamiPercent,
+      },
+    },
+    { merge: true },
+  )
+
+  const historyRef = doc(collection(db, 'portfolios', portfolioId, 'equityHistory'))
+  const entry: Omit<EquityChangeEntry, 'id' | 'changedAt'> & {
+    changedAt: ReturnType<typeof serverTimestamp>
+  } = {
+    changedAt: serverTimestamp(),
+    changedByUid,
+    changedByName,
+    fromInvestorPercent: currentConfig.investorConfig.investorSharePercent,
+    toInvestorPercent: newInvestorPercent,
+    fromArunamiPercent: currentConfig.investorConfig.arunamiFeePercent,
+    toArunamiPercent: newArunamiPercent,
+    reasonCategory,
+    effectiveFromPeriod,
+    ...(reasonNote && reasonNote.trim() ? { reasonNote: reasonNote.trim() } : {}),
+  }
+  batch.set(historyRef, entry)
+
+  await batch.commit()
+}
+
+export async function getEquityHistory(portfolioId: string): Promise<EquityChangeEntry[]> {
+  const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'equityHistory'))
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }) as EquityChangeEntry)
+  return rows.sort((a, b) => (b.changedAt?.seconds ?? 0) - (a.changedAt?.seconds ?? 0))
 }
 
 // ─── Financial Data ───────────────────────────────────────────────────────

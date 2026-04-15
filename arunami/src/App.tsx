@@ -28,6 +28,7 @@ import InvestorsPage from '@/pages/analyst/portfolio/InvestorsPage'
 import ManagementPage from '@/pages/analyst/portfolio/ManagementPage'
 import PublishingPage from '@/pages/analyst/portfolio/PublishingPage'
 import NotesPage from '@/pages/analyst/portfolio/NotesPage'
+import ProfitSharingPage from '@/pages/analyst/portfolio/ProfitSharingPage'
 
 // Investor
 import InvestorDashboard from '@/pages/investor/InvestorDashboard'
@@ -103,6 +104,7 @@ export default function App() {
             <Route path="management" element={<ManagementPage />} />
             <Route path="notes" element={<NotesPage />} />
             <Route path="publishing" element={<PublishingPage />} />
+            <Route path="settings/profit-sharing" element={<ProfitSharingPage />} />
           </Route>
 
           {/* Investor routes */}

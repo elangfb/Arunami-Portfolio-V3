@@ -432,3 +432,25 @@ export interface InvestorSummary {
   totalSlots: number
   portfolioCount: number
 }
+
+// ─── Equity Management ───────────────────────────────────────────────────
+
+export type EquityReasonCategory =
+  | 'milestone_24m'
+  | 'payback_achieved'
+  | 'renegotiation'
+  | 'other'
+
+export interface EquityChangeEntry {
+  id: string
+  changedAt: Timestamp
+  changedByUid: string
+  changedByName: string
+  fromInvestorPercent: number
+  toInvestorPercent: number
+  fromArunamiPercent: number
+  toArunamiPercent: number
+  reasonCategory: EquityReasonCategory
+  reasonNote?: string
+  effectiveFromPeriod: string
+}

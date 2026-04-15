@@ -10,7 +10,7 @@ import type { Portfolio } from '@/types'
 import {
   TrendingUp, LayoutDashboard, FileText, BarChart2,
   DollarSign, Users, ClipboardList, StickyNote, Send,
-  ChevronLeft, LogOut, PieChart,
+  ChevronLeft, LogOut, PieChart, Scale,
 } from 'lucide-react'
 
 const navGroups = [
@@ -41,6 +41,12 @@ const navGroups = [
     label: 'Publishing',
     items: [
       { to: 'publishing', label: 'Review & Publish', icon: Send },
+    ],
+  },
+  {
+    label: 'Pengaturan',
+    items: [
+      { to: 'settings/profit-sharing', label: 'Profit Sharing', icon: Scale },
     ],
   },
 ]

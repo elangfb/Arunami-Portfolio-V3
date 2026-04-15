@@ -75,6 +75,36 @@ export function comparePeriods(a: string, b: string): number {
   return a.localeCompare(b) // YYYY-MM sorts correctly with string comparison
 }
 
+/**
+ * Returns the next reporting period key (YYYY-MM) after today based on the
+ * portfolio's reporting frequency. Used by Profit Sharing Management to tell
+ * the analyst exactly when a change to the investor split takes effect.
+ *
+ * - 'bulanan'   → next month
+ * - 'kuartalan' → first month of next quarter
+ * - 'semesteran'→ first month of next semester (Jan or Jul)
+ */
+export function getNextReportingPeriod(
+  frequency: 'bulanan' | 'kuartalan' | 'semesteran',
+  from: Date = new Date(),
+): string {
+  const y = from.getFullYear()
+  const m = from.getMonth() // 0-11
+  let targetYear = y
+  let targetMonth = m + 1 // default: next month
+  if (frequency === 'kuartalan') {
+    const currentQuarter = Math.floor(m / 3) // 0..3
+    targetMonth = (currentQuarter + 1) * 3 // 3,6,9,12
+  } else if (frequency === 'semesteran') {
+    targetMonth = m < 6 ? 6 : 12
+  }
+  if (targetMonth > 11) {
+    targetMonth -= 12
+    targetYear += 1
+  }
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`
+}
+
 // ─── Period Grouping Helpers ────────────────────────────────────────────
 
 import type { PeriodType } from '@/store/reportFilterStore'
