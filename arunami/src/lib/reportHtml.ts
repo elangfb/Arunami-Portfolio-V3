@@ -8,6 +8,8 @@ import type {
 interface BuildArgs {
   portfolio: Portfolio
   allocation?: InvestorAllocation
+  /** Global investor-pool share of Net Profit, in percent (e.g. 70 = 70%). */
+  investorSharePercent: number
   period: string
   pnlReports: PnLExtractedData[]
   projectionReports: ProjectionExtractedData[]
@@ -36,7 +38,10 @@ function row(label: string, val: number): string {
 }
 
 export function buildInvestorReportHtml(args: BuildArgs): string {
-  const { portfolio, allocation, period, pnlReports, projectionReports, managementReports, notes } = args
+  const {
+    portfolio, allocation, investorSharePercent, period,
+    pnlReports, projectionReports, managementReports, notes,
+  } = args
 
   const latestPnl = pnlReports.find(r => r.period === period) ?? null
   const latestProj = projectionReports.find(r => r.period === period) ?? null
@@ -45,29 +50,38 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
     .filter(r => comparePeriods(r.period, period) <= 0)
     .at(-1) ?? null
 
+  // Derive Operating Profit defensively: some legacy reports stored 0 when
+  // Gemini didn't populate the field. Always recompute from grossProfit and
+  // totalOpex so the displayed table is internally consistent.
+  const derivedOperatingProfit = latestPnl
+    ? (latestPnl.grossProfit ?? 0) - (latestPnl.totalOpex ?? 0)
+    : 0
+
+  // Net Profit → × global investor pool share → × this investor's ownership
+  // of that pool → Net Investor.
+  const investorPoolShare = investorSharePercent / 100
+  const investorOwnership = allocation?.ownershipPercent != null
+    ? allocation.ownershipPercent / 100
+    : (allocation && portfolio.investasiAwal > 0
+        ? allocation.investedAmount / portfolio.investasiAwal
+        : 0)
+  const netProfit = latestPnl?.netProfit ?? 0
+  const afterPoolShare = netProfit * investorPoolShare
+  const netInvestor = afterPoolShare * investorOwnership
+
   // Investor-specific numbers (if allocation passed)
   let investorKpiBlock = ''
   if (allocation && latestPnl) {
-    const netProfit = latestPnl.netProfit
-    const ownership = portfolio.investasiAwal > 0
-      ? allocation.investedAmount / portfolio.investasiAwal
-      : 0
-    // Pull investor/arunami share from the same formula used elsewhere in-app.
-    // We don't have direct access to config here, so derive via ownership of
-    // the net profit (approximation: investor receives share proportional to
-    // their invested amount). The publishing flow always persists this
-    // snapshot, so it's fine to freeze this figure at publish time.
-    const investorEarning = netProfit * ownership
     const monthlyROI = allocation.investedAmount > 0
-      ? (investorEarning / allocation.investedAmount) * 100
+      ? (netInvestor / allocation.investedAmount) * 100
       : 0
     const annualROI = monthlyROI * 12
     investorKpiBlock = `
       <h2>Ringkasan Saya</h2>
       <div class="kpi">
         <div><span>Total Investasi</span><strong>${formatCurrencyExact(allocation.investedAmount)}</strong></div>
-        <div><span>Kepemilikan</span><strong>${formatPercent(ownership * 100)}</strong></div>
-        <div><span>Net untuk Investor</span><strong>${formatCurrencyExact(investorEarning)}</strong></div>
+        <div><span>Kepemilikan</span><strong>${formatPercent(investorOwnership * 100)}</strong></div>
+        <div><span>Net untuk Investor</span><strong>${formatCurrencyExact(netInvestor)}</strong></div>
         <div><span>Monthly ROI</span><strong>${formatPercent(monthlyROI, true)}</strong></div>
         <div><span>Annual ROI (×12)</span><strong>${formatPercent(annualROI, true)}</strong></div>
       </div>
@@ -81,10 +95,39 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
       ${row('COGS', latestPnl.cogs)}
       ${row('Gross Profit', latestPnl.grossProfit)}
       ${row('Total Opex', latestPnl.totalOpex)}
-      ${row('Operating Profit', latestPnl.operatingProfit)}
+      ${row('Operating Profit', derivedOperatingProfit)}
       ${row('Net Profit', latestPnl.netProfit)}
     </table>
   ` : '<p><em>Belum ada data P&amp;L untuk periode ini.</em></p>'
+
+  const netInvestorSection = (allocation && latestPnl) ? `
+    <h2>Net Investor — ${formatPeriod(latestPnl.period)}</h2>
+    <p style="font-size:12px;color:#555;margin-top:4px">
+      Perhitungan bagian keuntungan Anda untuk periode ini, dari Net Profit proyek sampai Net Investor.
+    </p>
+    <table class="data">
+      <tr>
+        <td><strong>Net Profit</strong><div style="font-size:11px;color:#666;margin-top:2px">Laba bersih proyek setelah seluruh biaya, bunga, dan pajak.</div></td>
+        <td style="text-align:right">${formatCurrencyExact(netProfit)}</td>
+      </tr>
+      <tr>
+        <td><strong>× Investor Share</strong><div style="font-size:11px;color:#666;margin-top:2px">Porsi Net Profit yang dialokasikan ke seluruh pool investor proyek ini.</div></td>
+        <td style="text-align:right">${investorSharePercent}%</td>
+      </tr>
+      <tr>
+        <td><strong>Bagian Pool Investor</strong><div style="font-size:11px;color:#666;margin-top:2px">Net Profit × Investor Share. Total yang dibagikan ke seluruh investor.</div></td>
+        <td style="text-align:right">${formatCurrencyExact(afterPoolShare)}</td>
+      </tr>
+      <tr>
+        <td><strong>× Kepemilikan Anda</strong><div style="font-size:11px;color:#666;margin-top:2px">Persentase slot/modal Anda terhadap total pool investor.</div></td>
+        <td style="text-align:right">${formatPercent(investorOwnership * 100)}</td>
+      </tr>
+      <tr style="background:#f5faf7">
+        <td><strong style="color:#1e5f3f">Net Investor</strong><div style="font-size:11px;color:#666;margin-top:2px">Bagian Pool Investor × Kepemilikan Anda. Inilah bagian Anda untuk periode ini.</div></td>
+        <td style="text-align:right"><strong style="color:#1e5f3f;font-size:15px">${formatCurrencyExact(netInvestor)}</strong></td>
+      </tr>
+    </table>
+  ` : ''
 
   const projSection = latestProj ? `
     <h2>Proyeksi — ${formatPeriod(latestProj.period)}</h2>
@@ -142,6 +185,7 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
   ${investorKpiBlock}
   ${summarySection}
   ${pnlSection}
+  ${netInvestorSection}
   ${projSection}
   ${costSection}
   ${issuesSection}

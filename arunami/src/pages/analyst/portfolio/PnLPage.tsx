@@ -136,18 +136,30 @@ export default function PnLPage() {
         filteredBreakdown[u.id] = data.unitBreakdown?.[u.id] ?? 0
       }
 
-      // Normalize period and ensure all fields exist for the review table
+      // Normalize period and ensure all fields exist for the review table.
+      // Derived values (grossProfit, totalOpex, operatingProfit, netProfit)
+      // are recomputed from raw inputs so we don't trust Gemini's totals,
+      // which have historically come back as 0 for some documents.
+      const revenue = data.revenue ?? 0
+      const cogs = data.cogs ?? 0
+      const opex = data.opex ?? []
+      const totalOpex = opex.reduce((s, o) => s + (Number(o.amount) || 0), 0)
+      const interest = data.interest ?? 0
+      const taxes = data.taxes ?? 0
+      const grossProfit = revenue - cogs
+      const operatingProfit = grossProfit - totalOpex
+      const netProfit = operatingProfit - interest - taxes
       setPendingPnl({
         period: normalizePeriod(data.period),
-        revenue: data.revenue ?? 0,
-        cogs: data.cogs ?? 0,
-        grossProfit: data.grossProfit ?? 0,
-        opex: data.opex ?? [],
-        totalOpex: data.totalOpex ?? 0,
-        operatingProfit: data.operatingProfit ?? 0,
-        interest: data.interest ?? 0,
-        taxes: data.taxes ?? 0,
-        netProfit: data.netProfit ?? 0,
+        revenue,
+        cogs,
+        grossProfit,
+        opex,
+        totalOpex,
+        operatingProfit,
+        interest,
+        taxes,
+        netProfit,
         transactionCount: data.transactionCount ?? 0,
         unitBreakdown: filteredBreakdown,
         notes: data.notes ?? '',

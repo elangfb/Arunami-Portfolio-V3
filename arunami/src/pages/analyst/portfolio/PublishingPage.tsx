@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getReports, getManagementReports, getNotes,
-  getAllocationsForPortfolio,
+  getAllocationsForPortfolio, getPortfolioConfigOrDefault,
   getInvestorReportsForPortfolio,
   upsertInvestorReportDraft, publishInvestorReport, publishAllInvestorReports,
   unpublishInvestorReport, unpublishAllInvestorReports,
@@ -36,6 +36,7 @@ export default function PublishingPage() {
   const [mgmtReports, setMgmtReports] = useState<ManagementReport[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
+  const [investorSharePercent, setInvestorSharePercent] = useState<number>(0)
   const [loading, setLoading] = useState(true)
 
   // Publishing state
@@ -48,18 +49,20 @@ export default function PublishingPage() {
   useEffect(() => {
     if (!portfolioId) return
     ;(async () => {
-      const [pnls, projs, mgmts, n, allocs] = await Promise.all([
+      const [pnls, projs, mgmts, n, allocs, config] = await Promise.all([
         getReports(portfolioId, 'pnl'),
         getReports(portfolioId, 'projection'),
         getManagementReports(portfolioId),
         getNotes(portfolioId),
         getAllocationsForPortfolio(portfolioId),
+        getPortfolioConfigOrDefault(portfolioId),
       ])
       setPnlReports(pnls)
       setProjReports(projs)
       setMgmtReports(mgmts)
       setNotes(n)
       setAllocations(allocs)
+      setInvestorSharePercent(config.investorConfig.investorSharePercent)
       // Auto-pick latest period that has a P&L, fall back to latest projection
       const allPeriods = [...new Set([...pnls, ...projs].map(r => r.period))]
         .sort((a, b) => comparePeriods(b, a))
@@ -95,13 +98,14 @@ export default function PublishingPage() {
     return buildInvestorReportHtml({
       portfolio,
       allocation: selectedAllocation,
+      investorSharePercent,
       period: selectedPeriod,
       pnlReports: pnlReports.map(r => r.extractedData as PnLExtractedData),
       projectionReports: projReports.map(r => r.extractedData as ProjectionExtractedData),
       managementReports: mgmtReports,
       notes,
     })
-  }, [portfolio, selectedAllocation, selectedPeriod, pnlReports, projReports, mgmtReports, notes])
+  }, [portfolio, selectedAllocation, investorSharePercent, selectedPeriod, pnlReports, projReports, mgmtReports, notes])
 
   const statusFor = (uid: string) =>
     existingReports.find(r => r.investorUid === uid)?.status ?? null
@@ -186,6 +190,7 @@ export default function PublishingPage() {
         htmlContent: buildInvestorReportHtml({
           portfolio,
           allocation: alloc,
+          investorSharePercent,
           period: selectedPeriod,
           pnlReports: pnlReports.map(r => r.extractedData as PnLExtractedData),
           projectionReports: projReports.map(r => r.extractedData as ProjectionExtractedData),
