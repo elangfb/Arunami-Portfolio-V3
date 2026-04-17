@@ -128,7 +128,6 @@ const LEGACY_RETAIL_CONFIG: Omit<PortfolioConfig, 'createdAt'> = {
     { id: 'net-profit', name: 'Net Profit', targetValue: 0, unit: 'currency' },
     { id: 'gross-margin', name: 'Gross Margin', targetValue: 0, unit: 'percentage' },
     { id: 'efficiency', name: 'Efisiensi', targetValue: 0, unit: 'percentage' },
-    { id: 'transaction-count', name: 'Transaksi', targetValue: 0, unit: 'count' },
   ],
 }
 
@@ -504,7 +503,6 @@ export async function syncFinancialData(portfolioId: string) {
   const radarData = latestPnl ? [
     { metric: 'Revenue', value: latestPnl.revenue, fullMark: latestPnl.revenue * 1.5 },
     { metric: 'Profit', value: latestPnl.netProfit, fullMark: latestPnl.revenue },
-    { metric: 'Transaksi', value: latestPnl.transactionCount, fullMark: latestPnl.transactionCount * 2 },
     { metric: 'Gross Margin', value: latestPnl.revenue > 0 ? (latestPnl.grossProfit / latestPnl.revenue) * 100 : 0, fullMark: 100 },
     { metric: 'Efisiensi', value: latestPnl.revenue > 0 ? ((latestPnl.revenue - latestPnl.totalOpex) / latestPnl.revenue) * 100 : 0, fullMark: 100 },
   ] : []

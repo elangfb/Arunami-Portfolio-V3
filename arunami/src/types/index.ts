@@ -260,7 +260,6 @@ export interface PnLExtractedData {
   interest: number
   taxes: number
   netProfit: number
-  transactionCount: number
   unitBreakdown: Record<string, number>
   notes: string
 }
@@ -276,7 +275,6 @@ export interface MonthlyPnLRow {
   interest: number
   taxes: number
   netProfit: number
-  transactionCount: number
 }
 
 export interface PnLUploadPending {
@@ -391,7 +389,6 @@ export interface ClassifiedPnLData {
   interest: number
   taxes: number
   netProfit: number
-  transactionCount: number
   revenueBreakdown: RevenueBreakdownItem[]
   notes: string
 }

@@ -32,7 +32,6 @@ export const INDUSTRY_PRESETS: Record<IndustryType, IndustryPreset> = {
     ]),
     kpiMetrics: [
       ...BASE_KPI,
-      { id: 'transaction-count', name: 'Jumlah Transaksi', targetValue: 0, unit: 'count' },
       { id: 'aov', name: 'Average Order Value', targetValue: 0, unit: 'currency' },
     ],
   },

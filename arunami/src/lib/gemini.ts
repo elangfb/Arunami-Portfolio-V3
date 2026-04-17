@@ -64,7 +64,6 @@ Kamu adalah asisten keuangan. Ekstrak data PnL berikut dari dokumen dan kembalik
   "opex": [{"name": "string", "amount": number}],
   "totalOpex": number,
   "netProfit": number,
-  "transactionCount": number,
   "unitBreakdown": {${categoryFields}},
   "notes": "string"
 }
@@ -121,8 +120,7 @@ Kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
       "operatingProfit": number,
       "interest": number,
       "taxes": number,
-      "netProfit": number,
-      "transactionCount": number
+      "netProfit": number
     }
   ]
 }
@@ -164,7 +162,6 @@ export async function extractPnLMonthly(file: File, config?: PortfolioConfig): P
       revenue, cogs, grossProfit,
       opex: filledOpex, totalOpex, operatingProfit,
       interest, taxes, netProfit,
-      transactionCount: Number(m.transactionCount) || 0,
     }
   })
 
@@ -188,7 +185,6 @@ Analisis dokumen keuangan ini dan kembalikan HANYA JSON valid (tanpa penjelasan 
   "interest": number,
   "taxes": number,
   "netProfit": number,
-  "transactionCount": number,
   "revenueBreakdown": [{"name": "string", "amount": number, "unitCount": number, "isStandard": boolean}],
   "notes": "string"
 }
@@ -397,7 +393,6 @@ function sanitizePnl(raw: ClassifiedPnLData): ClassifiedPnLData {
     interest: sanitizeNumber(raw.interest),
     taxes: sanitizeNumber(raw.taxes),
     netProfit: sanitizeNumber(raw.netProfit),
-    transactionCount: sanitizeNumber(raw.transactionCount),
     opex: (raw.opex ?? []).map(o => ({ ...o, amount: sanitizeNumber(o.amount) })),
     revenueBreakdown: (raw.revenueBreakdown ?? []).map(r => ({
       ...r,
@@ -536,14 +531,6 @@ export async function extractPortfolioSetup(
         derivedFrom: 'netProfit / revenue',
       })
     }
-    if (pnl.transactionCount > 0) {
-      suggestedKpis.push({
-        name: 'Jumlah Transaksi',
-        value: pnl.transactionCount,
-        unit: 'count' as const,
-        derivedFrom: 'PnL transactionCount',
-      })
-    }
   }
 
   return { pnl, projection, discoveredVariables, suggestedKpis, errors }
@@ -667,7 +654,6 @@ export async function generateManagementReport(args: GenerateArgs): Promise<Gene
   lines.push(`Interest: ${pnl.interest}`)
   lines.push(`Taxes: ${pnl.taxes}`)
   lines.push(`Net Profit: ${pnl.netProfit}`)
-  lines.push(`Jumlah Transaksi: ${pnl.transactionCount}`)
   if (pnl.opex?.length) {
     lines.push('Detail Opex:')
     for (const o of pnl.opex) lines.push(`  - ${o.name}: ${o.amount}`)

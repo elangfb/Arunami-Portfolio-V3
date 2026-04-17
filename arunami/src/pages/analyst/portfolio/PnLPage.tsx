@@ -53,7 +53,7 @@ export default function PnLPage() {
     defaultValues: {
       period: '', revenue: 0, cogs: 0, grossProfit: 0,
       opex: [], totalOpex: 0, operatingProfit: 0, interest: 0, taxes: 0,
-      netProfit: 0, transactionCount: 0,
+      netProfit: 0,
       unitBreakdown: {},
       notes: '',
     },
@@ -107,7 +107,7 @@ export default function PnLPage() {
     reset({
       period: '', revenue: 0, cogs: 0, grossProfit: 0,
       opex: [], totalOpex: 0, operatingProfit: 0, interest: 0, taxes: 0,
-      netProfit: 0, transactionCount: 0,
+      netProfit: 0,
       unitBreakdown: emptyBreakdown,
       notes: '',
     })
@@ -141,7 +141,6 @@ export default function PnLPage() {
       interest: d.interest,
       taxes: d.taxes,
       netProfit: d.netProfit,
-      transactionCount: d.transactionCount,
     }
     for (const item of d.opex ?? []) {
       data[`opex:${item.name}`] = item.amount
@@ -182,7 +181,6 @@ export default function PnLPage() {
         interest: inlineData.interest ?? d.interest,
         taxes: inlineData.taxes ?? d.taxes,
         netProfit: inlineData.netProfit ?? d.netProfit,
-        transactionCount: inlineData.transactionCount ?? d.transactionCount,
       }
 
       await updateReport(portfolioId, report.id, { extractedData })
@@ -286,7 +284,6 @@ export default function PnLPage() {
           interest: month.interest,
           taxes: month.taxes,
           netProfit: month.netProfit,
-          transactionCount: month.transactionCount,
           unitBreakdown: pendingPnl.unitBreakdown ?? {},
           notes: pendingPnl.notes ?? '',
         }
@@ -524,7 +521,6 @@ export default function PnLPage() {
                 { label: 'Interest', key: 'interest', className: 'text-red-600', editable: true },
                 { label: 'Taxes', key: 'taxes', className: 'text-red-600', editable: true },
                 { label: 'Net Profit', key: 'netProfit', bold: true },
-                { label: 'Transaction Count', key: 'transactionCount', editable: true },
               ]
               return (
                 <div className="rounded-lg border overflow-hidden">
@@ -598,7 +594,7 @@ export default function PnLPage() {
                                       className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                   ) : (
-                                    row.key === 'transactionCount' ? val.toLocaleString('id-ID') : formatCurrencyExact(val)
+                                    formatCurrencyExact(val)
                                   )}
                                 </td>
                               )
@@ -636,7 +632,6 @@ export default function PnLPage() {
                 ['interest', 'Interest (IDR)', false],
                 ['taxes', 'Taxes (IDR)', false],
                 ['netProfit', 'Net Profit (IDR)', true],
-                ['transactionCount', 'Jumlah Transaksi', false],
               ] as [keyof PnLExtractedData, string, boolean][]).map(([field, label, readOnly]) => (
                 <div key={field} className="space-y-1">
                   <Label className="text-xs">{label}</Label>

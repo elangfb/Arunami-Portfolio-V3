@@ -82,7 +82,6 @@ export function PnLReviewTable({
     { label: 'Interest', key: 'interest', className: 'text-red-600' },
     { label: 'Taxes', key: 'taxes', className: 'text-red-600' },
     { label: 'Net Profit', key: 'netProfit', isBold: true, readOnly: true },
-    { label: 'Jumlah Transaksi', key: 'transactionCount' },
   ]
 
   const getTotal = (key: string): number =>
