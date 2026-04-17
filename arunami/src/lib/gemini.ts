@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'
 import type {
   PnLExtractedData, ProjectionExtractedData, PortfolioConfig,
   ClassifiedPnLData, ClassifiedProjectionData, PortfolioSetupExtraction,
-  IndustryType, ProjectionUploadPending,
+  IndustryType, ProjectionUploadPending, PnLUploadPending,
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 
@@ -88,9 +88,87 @@ Kamu adalah asisten keuangan. Ekstrak data proyeksi keuangan berikut dan kembali
 Semua nilai moneter dalam IDR (angka saja, tanpa simbol).
 `
 
+/** @deprecated Use extractPnLMonthly for the multi-month review flow */
 export async function extractPnL(file: File, config?: PortfolioConfig): Promise<PnLExtractedData> {
   const raw = await sendToClaude(file, buildPnLPrompt(config))
   return safeParseJSON<PnLExtractedData>(raw)
+}
+
+// ─── Monthly PnL Extraction (Analyst Review) ────────────────────────────
+
+function buildPnLMonthlyPrompt(config?: PortfolioConfig): string {
+  const categoryFields = config?.pnlUnitCategories?.length
+    ? config.pnlUnitCategories.map(c => `"${c.id}": number`).join(', ')
+    : config?.revenueCategories?.length
+      ? config.revenueCategories.map(c => `"${c.id}": number`).join(', ')
+      : '"laptop": number, "service": number, "aksesoris": number'
+
+  return `
+Kamu adalah asisten keuangan. Ekstrak data Profit & Loss (PnL) BULANAN dari dokumen berikut.
+Kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
+{
+  "period": "string (contoh: Januari 2026 - Maret 2026)",
+  "notes": "string",
+  "unitBreakdown": {${categoryFields}},
+  "monthlyData": [
+    {
+      "month": "string format YYYY-MM (contoh: 2026-01 untuk Januari 2026)",
+      "revenue": number,
+      "cogs": number,
+      "grossProfit": number,
+      "opex": [{"name": "string", "amount": number}],
+      "totalOpex": number,
+      "operatingProfit": number,
+      "interest": number,
+      "taxes": number,
+      "netProfit": number,
+      "transactionCount": number
+    }
+  ]
+}
+ATURAN:
+- Sertakan data untuk SETIAP bulan yang ada di dokumen (jangan diringkas/diaggregat)
+- Semua nilai moneter dalam IDR (angka saja, tanpa simbol Rp atau titik ribuan)
+- Gunakan nama opex yang KONSISTEN di semua bulan
+- grossProfit = revenue - cogs
+- operatingProfit = grossProfit - totalOpex
+- netProfit = operatingProfit - interest - taxes
+- Jika hanya ada data satu bulan, kembalikan monthlyData dengan satu entry saja
+- Jika data untuk suatu kategori unit tidak ditemukan, isi dengan 0
+`
+}
+
+export async function extractPnLMonthly(file: File, config?: PortfolioConfig): Promise<PnLUploadPending> {
+  const raw = await sendToClaude(file, buildPnLMonthlyPrompt(config))
+  const parsed = safeParseJSON<PnLUploadPending>(raw)
+
+  // Normalize opex names across months: collect all unique names, ensure every month has all
+  const allOpexNames = [...new Set(parsed.monthlyData.flatMap(m => (m.opex ?? []).map(o => o.name)))]
+  const normalizedData = parsed.monthlyData.map(m => {
+    const existingNames = new Set((m.opex ?? []).map(o => o.name))
+    const filledOpex = [
+      ...(m.opex ?? []),
+      ...allOpexNames.filter(n => !existingNames.has(n)).map(n => ({ name: n, amount: 0 })),
+    ]
+    // Recalculate derived values
+    const revenue = Number(m.revenue) || 0
+    const cogs = Number(m.cogs) || 0
+    const totalOpex = filledOpex.reduce((s, o) => s + (Number(o.amount) || 0), 0)
+    const interest = Number(m.interest) || 0
+    const taxes = Number(m.taxes) || 0
+    const grossProfit = revenue - cogs
+    const operatingProfit = grossProfit - totalOpex
+    const netProfit = operatingProfit - interest - taxes
+    return {
+      ...m,
+      revenue, cogs, grossProfit,
+      opex: filledOpex, totalOpex, operatingProfit,
+      interest, taxes, netProfit,
+      transactionCount: Number(m.transactionCount) || 0,
+    }
+  })
+
+  return { ...parsed, monthlyData: normalizedData, status: 'pending_review' }
 }
 
 // ─── Portfolio Setup Extraction (with classification) ────────────────────

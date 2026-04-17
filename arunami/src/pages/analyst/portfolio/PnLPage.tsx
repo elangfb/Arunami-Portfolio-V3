@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { extractPnL } from '@/lib/gemini'
+import { extractPnLMonthly } from '@/lib/gemini'
 import { getReports, saveReport, updateReport, deleteReport, syncFinancialData, getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
 import { enrichConfigFromFirstUpload } from '@/lib/portfolioEnrichment'
 import { useAuthStore } from '@/store/authStore'
@@ -22,7 +22,7 @@ import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 import SchedulePaymentConfirm from './SchedulePaymentConfirm'
 import DividendDeclaration from './DividendDeclaration'
 import CustomVariableInput from './CustomVariableInput'
-import type { PnLExtractedData, OpexItem, PortfolioReport, Portfolio, PortfolioConfig, RevenueCategory } from '@/types'
+import type { PnLExtractedData, PnLUploadPending, OpexItem, PortfolioReport, Portfolio, PortfolioConfig, RevenueCategory } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -40,7 +40,7 @@ export default function PnLPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
   const [categories, setCategories] = useState<RevenueCategory[]>([])
-  const [pendingPnl, setPendingPnl] = useState<PnLExtractedData | null>(null)
+  const [pendingPnl, setPendingPnl] = useState<PnLUploadPending | null>(null)
   const [pendingUnits, setPendingUnits] = useState<RevenueCategory[]>([])
   const [isConfirming, setIsConfirming] = useState(false)
 
@@ -127,7 +127,7 @@ export default function PnLPage() {
     if (!portfolioId || !portfolio) { toast.error('Portofolio belum siap'); return }
     setMode('extracting')
     try {
-      const data = await extractPnL(file, portfolioConfig ?? undefined)
+      const data = await extractPnLMonthly(file, portfolioConfig ?? undefined)
 
       // Unit breakdown: use only the units the analyst has previously saved
       // (from PortfolioConfig.pnlUnitCategories). First upload → empty list.
@@ -139,34 +139,17 @@ export default function PnLPage() {
         filteredBreakdown[u.id] = data.unitBreakdown?.[u.id] ?? 0
       }
 
-      // Normalize period and ensure all fields exist for the review table.
-      // Derived values (grossProfit, totalOpex, operatingProfit, netProfit)
-      // are recomputed from raw inputs so we don't trust Gemini's totals,
-      // which have historically come back as 0 for some documents.
-      const revenue = data.revenue ?? 0
-      const cogs = data.cogs ?? 0
-      const opex = data.opex ?? []
-      const totalOpex = opex.reduce((s, o) => s + (Number(o.amount) || 0), 0)
-      const interest = data.interest ?? 0
-      const taxes = data.taxes ?? 0
-      const grossProfit = revenue - cogs
-      const operatingProfit = grossProfit - totalOpex
-      const netProfit = operatingProfit - interest - taxes
-      setPendingPnl({
-        period: normalizePeriod(data.period),
-        revenue,
-        cogs,
-        grossProfit,
-        opex,
-        totalOpex,
-        operatingProfit,
-        interest,
-        taxes,
-        netProfit,
-        transactionCount: data.transactionCount ?? 0,
+      // Normalize month periods in each row
+      const normalizedData: PnLUploadPending = {
+        ...data,
         unitBreakdown: filteredBreakdown,
-        notes: data.notes ?? '',
-      })
+        monthlyData: data.monthlyData.map(m => ({
+          ...m,
+          month: normalizePeriod(m.month),
+        })),
+      }
+
+      setPendingPnl(normalizedData)
       toast.success('Data berhasil diekstrak — silakan review sebelum konfirmasi')
 
       // One-shot enrichment on the very first upload — discovers custom revenue
@@ -199,23 +182,41 @@ export default function PnLPage() {
   // Confirm & save from the inline review table (upload flow)
   const handleConfirmPnl = async () => {
     if (!portfolioId || !user || !pendingPnl) return
-    if (!pendingPnl.period) {
-      toast.error('Periode wajib diisi')
+    if (pendingPnl.monthlyData.length === 0) {
+      toast.error('Tidak ada data bulan untuk disimpan')
       return
     }
     setIsConfirming(true)
     try {
-      await saveReport(portfolioId, {
-        type: 'pnl',
-        fileName: fileRef.current?.files?.[0]?.name ?? 'Upload PnL',
-        fileUrl: '',
-        period: pendingPnl.period,
-        extractedData: pendingPnl,
-        uploadedBy: user.uid,
-      })
+      // Save each month as an individual PnL report
+      for (const month of pendingPnl.monthlyData) {
+        const normalizedPeriod = normalizePeriod(month.month)
+        const extractedData: PnLExtractedData = {
+          period: normalizedPeriod,
+          revenue: month.revenue,
+          cogs: month.cogs,
+          grossProfit: month.grossProfit,
+          opex: month.opex,
+          totalOpex: month.totalOpex,
+          operatingProfit: month.operatingProfit,
+          interest: month.interest,
+          taxes: month.taxes,
+          netProfit: month.netProfit,
+          transactionCount: month.transactionCount,
+          unitBreakdown: pendingPnl.unitBreakdown ?? {},
+          notes: pendingPnl.notes ?? '',
+        }
+        await saveReport(portfolioId, {
+          type: 'pnl',
+          fileName: fileRef.current?.files?.[0]?.name ?? 'Upload PnL',
+          fileUrl: '',
+          period: normalizedPeriod,
+          extractedData,
+          uploadedBy: user.uid,
+        })
+      }
 
       // Persist the unit category list so the next upload pre-populates it.
-      // Only writes when the list has actually changed to avoid noisy config writes.
       const existingUnits = portfolioConfig?.pnlUnitCategories ?? []
       const unitsChanged =
         existingUnits.length !== pendingUnits.length ||
@@ -231,7 +232,7 @@ export default function PnLPage() {
       setPendingUnits([])
       fetchReports()
       fetchConfig()
-      toast.success('Laporan PnL berhasil disimpan')
+      toast.success(`${pendingPnl.monthlyData.length} bulan laporan PnL berhasil disimpan`)
     } catch {
       toast.error('Gagal menyimpan laporan')
     } finally {

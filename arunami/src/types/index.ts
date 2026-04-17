@@ -265,6 +265,28 @@ export interface PnLExtractedData {
   notes: string
 }
 
+export interface MonthlyPnLRow {
+  month: string
+  revenue: number
+  cogs: number
+  grossProfit: number
+  opex: OpexItem[]
+  totalOpex: number
+  operatingProfit: number
+  interest: number
+  taxes: number
+  netProfit: number
+  transactionCount: number
+}
+
+export interface PnLUploadPending {
+  period: string
+  notes: string
+  unitBreakdown: Record<string, number>
+  monthlyData: MonthlyPnLRow[]
+  status: 'pending_review' | 'confirmed'
+}
+
 export interface ProjectionExtractedData {
   period: string
   projectedRevenue: number
