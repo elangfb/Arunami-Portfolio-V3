@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react'
+import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check } from 'lucide-react'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { PnLReviewTable } from '@/components/PnLReviewTable'
 import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -43,6 +43,11 @@ export default function PnLPage() {
   const [pendingPnl, setPendingPnl] = useState<PnLUploadPending | null>(null)
   const [pendingUnits, setPendingUnits] = useState<RevenueCategory[]>([])
   const [isConfirming, setIsConfirming] = useState(false)
+
+  // Inline editing state
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null)
+  const [inlineData, setInlineData] = useState<Record<string, number>>({})
+  const [inlineSaving, setInlineSaving] = useState(false)
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<PnLExtractedData>({
     defaultValues: {
@@ -110,13 +115,92 @@ export default function PnLPage() {
     setDialogOpen(true)
   }
 
-  // Open dialog for editing
-  const openEdit = (report: PortfolioReport) => {
-    setEditingReport(report)
+  // openEdit kept for potential future use but no longer called from Pencil button
+
+  // Inline editing helpers
+  const recalcPnl = (data: Record<string, number>): Record<string, number> => {
+    const next = { ...data }
+    const opexTotal = Object.entries(next)
+      .filter(([k]) => k.startsWith('opex:'))
+      .reduce((sum, [, v]) => sum + (v || 0), 0)
+    next.grossProfit = (next.revenue || 0) - (next.cogs || 0)
+    next.totalOpex = opexTotal
+    next.operatingProfit = next.grossProfit - next.totalOpex
+    next.netProfit = next.operatingProfit - (next.interest || 0) - (next.taxes || 0)
+    return next
+  }
+
+  const startInlineEdit = (report: PortfolioReport) => {
     const d = report.extractedData as PnLExtractedData
-    reset(d)
-    setOpexItems(d.opex ?? [])
-    setDialogOpen(true)
+    const data: Record<string, number> = {
+      revenue: d.revenue,
+      cogs: d.cogs,
+      grossProfit: d.grossProfit,
+      totalOpex: d.totalOpex,
+      operatingProfit: d.operatingProfit,
+      interest: d.interest,
+      taxes: d.taxes,
+      netProfit: d.netProfit,
+      transactionCount: d.transactionCount,
+    }
+    for (const item of d.opex ?? []) {
+      data[`opex:${item.name}`] = item.amount
+    }
+    // Initialize opex items from ALL reports that may not exist in this report
+    const allOpexNames = [...new Set(reports.flatMap(r => {
+      const rd = r.extractedData as PnLExtractedData
+      return (rd.opex ?? []).map(o => o.name)
+    }))]
+    for (const name of allOpexNames) {
+      if (data[`opex:${name}`] === undefined) data[`opex:${name}`] = 0
+    }
+    setInlineData(data)
+    setInlineEditId(report.id)
+  }
+
+  const handleInlineChange = (key: string, value: number) => {
+    setInlineData(prev => recalcPnl({ ...prev, [key]: value }))
+  }
+
+  const handleInlineSave = async (report: PortfolioReport) => {
+    if (!portfolioId || !user) return
+    setInlineSaving(true)
+    try {
+      const d = report.extractedData as PnLExtractedData
+      const opex: OpexItem[] = Object.entries(inlineData)
+        .filter(([k]) => k.startsWith('opex:'))
+        .map(([k, amount]) => ({ name: k.slice(5), amount }))
+
+      const extractedData: PnLExtractedData = {
+        ...d,
+        revenue: inlineData.revenue ?? d.revenue,
+        cogs: inlineData.cogs ?? d.cogs,
+        grossProfit: inlineData.grossProfit ?? d.grossProfit,
+        opex,
+        totalOpex: inlineData.totalOpex ?? d.totalOpex,
+        operatingProfit: inlineData.operatingProfit ?? d.operatingProfit,
+        interest: inlineData.interest ?? d.interest,
+        taxes: inlineData.taxes ?? d.taxes,
+        netProfit: inlineData.netProfit ?? d.netProfit,
+        transactionCount: inlineData.transactionCount ?? d.transactionCount,
+      }
+
+      await updateReport(portfolioId, report.id, { extractedData })
+      await syncFinancialData(portfolioId)
+      setInlineEditId(null)
+      setInlineData({})
+      fetchReports()
+      toast.success('Laporan PnL berhasil diperbarui')
+    } catch {
+      toast.error('Gagal menyimpan laporan')
+    } finally {
+      setInlineSaving(false)
+    }
+  }
+
+  const cancelInlineEdit = () => {
+    setInlineEditId(null)
+    setInlineData({})
   }
 
   // File upload → extract → show inline review table
@@ -430,17 +514,17 @@ export default function PnLPage() {
                 }
                 return (d[key as keyof PnLExtractedData] as number) ?? 0
               }
-              const rows: { label: string; key: string; bold?: boolean; className?: string }[] = [
-                { label: 'Revenue', key: 'revenue', bold: true },
-                { label: 'COGS', key: 'cogs', className: 'text-red-600' },
+              const rows: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
+                { label: 'Revenue', key: 'revenue', bold: true, editable: true },
+                { label: 'COGS', key: 'cogs', className: 'text-red-600', editable: true },
                 { label: 'Gross Profit', key: 'grossProfit', bold: true, className: 'text-green-700' },
-                ...opexNames.map(n => ({ label: n, key: `opex:${n}`, className: 'text-xs text-muted-foreground' })),
+                ...opexNames.map(n => ({ label: n, key: `opex:${n}`, className: 'text-xs text-muted-foreground', editable: true })),
                 { label: 'Total Opex', key: 'totalOpex', className: 'text-red-600' },
                 { label: 'Operating Profit', key: 'operatingProfit', bold: true },
-                { label: 'Interest', key: 'interest', className: 'text-red-600' },
-                { label: 'Taxes', key: 'taxes', className: 'text-red-600' },
+                { label: 'Interest', key: 'interest', className: 'text-red-600', editable: true },
+                { label: 'Taxes', key: 'taxes', className: 'text-red-600', editable: true },
                 { label: 'Net Profit', key: 'netProfit', bold: true },
-                { label: 'Transaction Count', key: 'transactionCount' },
+                { label: 'Transaction Count', key: 'transactionCount', editable: true },
               ]
               return (
                 <div className="rounded-lg border overflow-hidden">
@@ -452,19 +536,40 @@ export default function PnLPage() {
                             Variable
                           </th>
                           {sorted.map(r => (
-                            <th key={r.id} className="px-3 py-2 text-right font-medium whitespace-nowrap min-w-[150px]">
+                            <th key={r.id} className="px-3 py-2 text-right font-medium whitespace-nowrap min-w-[170px]">
                               <div>{formatPeriod(r.period)}</div>
                               <div className="flex justify-end gap-1 mt-1">
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(r)}>
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive"
-                                  disabled={deleteId === r.id}
-                                  onClick={() => handleDelete(r.id)}
-                                >
-                                  {deleteId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                                </Button>
+                                {inlineEditId === r.id ? (
+                                  <>
+                                    <Button
+                                      variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700"
+                                      disabled={inlineSaving}
+                                      onClick={() => handleInlineSave(r)}
+                                    >
+                                      {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                    </Button>
+                                    <Button
+                                      variant="ghost" size="icon" className="h-6 w-6"
+                                      disabled={inlineSaving}
+                                      onClick={cancelInlineEdit}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" disabled={!!inlineEditId} onClick={() => startInlineEdit(r)}>
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive"
+                                      disabled={deleteId === r.id || !!inlineEditId}
+                                      onClick={() => handleDelete(r.id)}
+                                    >
+                                      {deleteId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </th>
                           ))}
@@ -477,14 +582,24 @@ export default function PnLPage() {
                               {row.label}
                             </td>
                             {sorted.map(r => {
-                              const val = getCell(r, row.key)
+                              const isEditing = inlineEditId === r.id
+                              const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
                               const isNet = row.key === 'netProfit'
                               const colorClass = isNet
                                 ? val >= 0 ? 'text-green-600' : 'text-red-600'
                                 : row.className ?? ''
                               return (
-                                <td key={r.id} className={`px-3 py-2 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
-                                  {row.key === 'transactionCount' ? val.toLocaleString('id-ID') : formatCurrencyExact(val)}
+                                <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
+                                  {isEditing && row.editable ? (
+                                    <Input
+                                      type="number"
+                                      value={inlineData[row.key] ?? 0}
+                                      onChange={e => handleInlineChange(row.key, Number(e.target.value) || 0)}
+                                      className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                  ) : (
+                                    row.key === 'transactionCount' ? val.toLocaleString('id-ID') : formatCurrencyExact(val)
+                                  )}
                                 </td>
                               )
                             })}
@@ -504,7 +619,7 @@ export default function PnLPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingReport ? 'Edit Laporan PnL' : 'Input Laporan PnL'}</DialogTitle>
+            <DialogTitle>Input Laporan PnL</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSave)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -590,7 +705,7 @@ export default function PnLPage() {
             <div className="flex gap-3 pt-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Menyimpan...' : editingReport ? 'Perbarui' : 'Simpan'}
+                {isSaving ? 'Menyimpan...' : 'Simpan'}
               </Button>
             </div>
           </form>

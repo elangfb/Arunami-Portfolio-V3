@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react'
+import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check } from 'lucide-react'
 import { ProjectionReviewTable } from '@/components/ProjectionReviewTable'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -37,6 +37,11 @@ export default function ProjectionsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [pendingProjection, setPendingProjection] = useState<ProjectionUploadPending | null>(null)
   const [isConfirming, setIsConfirming] = useState(false)
+
+  // Inline editing state
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null)
+  const [inlineData, setInlineData] = useState<Record<string, number>>({})
+  const [inlineSaving, setInlineSaving] = useState(false)
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<ProjectionExtractedData>({
     defaultValues: {
@@ -84,19 +89,90 @@ export default function ProjectionsPage() {
     setDialogOpen(true)
   }
 
-  const openEdit = (report: PortfolioReport) => {
-    setEditingReport(report)
+  // openEdit kept for potential future use but no longer called from Pencil button
+
+  // Inline editing helpers
+  const recalcProjection = (data: Record<string, number>): Record<string, number> => {
+    const next = { ...data }
+    const opexTotal = Object.entries(next)
+      .filter(([k]) => k.startsWith('opex:'))
+      .reduce((sum, [, v]) => sum + (v || 0), 0)
+    next.projectedGrossProfit = (next.projectedRevenue || 0) - (next.projectedCogs || 0)
+    next.projectedTotalOpex = opexTotal
+    next.projectedNetProfit = next.projectedGrossProfit - next.projectedTotalOpex
+    return next
+  }
+
+  const startInlineEdit = (report: PortfolioReport) => {
     const d = report.extractedData as ProjectionExtractedData
-    // Backward compat: derive cogsPercent if not stored
-    const cogsPercent = d.projectedCogsPercent ?? (d.projectedRevenue ? (d.projectedCogs / d.projectedRevenue) * 100 : 0)
-    reset({ ...d, projectedCogsPercent: Math.round(cogsPercent * 10) / 10 })
-    // Restore opex percentages from stored data or derive from revenue
-    const opex = (d.projectedOpex ?? []).map(item => ({
-      ...item,
-      percentage: item.percentage ?? (d.projectedRevenue ? Math.round((item.amount / d.projectedRevenue) * 1000) / 10 : 0),
-    }))
-    setOpexItems(opex)
-    setDialogOpen(true)
+    const data: Record<string, number> = {
+      projectedRevenue: d.projectedRevenue,
+      projectedCogs: d.projectedCogs,
+      projectedGrossProfit: d.projectedGrossProfit,
+      projectedTotalOpex: d.projectedTotalOpex,
+      projectedNetProfit: d.projectedNetProfit,
+    }
+    for (const item of d.projectedOpex ?? []) {
+      data[`opex:${item.name}`] = item.amount
+    }
+    // Initialize opex items from ALL reports that may not exist in this report
+    const allOpexNames = [...new Set(reports.flatMap(r => {
+      const rd = r.extractedData as ProjectionExtractedData
+      return (rd.projectedOpex ?? []).map(o => o.name)
+    }))]
+    for (const name of allOpexNames) {
+      if (data[`opex:${name}`] === undefined) data[`opex:${name}`] = 0
+    }
+    setInlineData(data)
+    setInlineEditId(report.id)
+  }
+
+  const handleInlineChange = (key: string, value: number) => {
+    setInlineData(prev => recalcProjection({ ...prev, [key]: value }))
+  }
+
+  const handleInlineSave = async (report: PortfolioReport) => {
+    if (!portfolioId || !user) return
+    setInlineSaving(true)
+    try {
+      const d = report.extractedData as ProjectionExtractedData
+      const projectedOpex: OpexItem[] = Object.entries(inlineData)
+        .filter(([k]) => k.startsWith('opex:'))
+        .map(([k, amount]) => ({ name: k.slice(5), amount }))
+
+      const projectedRevenue = inlineData.projectedRevenue ?? d.projectedRevenue
+      const projectedCogs = inlineData.projectedCogs ?? d.projectedCogs
+      const projectedCogsPercent = projectedRevenue
+        ? Math.round((projectedCogs / projectedRevenue) * 1000) / 10
+        : 0
+
+      const extractedData: ProjectionExtractedData = {
+        ...d,
+        projectedRevenue,
+        projectedCogsPercent,
+        projectedCogs,
+        projectedGrossProfit: inlineData.projectedGrossProfit ?? d.projectedGrossProfit,
+        projectedOpex,
+        projectedTotalOpex: inlineData.projectedTotalOpex ?? d.projectedTotalOpex,
+        projectedNetProfit: inlineData.projectedNetProfit ?? d.projectedNetProfit,
+      }
+
+      await updateReport(portfolioId, report.id, { extractedData })
+      await syncFinancialData(portfolioId)
+      setInlineEditId(null)
+      setInlineData({})
+      fetchReports()
+      toast.success('Proyeksi berhasil diperbarui')
+    } catch {
+      toast.error('Gagal menyimpan proyeksi')
+    } finally {
+      setInlineSaving(false)
+    }
+  }
+
+  const cancelInlineEdit = () => {
+    setInlineEditId(null)
+    setInlineData({})
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,11 +404,11 @@ export default function ProjectionsPage() {
                 }
                 return (d[key as keyof ProjectionExtractedData] as number) ?? 0
               }
-              const rows: { label: string; key: string; bold?: boolean; className?: string }[] = [
-                { label: 'Projected Revenue', key: 'projectedRevenue', bold: true },
-                { label: 'COGS', key: 'projectedCogs', className: 'text-red-600' },
+              const rows: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
+                { label: 'Projected Revenue', key: 'projectedRevenue', bold: true, editable: true },
+                { label: 'COGS', key: 'projectedCogs', className: 'text-red-600', editable: true },
                 { label: 'Gross Profit', key: 'projectedGrossProfit', bold: true, className: 'text-green-700' },
-                ...opexNames.map(n => ({ label: n, key: `opex:${n}`, className: 'text-xs text-muted-foreground' })),
+                ...opexNames.map(n => ({ label: n, key: `opex:${n}`, className: 'text-xs text-muted-foreground', editable: true })),
                 { label: 'Total Opex', key: 'projectedTotalOpex', className: 'text-red-600' },
                 { label: 'Net Profit', key: 'projectedNetProfit', bold: true },
               ]
@@ -346,19 +422,40 @@ export default function ProjectionsPage() {
                             Variable
                           </th>
                           {sorted.map(r => (
-                            <th key={r.id} className="px-3 py-2 text-right font-medium whitespace-nowrap min-w-[150px]">
+                            <th key={r.id} className="px-3 py-2 text-right font-medium whitespace-nowrap min-w-[170px]">
                               <div>{formatPeriod(r.period)}</div>
                               <div className="flex justify-end gap-1 mt-1">
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(r)}>
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive"
-                                  disabled={deleteId === r.id}
-                                  onClick={() => handleDelete(r.id)}
-                                >
-                                  {deleteId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                                </Button>
+                                {inlineEditId === r.id ? (
+                                  <>
+                                    <Button
+                                      variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700"
+                                      disabled={inlineSaving}
+                                      onClick={() => handleInlineSave(r)}
+                                    >
+                                      {inlineSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                    </Button>
+                                    <Button
+                                      variant="ghost" size="icon" className="h-6 w-6"
+                                      disabled={inlineSaving}
+                                      onClick={cancelInlineEdit}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" disabled={!!inlineEditId} onClick={() => startInlineEdit(r)}>
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive"
+                                      disabled={deleteId === r.id || !!inlineEditId}
+                                      onClick={() => handleDelete(r.id)}
+                                    >
+                                      {deleteId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </th>
                           ))}
@@ -371,14 +468,24 @@ export default function ProjectionsPage() {
                               {row.label}
                             </td>
                             {sorted.map(r => {
-                              const val = getCell(r, row.key)
+                              const isEditing = inlineEditId === r.id
+                              const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
                               const isNet = row.key === 'projectedNetProfit'
                               const colorClass = isNet
                                 ? val >= 0 ? 'text-green-600' : 'text-red-600'
                                 : row.className ?? ''
                               return (
-                                <td key={r.id} className={`px-3 py-2 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
-                                  {formatCurrencyExact(val)}
+                                <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
+                                  {isEditing && row.editable ? (
+                                    <Input
+                                      type="number"
+                                      value={inlineData[row.key] ?? 0}
+                                      onChange={e => handleInlineChange(row.key, Number(e.target.value) || 0)}
+                                      className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                  ) : (
+                                    formatCurrencyExact(val)
+                                  )}
                                 </td>
                               )
                             })}
@@ -398,7 +505,7 @@ export default function ProjectionsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingReport ? 'Edit Proyeksi' : 'Input Proyeksi'}</DialogTitle>
+            <DialogTitle>Input Proyeksi</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSave)} className="space-y-5">
             {/* Period & Revenue */}
@@ -511,7 +618,7 @@ export default function ProjectionsPage() {
             <div className="flex gap-3 pt-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Menyimpan...' : editingReport ? 'Perbarui' : 'Simpan'}
+                {isSaving ? 'Menyimpan...' : 'Simpan'}
               </Button>
             </div>
           </form>
