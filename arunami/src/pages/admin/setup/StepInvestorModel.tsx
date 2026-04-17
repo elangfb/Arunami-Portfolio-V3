@@ -71,7 +71,7 @@ export default function StepInvestorModel({ form }: Props) {
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => setValue('returnModel', opt.value, { shouldValidate: true })}
+                onClick={() => setValue('returnModel', opt.value as WizardFormData['returnModel'], { shouldValidate: true })}
                 className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
                   returnModel === opt.value
                     ? 'border-green-600 bg-green-50 ring-1 ring-green-600'

@@ -16,8 +16,8 @@ export function calculateROI(netProfit: number, config: InvestorConfig | Investo
 
   // Determine slot-based values
   const hasSlots = 'totalSlots' in config && 'nominalPerSlot' in config
-  const totalSlots = hasSlots ? (config as InvestorConfig).totalSlots : 0
-  const nominalPerSlot = hasSlots ? (config as InvestorConfig).nominalPerSlot : 0
+  const totalSlots: number = hasSlots ? (config as InvestorConfig).totalSlots ?? 0 : 0
+  const nominalPerSlot: number = hasSlots ? (config as InvestorConfig).nominalPerSlot ?? 0 : 0
 
   const returnPerSlot = totalSlots > 0 ? netForInvestor / totalSlots : netForInvestor
   const monthlyROI = nominalPerSlot > 0 ? (returnPerSlot / nominalPerSlot) * 100 : 0

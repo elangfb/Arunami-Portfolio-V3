@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
 import { formatCurrencyExact } from '@/lib/utils'
 import { formatPeriod } from '@/lib/dateUtils'
-import type { PortfolioConfig, FixedScheduleConfig, ScheduledPayment } from '@/types'
+import type { PortfolioConfig, FixedScheduleConfig } from '@/types'
 
 interface Props {
   portfolioId: string

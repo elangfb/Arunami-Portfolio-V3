@@ -10,7 +10,7 @@ import { createPortfolio, savePortfolioConfig } from '@/lib/firestore'
 import { INDUSTRY_PRESETS } from '@/lib/industryPresets'
 import type {
   IndustryType, ReturnModelType, ReportingFrequency,
-  RevenueCategory, KpiMetric, InvestorConfigUnion, CustomVariableSource,
+  RevenueCategory, KpiMetric, InvestorConfigUnion,
   ScheduledPayment, CustomVariable,
 } from '@/types'
 

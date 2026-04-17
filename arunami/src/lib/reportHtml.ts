@@ -66,7 +66,7 @@ function buildDistributionSection(
   modelType: string,
   result: DistributionResult,
   config: InvestorConfigUnion,
-  allocation: InvestorAllocation,
+  _allocation: InvestorAllocation,
   periodLabel: string,
 ): string {
   const b = result.breakdown
