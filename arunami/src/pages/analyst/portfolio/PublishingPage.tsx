@@ -7,6 +7,7 @@ import {
   getInvestorReportsForPortfolio,
   upsertInvestorReportDraft, publishInvestorReport, publishAllInvestorReports,
   unpublishInvestorReport, unpublishAllInvestorReports,
+  getAllUsers,
 } from '@/lib/firestore'
 import { buildInvestorReportHtml } from '@/lib/reportHtml'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
@@ -19,9 +20,9 @@ import {
 } from '@/components/ui/select'
 import { Send, Upload, FileCheck2, CheckCircle2, Undo2 } from 'lucide-react'
 import type {
-  Portfolio, InvestorAllocation, PortfolioReport,
+  Portfolio, PortfolioConfig, InvestorAllocation, PortfolioReport,
   PnLExtractedData, ProjectionExtractedData, ManagementReport, Note,
-  InvestorReportDoc,
+  InvestorReportDoc, AppUser,
 } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -37,6 +38,7 @@ export default function PublishingPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
   const [investorSharePercent, setInvestorSharePercent] = useState<number>(0)
+  const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Publishing state
@@ -44,24 +46,28 @@ export default function PublishingPage() {
   const [selectedInvestorUid, setSelectedInvestorUid] = useState<string>('')
   const [existingReports, setExistingReports] = useState<InvestorReportDoc[]>([])
   const [publishing, setPublishing] = useState(false)
+  const [investors, setInvestors] = useState<AppUser[]>([])
 
   // Load base data once per portfolio
   useEffect(() => {
     if (!portfolioId) return
     ;(async () => {
-      const [pnls, projs, mgmts, n, allocs, config] = await Promise.all([
+      const [pnls, projs, mgmts, n, allocs, config, usrs] = await Promise.all([
         getReports(portfolioId, 'pnl'),
         getReports(portfolioId, 'projection'),
         getManagementReports(portfolioId),
         getNotes(portfolioId),
         getAllocationsForPortfolio(portfolioId),
         getPortfolioConfigOrDefault(portfolioId),
+        getAllUsers(),
       ])
       setPnlReports(pnls)
       setProjReports(projs)
       setMgmtReports(mgmts)
       setNotes(n)
       setAllocations(allocs)
+      setPortfolioConfig(config)
+      setInvestors(usrs)
       setInvestorSharePercent(config.investorConfig.investorSharePercent)
       // Auto-pick latest period that has a P&L, fall back to latest projection
       const allPeriods = [...new Set([...pnls, ...projs].map(r => r.period))]
@@ -95,17 +101,20 @@ export default function PublishingPage() {
   // Generate preview HTML client-side
   const previewHtml = useMemo(() => {
     if (!portfolio || !selectedAllocation || !selectedPeriod) return ''
+    const investorUser = investors.find(u => u.uid === selectedAllocation.investorUid)
     return buildInvestorReportHtml({
       portfolio,
+      config: portfolioConfig ?? undefined,
       allocation: selectedAllocation,
       investorSharePercent,
+      isArunamiTeam: investorUser?.isArunamiTeam,
       period: selectedPeriod,
       pnlReports: pnlReports.map(r => r.extractedData as PnLExtractedData),
       projectionReports: projReports.map(r => r.extractedData as ProjectionExtractedData),
       managementReports: mgmtReports,
       notes,
     })
-  }, [portfolio, selectedAllocation, investorSharePercent, selectedPeriod, pnlReports, projReports, mgmtReports, notes])
+  }, [portfolio, portfolioConfig, selectedAllocation, investorSharePercent, selectedPeriod, pnlReports, projReports, mgmtReports, notes])
 
   const statusFor = (uid: string) =>
     existingReports.find(r => r.investorUid === uid)?.status ?? null
@@ -183,21 +192,26 @@ export default function PublishingPage() {
     }
     setPublishing(true)
     try {
-      const reports = allocations.map(alloc => ({
-        portfolioName: portfolio.name,
-        investorUid: alloc.investorUid,
-        investorName: alloc.investorName,
-        htmlContent: buildInvestorReportHtml({
-          portfolio,
-          allocation: alloc,
-          investorSharePercent,
-          period: selectedPeriod,
-          pnlReports: pnlReports.map(r => r.extractedData as PnLExtractedData),
-          projectionReports: projReports.map(r => r.extractedData as ProjectionExtractedData),
-          managementReports: mgmtReports,
-          notes,
-        }),
-      }))
+      const reports = allocations.map(alloc => {
+        const investorUser = investors.find(u => u.uid === alloc.investorUid)
+        return {
+          portfolioName: portfolio.name,
+          investorUid: alloc.investorUid,
+          investorName: alloc.investorName,
+          htmlContent: buildInvestorReportHtml({
+            portfolio,
+            config: portfolioConfig ?? undefined,
+            allocation: alloc,
+            investorSharePercent,
+            isArunamiTeam: investorUser?.isArunamiTeam,
+            period: selectedPeriod,
+            pnlReports: pnlReports.map(r => r.extractedData as PnLExtractedData),
+            projectionReports: projReports.map(r => r.extractedData as ProjectionExtractedData),
+            managementReports: mgmtReports,
+            notes,
+          }),
+        }
+      })
       await publishAllInvestorReports({
         portfolioId,
         period: selectedPeriod,

@@ -406,7 +406,12 @@ export default function AdminPortfolios() {
                         return (
                           <tr key={alloc.id} className="hover:bg-muted/30">
                             <td className="py-2.5 px-3">
-                              <p className="font-medium">{alloc.investorName}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{alloc.investorName}</p>
+                                {investors.find(i => i.uid === alloc.investorUid)?.isArunamiTeam && (
+                                  <Badge variant="outline" className="border-green-600 text-green-700 text-xs">Tim Arunami</Badge>
+                                )}
+                              </div>
                               {alloc.investorEmail && (
                                 <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
                               )}

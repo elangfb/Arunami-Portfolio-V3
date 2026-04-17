@@ -1,15 +1,19 @@
 import { formatCurrencyExact, formatPercent } from './utils'
 import { formatPeriod, comparePeriods } from './dateUtils'
+import { calculateDistribution } from './distributionStrategies'
+import type { DistributionResult } from './distributionStrategies'
 import type {
-  Portfolio, PnLExtractedData, ProjectionExtractedData,
-  ManagementReport, Note, InvestorAllocation,
+  Portfolio, PortfolioConfig, PnLExtractedData, ProjectionExtractedData,
+  ManagementReport, Note, InvestorAllocation, InvestorConfigUnion,
 } from '@/types'
 
 interface BuildArgs {
   portfolio: Portfolio
+  config?: PortfolioConfig
   allocation?: InvestorAllocation
   /** Global investor-pool share of Net Profit, in percent (e.g. 70 = 70%). */
   investorSharePercent: number
+  isArunamiTeam?: boolean
   period: string
   pnlReports: PnLExtractedData[]
   projectionReports: ProjectionExtractedData[]
@@ -37,9 +41,161 @@ function row(label: string, val: number): string {
   return `<tr><td>${label}</td><td style="text-align:right">${formatCurrencyExact(val)}</td></tr>`
 }
 
+function descRow(label: string, desc: string, val: string): string {
+  return `<tr>
+    <td><strong>${label}</strong><div style="font-size:11px;color:#666;margin-top:2px">${desc}</div></td>
+    <td style="text-align:right">${val}</td>
+  </tr>`
+}
+
+function highlightRow(label: string, desc: string, val: string): string {
+  return `<tr style="background:#f5faf7">
+    <td><strong style="color:#1e5f3f">${label}</strong><div style="font-size:11px;color:#666;margin-top:2px">${desc}</div></td>
+    <td style="text-align:right"><strong style="color:#1e5f3f;font-size:15px">${val}</strong></td>
+  </tr>`
+}
+
+// ─── Model-Specific Sections ──────────────────────────────────────────────
+
+function feeLabel(result: DistributionResult): string {
+  if (result.isFeeExempt) return 'Rp 0 (Tim Arunami — Bebas Fee)'
+  return formatCurrencyExact(result.arunamiFeeAmount)
+}
+
+function buildDistributionSection(
+  modelType: string,
+  result: DistributionResult,
+  config: InvestorConfigUnion,
+  allocation: InvestorAllocation,
+  periodLabel: string,
+): string {
+  const b = result.breakdown
+  const feeRow = config.arunamiFeePercent > 0
+    ? descRow('- Arunami Fee', result.isFeeExempt ? 'Tim Arunami — Bebas Fee.' : 'Management fee Arunami.', feeLabel(result))
+    : ''
+
+  switch (modelType) {
+    case 'net_profit_share':
+    case 'percentage_based':
+      return `
+        <h2>Net Investor — ${periodLabel}</h2>
+        <p style="font-size:12px;color:#555;margin-top:4px">
+          Perhitungan bagian keuntungan Anda untuk periode ini, dari Net Profit proyek sampai Net Investor.
+        </p>
+        <table class="data">
+          ${descRow('Net Profit', 'Laba bersih proyek setelah seluruh biaya, bunga, dan pajak.', formatCurrencyExact(b.netProfit ?? 0))}
+          ${descRow('× Investor Share', 'Porsi Net Profit yang dialokasikan ke seluruh pool investor.', `${config.investorSharePercent}%`)}
+          ${descRow('Bagian Pool Investor', 'Net Profit × Investor Share.', formatCurrencyExact(b.investorPool ?? 0))}
+          ${descRow('× Kepemilikan Anda', 'Persentase modal Anda terhadap total pool investor.', formatPercent(b.ownership ?? 0))}
+          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
+          ${feeRow}
+          ${highlightRow('Net Investor', 'Bagian Anda untuk periode ini.', formatCurrencyExact(result.perInvestorAmount))}
+        </table>`
+
+    case 'slot_based':
+      return `
+        <h2>Net Investor — ${periodLabel}</h2>
+        <table class="data">
+          ${descRow('Net Profit', 'Laba bersih proyek.', formatCurrencyExact(b.netProfit ?? 0))}
+          ${descRow('Investor Pool', 'Setelah dipotong share.', formatCurrencyExact(b.investorPool ?? 0))}
+          ${descRow('Slot Anda', 'Jumlah slot × total slot.', `${b.slots ?? 0} / ${b.totalSlots ?? 0}`)}
+          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
+          ${feeRow}
+          ${highlightRow('Net Investor', 'Bagian Anda.', formatCurrencyExact(result.perInvestorAmount))}
+        </table>`
+
+    case 'fixed_yield':
+      return `
+        <h2>Fixed Yield — ${periodLabel}</h2>
+        <p style="font-size:12px;color:#555;margin-top:4px">
+          Return tetap berdasarkan persentase modal investasi.
+        </p>
+        <table class="data">
+          ${descRow('Modal Investasi', 'Basis perhitungan yield.', formatCurrencyExact(b.principal ?? 0))}
+          ${descRow('× Fixed Yield', 'Persentase yield per bulan.', `${b.fixedYieldPercent ?? 0}%`)}
+          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
+          ${feeRow}
+          ${highlightRow('Pembayaran Bulan Ini', 'Yield Anda.', formatCurrencyExact(result.perInvestorAmount))}
+        </table>`
+
+    case 'revenue_share':
+      return `
+        <h2>Revenue Share — ${periodLabel}</h2>
+        <p style="font-size:12px;color:#555;margin-top:4px">
+          Bagian Anda dari pendapatan bruto proyek.
+        </p>
+        <table class="data">
+          ${descRow('Revenue', 'Pendapatan bruto proyek periode ini.', formatCurrencyExact(b.revenue ?? 0))}
+          ${descRow('× Revenue Share', 'Persentase yang dialokasikan ke investor.', `${b.revenueSharePercent ?? 0}%`)}
+          ${descRow('Total Share', 'Revenue × Share %.', formatCurrencyExact(b.totalShare ?? 0))}
+          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
+          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
+          ${feeRow}
+          ${highlightRow('Bagian Anda', 'Revenue share Anda untuk periode ini.', formatCurrencyExact(result.perInvestorAmount))}
+        </table>`
+
+    case 'fixed_schedule':
+      return `
+        <h2>Pembayaran Terjadwal — ${periodLabel}</h2>
+        <table class="data">
+          ${descRow('Jumlah Terjadwal', 'Pembayaran sesuai kontrak.', formatCurrencyExact(b.scheduledAmount ?? 0))}
+          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
+          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
+          ${feeRow}
+          ${highlightRow('Pembayaran Anda', 'Bagian Anda periode ini.', formatCurrencyExact(result.perInvestorAmount))}
+        </table>`
+
+    case 'annual_dividend':
+      return `
+        <h2>Dividen Tahunan — ${b.year ?? ''}</h2>
+        <table class="data">
+          ${descRow('Dividen Ditetapkan', 'Total dividen yang disetujui RUPS.', formatCurrencyExact(b.declaredDividend ?? 0))}
+          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
+          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
+          ${feeRow}
+          ${highlightRow('Dividen Anda', 'Bagian dividen Anda.', formatCurrencyExact(result.perInvestorAmount))}
+        </table>`
+
+    case 'custom':
+      return `
+        <h2>Distribusi Kustom — ${periodLabel}</h2>
+        <table class="data">
+          ${descRow('Hasil Formula', 'Kalkulasi berdasarkan formula kustom.', formatCurrencyExact(b.formulaResult ?? 0))}
+          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
+          ${feeRow}
+          ${highlightRow('Bagian Anda', 'Distribusi Anda periode ini.', formatCurrencyExact(result.perInvestorAmount))}
+        </table>`
+
+    default:
+      return ''
+  }
+}
+
+function buildKpiBlock(
+  result: DistributionResult,
+  allocation: InvestorAllocation,
+  modelType: string,
+): string {
+  return `
+    <h2>Ringkasan Saya</h2>
+    <div class="kpi">
+      <div><span>Total Investasi</span><strong>${formatCurrencyExact(allocation.investedAmount)}</strong></div>
+      <div><span>Kepemilikan</span><strong>${formatPercent(allocation.ownershipPercent ?? 0)}</strong></div>
+      <div><span>Distribusi Periode Ini</span><strong>${formatCurrencyExact(result.perInvestorAmount)}</strong></div>
+      <div><span>Monthly ROI</span><strong>${formatPercent(result.roiPercent, true)}</strong></div>
+      ${modelType !== 'annual_dividend'
+        ? `<div><span>Annual ROI (×12)</span><strong>${formatPercent(result.annualRoiPercent, true)}</strong></div>`
+        : `<div><span>Annual ROI</span><strong>${formatPercent(result.annualRoiPercent, true)}</strong></div>`
+      }
+    </div>
+  `
+}
+
+// ─── Main Builder ─────────────────────────────────────────────────────────
+
 export function buildInvestorReportHtml(args: BuildArgs): string {
   const {
-    portfolio, allocation, investorSharePercent, period,
+    portfolio, config, allocation, investorSharePercent, isArunamiTeam, period,
     pnlReports, projectionReports, managementReports, notes,
   } = args
 
@@ -50,42 +206,45 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
     .filter(r => comparePeriods(r.period, period) <= 0)
     .at(-1) ?? null
 
-  // Derive Operating Profit defensively: some legacy reports stored 0 when
-  // Gemini didn't populate the field. Always recompute from grossProfit and
-  // totalOpex so the displayed table is internally consistent.
   const derivedOperatingProfit = latestPnl
     ? (latestPnl.grossProfit ?? 0) - (latestPnl.totalOpex ?? 0)
     : 0
 
-  // Net Profit → × global investor pool share → × this investor's ownership
-  // of that pool → Net Investor.
-  const investorPoolShare = investorSharePercent / 100
-  const investorOwnership = allocation?.ownershipPercent != null
-    ? allocation.ownershipPercent / 100
-    : (allocation && portfolio.investasiAwal > 0
-        ? allocation.investedAmount / portfolio.investasiAwal
-        : 0)
-  const netProfit = latestPnl?.netProfit ?? 0
-  const afterPoolShare = netProfit * investorPoolShare
-  const netInvestor = afterPoolShare * investorOwnership
+  // Determine model type from config, falling back to percentage_based
+  const modelType = config?.investorConfig?.type ?? 'percentage_based'
+  const investorConfig = config?.investorConfig ?? {
+    type: 'percentage_based' as const,
+    investorSharePercent,
+    arunamiFeePercent: 0,
+  }
 
-  // Investor-specific numbers (if allocation passed)
+  // Calculate distribution using the strategy pattern
+  let distributionResult: DistributionResult | null = null
   let investorKpiBlock = ''
-  if (allocation && latestPnl) {
-    const monthlyROI = allocation.investedAmount > 0
-      ? (netInvestor / allocation.investedAmount) * 100
-      : 0
-    const annualROI = monthlyROI * 12
-    investorKpiBlock = `
-      <h2>Ringkasan Saya</h2>
-      <div class="kpi">
-        <div><span>Total Investasi</span><strong>${formatCurrencyExact(allocation.investedAmount)}</strong></div>
-        <div><span>Kepemilikan</span><strong>${formatPercent(investorOwnership * 100)}</strong></div>
-        <div><span>Net untuk Investor</span><strong>${formatCurrencyExact(netInvestor)}</strong></div>
-        <div><span>Monthly ROI</span><strong>${formatPercent(monthlyROI, true)}</strong></div>
-        <div><span>Annual ROI (×12)</span><strong>${formatPercent(annualROI, true)}</strong></div>
-      </div>
-    `
+  let distributionSection = ''
+
+  if (allocation) {
+    const reportData = latestPnl ? {
+      period,
+      revenue: latestPnl.revenue,
+      netProfit: latestPnl.netProfit,
+      grossProfit: latestPnl.grossProfit,
+    } : null
+
+    distributionResult = calculateDistribution({
+      reportData,
+      config: investorConfig,
+      allocation,
+      portfolio,
+      isArunamiTeam,
+    })
+
+    if (latestPnl || ['fixed_yield', 'fixed_schedule', 'annual_dividend'].includes(modelType)) {
+      investorKpiBlock = buildKpiBlock(distributionResult, allocation, modelType)
+      distributionSection = buildDistributionSection(
+        modelType, distributionResult, investorConfig, allocation, formatPeriod(period),
+      )
+    }
   }
 
   const pnlSection = latestPnl ? `
@@ -99,35 +258,6 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
       ${row('Net Profit', latestPnl.netProfit)}
     </table>
   ` : '<p><em>Belum ada data P&amp;L untuk periode ini.</em></p>'
-
-  const netInvestorSection = (allocation && latestPnl) ? `
-    <h2>Net Investor — ${formatPeriod(latestPnl.period)}</h2>
-    <p style="font-size:12px;color:#555;margin-top:4px">
-      Perhitungan bagian keuntungan Anda untuk periode ini, dari Net Profit proyek sampai Net Investor.
-    </p>
-    <table class="data">
-      <tr>
-        <td><strong>Net Profit</strong><div style="font-size:11px;color:#666;margin-top:2px">Laba bersih proyek setelah seluruh biaya, bunga, dan pajak.</div></td>
-        <td style="text-align:right">${formatCurrencyExact(netProfit)}</td>
-      </tr>
-      <tr>
-        <td><strong>× Investor Share</strong><div style="font-size:11px;color:#666;margin-top:2px">Porsi Net Profit yang dialokasikan ke seluruh pool investor proyek ini.</div></td>
-        <td style="text-align:right">${investorSharePercent}%</td>
-      </tr>
-      <tr>
-        <td><strong>Bagian Pool Investor</strong><div style="font-size:11px;color:#666;margin-top:2px">Net Profit × Investor Share. Total yang dibagikan ke seluruh investor.</div></td>
-        <td style="text-align:right">${formatCurrencyExact(afterPoolShare)}</td>
-      </tr>
-      <tr>
-        <td><strong>× Kepemilikan Anda</strong><div style="font-size:11px;color:#666;margin-top:2px">Persentase slot/modal Anda terhadap total pool investor.</div></td>
-        <td style="text-align:right">${formatPercent(investorOwnership * 100)}</td>
-      </tr>
-      <tr style="background:#f5faf7">
-        <td><strong style="color:#1e5f3f">Net Investor</strong><div style="font-size:11px;color:#666;margin-top:2px">Bagian Pool Investor × Kepemilikan Anda. Inilah bagian Anda untuk periode ini.</div></td>
-        <td style="text-align:right"><strong style="color:#1e5f3f;font-size:15px">${formatCurrencyExact(netInvestor)}</strong></td>
-      </tr>
-    </table>
-  ` : ''
 
   const projSection = latestProj ? `
     <h2>Proyeksi — ${formatPeriod(latestProj.period)}</h2>
@@ -185,7 +315,7 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
   ${investorKpiBlock}
   ${summarySection}
   ${pnlSection}
-  ${netInvestorSection}
+  ${distributionSection}
   ${projSection}
   ${costSection}
   ${issuesSection}

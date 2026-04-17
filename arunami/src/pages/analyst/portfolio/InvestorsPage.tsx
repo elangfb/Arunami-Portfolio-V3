@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   getFinancialData, getTransferProofs,
-  getAllocationsForPortfolio,
+  getAllocationsForPortfolio, getPortfolioConfig, getAllUsers,
 } from '@/lib/firestore'
+import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatPeriod } from '@/lib/dateUtils'
 import type {
-  FinancialData, TransferProof, Portfolio, InvestorAllocation,
+  FinancialData, TransferProof, Portfolio, InvestorAllocation, PortfolioConfig, AppUser,
 } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -19,6 +20,8 @@ export default function InvestorsPage() {
   const [data, setData] = useState<FinancialData | null>(null)
   const [proofs, setProofs] = useState<TransferProof[]>([])
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
+  const [config, setConfig] = useState<PortfolioConfig | null>(null)
+  const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,10 +30,14 @@ export default function InvestorsPage() {
       getFinancialData(portfolioId),
       getTransferProofs(portfolioId),
       getAllocationsForPortfolio(portfolioId),
-    ]).then(([d, p, allocs]) => {
+      getPortfolioConfig(portfolioId),
+      getAllUsers(),
+    ]).then(([d, p, allocs, cfg, u]) => {
       setData(d)
       setProofs(p)
       setAllocations(allocs)
+      setConfig(cfg)
+      setUsers(u)
       setLoading(false)
     })
   }, [portfolioId])
@@ -43,13 +50,30 @@ export default function InvestorsPage() {
   const lastProfit = latestActual?.aktual ?? data.profitData.at(-1)?.aktual ?? 0
   const periodLabel = latestActualPeriod ? formatPeriod(latestActualPeriod) : 'Bulan Terakhir'
 
-  const cfg = data.investorConfig
-  const investorShare = lastProfit * (cfg.investorSharePercent / 100)
-  const arunamiFee = investorShare * (cfg.arunamiFeePercent / 100)
-  const netForInvestor = investorShare - arunamiFee
+  // Portfolio-level summary: use a "whole portfolio" mock allocation for the summary cards
   const totalInvestment = portfolio?.investasiAwal ?? 0
-  const monthlyROI = totalInvestment > 0 ? (netForInvestor / totalInvestment) * 100 : 0
-  const annualROI = monthlyROI * 12
+  let netForInvestor = 0
+  let monthlyROI = 0
+  let annualROI = 0
+
+  if (config?.investorConfig && portfolio) {
+    const mockAlloc: InvestorAllocation = {
+      id: '_summary', investorUid: '', investorName: '', investorEmail: '',
+      portfolioId: portfolioId ?? '', portfolioName: portfolio.name, portfolioCode: portfolio.code,
+      slots: 0, investedAmount: totalInvestment, ownershipPercent: 100,
+      joinedAt: null as any, updatedAt: null as any,
+    }
+    const latestRev = [...data.revenueData].reverse().find(r => r.aktual > 0)
+    const summaryResult = calculateDistribution({
+      reportData: { period: latestActualPeriod ?? '', revenue: latestRev?.aktual ?? 0, netProfit: lastProfit, grossProfit: 0 },
+      config: config.investorConfig,
+      allocation: mockAlloc,
+      portfolio,
+    })
+    netForInvestor = summaryResult.perInvestorAmount
+    monthlyROI = summaryResult.roiPercent
+    annualROI = summaryResult.annualRoiPercent
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -93,14 +117,32 @@ export default function InvestorsPage() {
               </thead>
               <tbody className="divide-y">
                 {allocations.map(alloc => {
-                  const ownership = totalInvestment > 0 ? alloc.investedAmount / totalInvestment : 0
-                  const investorNet = netForInvestor * ownership
-                  const investorMonthly = alloc.investedAmount > 0 ? (investorNet / alloc.investedAmount) * 100 : 0
-                  const investorAnnual = investorMonthly * 12
+                  let investorNet = 0
+                  let investorMonthly = 0
+                  let investorAnnual = 0
+                  if (config?.investorConfig && portfolio) {
+                    const latestRev = [...data.revenueData].reverse().find(r => r.aktual > 0)
+                    const investorUser = users.find(u => u.uid === alloc.investorUid)
+                    const result = calculateDistribution({
+                      reportData: { period: latestActualPeriod ?? '', revenue: latestRev?.aktual ?? 0, netProfit: lastProfit, grossProfit: 0 },
+                      config: config.investorConfig,
+                      allocation: alloc,
+                      portfolio,
+                      isArunamiTeam: investorUser?.isArunamiTeam,
+                    })
+                    investorNet = result.perInvestorAmount
+                    investorMonthly = result.roiPercent
+                    investorAnnual = result.annualRoiPercent
+                  }
                   return (
                     <tr key={alloc.id} className="hover:bg-muted/30">
                       <td className="py-2.5 px-3">
-                        <p className="font-medium">{alloc.investorName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{alloc.investorName}</p>
+                          {users.find(u => u.uid === alloc.investorUid)?.isArunamiTeam && (
+                            <Badge variant="outline" className="border-green-600 text-green-700 text-xs">Tim Arunami</Badge>
+                          )}
+                        </div>
                         {alloc.investorEmail && (
                           <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
                         )}

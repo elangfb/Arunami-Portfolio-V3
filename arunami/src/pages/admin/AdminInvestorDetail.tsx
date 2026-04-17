@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getUser, getAllocationsForInvestor, getPortfolioConfig, getFinancialData,
-  getCommunicationsForInvestor, updateAllocation,
+  getCommunicationsForInvestor, updateAllocation, getPortfolio,
 } from '@/lib/firestore'
-import { calculateInvestorROI } from '@/lib/roi'
+import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
 import { formatPeriod } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,13 +16,14 @@ import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, Pencil, FileText }
 import InvestorReportGenerator from './components/InvestorReportGenerator'
 import type {
   AppUser, InvestorAllocation, FinancialData as FinancialDataType,
-  PortfolioConfig, SlotBasedConfig, InvestorCommunication,
+  PortfolioConfig, SlotBasedConfig, InvestorCommunication, Portfolio,
 } from '@/types'
 
 interface PortfolioEnriched {
   allocation: InvestorAllocation
   financial: FinancialDataType | null
   config: PortfolioConfig | null
+  portfolio: Portfolio | null
   earnings: number
   monthlyROI: number
   netProfit: number
@@ -66,9 +67,10 @@ export default function AdminInvestorDetail() {
     // Enrich each allocation with financial data
     const enriched = await Promise.all(
       allocations.map(async (allocation) => {
-        const [config, financial] = await Promise.all([
+        const [config, financial, ptf] = await Promise.all([
           getPortfolioConfig(allocation.portfolioId),
           getFinancialData(allocation.portfolioId),
+          getPortfolio(allocation.portfolioId),
         ])
 
         let earnings = 0
@@ -76,28 +78,30 @@ export default function AdminInvestorDetail() {
         let netProfit = 0
         let periodLabel = 'Bulan Ini'
 
-        if (financial && config?.investorConfig?.type === 'slot_based') {
-          const sc = config.investorConfig as SlotBasedConfig
+        if (financial && config?.investorConfig && ptf) {
           const latestActual = [...financial.profitData].reverse().find(r => r.aktual > 0)
+          const latestRevenue = [...financial.revenueData].reverse().find(r => r.aktual > 0)
           const latestActualPeriod = latestActual?.month ?? financial.profitData.at(-1)?.month
           netProfit = latestActual?.aktual ?? financial.profitData.at(-1)?.aktual ?? 0
           if (latestActualPeriod) periodLabel = formatPeriod(latestActualPeriod)
 
-          if (netProfit !== 0) {
-            const roi = calculateInvestorROI(
+          const result = calculateDistribution({
+            reportData: {
+              period: latestActualPeriod ?? '',
+              revenue: latestRevenue?.aktual ?? 0,
               netProfit,
-              allocation.slots,
-              sc.totalSlots,
-              sc.investorSharePercent,
-              sc.arunamiFeePercent,
-              sc.nominalPerSlot,
-            )
-            earnings = roi.earnings
-            monthlyROI = roi.monthlyROI
-          }
+              grossProfit: 0,
+            },
+            config: config.investorConfig,
+            allocation,
+            portfolio: ptf,
+            isArunamiTeam: user?.isArunamiTeam,
+          })
+          earnings = result.perInvestorAmount
+          monthlyROI = result.roiPercent
         }
 
-        return { allocation, financial, config, earnings, monthlyROI, netProfit, periodLabel }
+        return { allocation, financial, config, portfolio: ptf, earnings, monthlyROI, netProfit, periodLabel }
       }),
     )
 
@@ -175,6 +179,9 @@ export default function AdminInvestorDetail() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">{investor.displayName}</h1>
             <Badge variant="outline">Investor</Badge>
+            {investor.isArunamiTeam && (
+              <Badge variant="outline" className="border-green-600 text-green-700">Tim Arunami</Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">{investor.email}</p>
         </div>
@@ -394,6 +401,7 @@ export default function AdminInvestorDetail() {
           allocation: p.allocation,
           financial: p.financial,
           config: p.config,
+          portfolio: p.portfolio,
         }))}
       />
     </div>

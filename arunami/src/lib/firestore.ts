@@ -33,6 +33,7 @@ export async function createUser(
   displayName: string,
   role: AppUser['role'],
   createdBy: string,
+  isArunamiTeam?: boolean,
 ) {
   // Use secondaryAuth so the admin's session on the primary auth is not replaced
   const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password)
@@ -42,6 +43,7 @@ export async function createUser(
     email,
     displayName,
     role,
+    isArunamiTeam: isArunamiTeam ?? false,
     createdBy,
     createdAt: serverTimestamp(),
   }
@@ -49,7 +51,7 @@ export async function createUser(
   return cred.user
 }
 
-export async function updateUser(uid: string, data: Partial<Pick<AppUser, 'displayName' | 'role'>>) {
+export async function updateUser(uid: string, data: Partial<Pick<AppUser, 'displayName' | 'role' | 'isArunamiTeam'>>) {
   await updateDoc(doc(db, 'users', uid), data)
 }
 
@@ -507,13 +509,16 @@ export async function syncFinancialData(portfolioId: string) {
     { metric: 'Efisiensi', value: latestPnl.revenue > 0 ? ((latestPnl.revenue - latestPnl.totalOpex) / latestPnl.revenue) * 100 : 0, fullMark: 100 },
   ] : []
 
-  // Preserve existing investorConfig or use defaults
+  // Preserve existing investorConfig or build from portfolio config
   const investorConfig = existingData?.investorConfig ?? {
-    totalSlots: 10,
-    nominalPerSlot: 5000000,
-    investorSharePercent: 70,
-    arunamiFeePercent: 10,
+    returnModel: config.returnModel,
+    totalSlots: 'totalSlots' in config.investorConfig ? (config.investorConfig as any).totalSlots : undefined,
+    nominalPerSlot: 'nominalPerSlot' in config.investorConfig ? (config.investorConfig as any).nominalPerSlot : undefined,
+    investorSharePercent: config.investorConfig.investorSharePercent,
+    arunamiFeePercent: config.investorConfig.arunamiFeePercent,
   }
+  // Always sync returnModel from latest config
+  investorConfig.returnModel = config.returnModel
 
   const financialData: FinancialData = {
     revenueData,

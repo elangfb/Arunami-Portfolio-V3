@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getFinancialData, getAllocationsForInvestor, getPortfolioConfig } from '@/lib/firestore'
-import { calculateROI, calculateInvestorROI } from '@/lib/roi'
+import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,15 +9,15 @@ import { Badge } from '@/components/ui/badge'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DollarSign, TrendingUp, BarChart2, PieChart } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
-import type { FinancialData, InvestorAllocation, SlotBasedConfig } from '@/types'
+import type { FinancialData, InvestorAllocation, PortfolioConfig } from '@/types'
 import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
 
 export default function InvestorOverviewPage() {
-  const { portfolioId, selectedPeriod, availablePeriods } = useOutletContext<InvestorPortfolioOutletContext>()
+  const { portfolio, portfolioId, selectedPeriod, availablePeriods } = useOutletContext<InvestorPortfolioOutletContext>()
   const { user } = useAuthStore()
   const [data, setData] = useState<FinancialData | null>(null)
   const [allocation, setAllocation] = useState<InvestorAllocation | null>(null)
-  const [slotConfig, setSlotConfig] = useState<SlotBasedConfig | null>(null)
+  const [config, setConfig] = useState<PortfolioConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,12 +26,10 @@ export default function InvestorOverviewPage() {
       getFinancialData(portfolioId),
       getAllocationsForInvestor(user.uid),
       getPortfolioConfig(portfolioId),
-    ]).then(([d, allocs, config]) => {
+    ]).then(([d, allocs, cfg]) => {
       setData(d)
       setAllocation(allocs.find(a => a.portfolioId === portfolioId) ?? null)
-      if (config?.investorConfig?.type === 'slot_based') {
-        setSlotConfig(config.investorConfig as SlotBasedConfig)
-      }
+      setConfig(cfg)
       setLoading(false)
     })
   }, [portfolioId, user])
@@ -49,30 +47,35 @@ export default function InvestorOverviewPage() {
     )
   }
 
-  // Use period chosen in the sidebar; fall back to first available
   const activePeriod = selectedPeriod || availablePeriods[0]
   const revEntry = data.revenueData.find(r => r.month === activePeriod)
   const profEntry = data.profitData.find(r => r.month === activePeriod)
   const lastRevenue = revEntry?.aktual ?? 0
   const lastProfit = profEntry?.aktual ?? 0
   const periodLabel = formatPeriod(activePeriod)
-  const roi = calculateROI(lastProfit, data.investorConfig)
 
-  const mySlots = allocation?.slots ?? 0
-  const totalSlots = slotConfig?.totalSlots ?? data.investorConfig.totalSlots
-  const nominalPerSlot = slotConfig?.nominalPerSlot ?? data.investorConfig.nominalPerSlot
-  const investorSharePct = slotConfig?.investorSharePercent ?? data.investorConfig.investorSharePercent
-  const arunamiFeePct = slotConfig?.arunamiFeePercent ?? data.investorConfig.arunamiFeePercent
+  // Calculate distribution using strategy pattern
+  let myResult: ReturnType<typeof calculateDistribution> | null = null
+  if (allocation && portfolio && config?.investorConfig) {
+    myResult = calculateDistribution({
+      reportData: { period: activePeriod, revenue: lastRevenue, netProfit: lastProfit, grossProfit: 0 },
+      config: config.investorConfig,
+      allocation,
+      portfolio,
+      isArunamiTeam: user?.isArunamiTeam,
+    })
+  }
 
-  const myRoi = allocation
-    ? calculateInvestorROI(lastProfit, mySlots, totalSlots, investorSharePct, arunamiFeePct, nominalPerSlot)
-    : null
+  const ownershipPct = allocation?.ownershipPercent
+    ?? (portfolio && portfolio.investasiAwal > 0 && allocation
+      ? (allocation.investedAmount / portfolio.investasiAwal) * 100
+      : 0)
 
   const kpis = [
     { label: `Revenue (${periodLabel})`, value: formatCurrencyCompact(lastRevenue), icon: DollarSign },
     { label: `Net Profit (${periodLabel})`, value: formatCurrencyCompact(lastProfit), icon: TrendingUp },
-    { label: 'Slot Saya', value: allocation ? `${mySlots} / ${totalSlots}` : `${totalSlots} total`, icon: PieChart },
-    { label: `Earning Saya (${periodLabel})`, value: myRoi ? formatCurrencyCompact(myRoi.earnings) : formatCurrencyCompact(roi.returnPerSlot), icon: BarChart2 },
+    { label: 'Kepemilikan', value: `${ownershipPct.toFixed(1)}%`, icon: PieChart },
+    { label: `Earning Saya (${periodLabel})`, value: formatCurrencyCompact(myResult?.perInvestorAmount ?? 0), icon: BarChart2 },
   ]
 
   const publishedSet = new Set(availablePeriods)
@@ -85,11 +88,11 @@ export default function InvestorOverviewPage() {
       <h2 className="text-xl font-bold">Overview Portofolio</h2>
 
       {/* My Allocation Card */}
-      {allocation && myRoi && (
+      {allocation && myResult && (
         <div className="rounded-lg border bg-[#1e5f3f]/5 p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Alokasi Saya</span>
-            <Badge variant="secondary">{mySlots} slot · {myRoi.ownershipPct.toFixed(1)}% kepemilikan</Badge>
+            <Badge variant="secondary">{ownershipPct.toFixed(1)}% kepemilikan</Badge>
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
@@ -98,12 +101,12 @@ export default function InvestorOverviewPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Earning {periodLabel}</p>
-              <p className="font-semibold">{formatCurrencyCompact(myRoi.earnings)}</p>
+              <p className="font-semibold">{formatCurrencyCompact(myResult.perInvestorAmount)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">ROI Bulanan</p>
-              <p className={`font-semibold ${myRoi.monthlyROI >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                {formatPercent(myRoi.monthlyROI, true)}
+              <p className={`font-semibold ${myResult.roiPercent >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {formatPercent(myResult.roiPercent, true)}
               </p>
             </div>
           </div>

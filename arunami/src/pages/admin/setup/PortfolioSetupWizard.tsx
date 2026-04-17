@@ -10,7 +10,8 @@ import { createPortfolio, savePortfolioConfig } from '@/lib/firestore'
 import { INDUSTRY_PRESETS } from '@/lib/industryPresets'
 import type {
   IndustryType, ReturnModelType, ReportingFrequency,
-  RevenueCategory, KpiMetric, InvestorConfigUnion,
+  RevenueCategory, KpiMetric, InvestorConfigUnion, CustomVariableSource,
+  ScheduledPayment, CustomVariable,
 } from '@/types'
 
 import StepIndicator from './StepIndicator'
@@ -32,6 +33,25 @@ const kpiMetricSchema = z.object({
   unit: z.enum(['currency', 'percentage', 'count', 'ratio']),
 })
 
+const scheduledPaymentSchema = z.object({
+  id: z.string(),
+  dueDate: z.string(),
+  amount: z.number().min(0),
+  label: z.string().optional(),
+  status: z.enum(['pending', 'paid']),
+})
+
+const customVariableSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(['currency', 'percentage', 'number']),
+  defaultValue: z.number(),
+  source: z.enum([
+    'manual', 'from_pnl_revenue', 'from_pnl_net_profit',
+    'from_pnl_gross_profit', 'from_invested_amount', 'from_investasi_awal',
+  ]),
+})
+
 const wizardSchema = z.object({
   // Step 1: Basic Info
   name: z.string().min(2, 'Nama minimal 2 karakter'),
@@ -47,22 +67,101 @@ const wizardSchema = z.object({
   revenueCategories: z.array(revenueCategorySchema).min(1),
   kpiMetrics: z.array(kpiMetricSchema).min(1),
 
-  // Step 2: Investment Structure (simplified)
+  // Step 2: Distribution Model + Investment Structure
+  returnModel: z.enum([
+    'net_profit_share', 'fixed_yield', 'revenue_share',
+    'fixed_schedule', 'annual_dividend', 'custom',
+  ]),
   investorSharePercent: z.number().min(0).max(100),
   arunamiFeePercent: z.number().min(0).max(100),
+
+  // Fixed Yield
+  fixedYieldPercent: z.number().min(0).optional(),
+  principalReference: z.enum(['invested_amount', 'investasi_awal']).optional(),
+
+  // Revenue Share
+  revenueSharePercent: z.number().min(0).optional(),
+
+  // Fixed Schedule
+  scheduledPayments: z.array(scheduledPaymentSchema).optional(),
+
+  // Annual Dividend — no extra config at setup
+
+  // Custom
+  customVariables: z.array(customVariableSchema).optional(),
+  formula: z.string().optional(),
+  distributionFrequency: z.enum(['bulanan', 'kuartalan', 'semesteran', 'custom']).optional(),
 })
 
 export type WizardFormData = z.infer<typeof wizardSchema>
 
 const STEP_FIELDS: (keyof WizardFormData)[][] = [
   ['name', 'brandName', 'code', 'industryType', 'stage', 'periode', 'investasiAwal'],
-  ['investorSharePercent', 'arunamiFeePercent'],
+  ['returnModel', 'investorSharePercent', 'arunamiFeePercent'],
 ]
 
 const STEPS = [
   { label: 'Info' },
   { label: 'Struktur Investasi' },
 ]
+
+function buildInvestorConfig(data: WizardFormData): InvestorConfigUnion {
+  const base = {
+    investorSharePercent: data.investorSharePercent,
+    arunamiFeePercent: data.arunamiFeePercent,
+  }
+
+  switch (data.returnModel) {
+    case 'net_profit_share':
+      return { ...base, type: 'net_profit_share' as const }
+
+    case 'fixed_yield':
+      return {
+        ...base,
+        type: 'fixed_yield' as const,
+        fixedYieldPercent: data.fixedYieldPercent ?? 0,
+        principalReference: (data.principalReference ?? 'invested_amount') as 'invested_amount' | 'investasi_awal',
+      }
+
+    case 'revenue_share':
+      return {
+        ...base,
+        type: 'revenue_share' as const,
+        revenueSharePercent: data.revenueSharePercent ?? 0,
+      }
+
+    case 'fixed_schedule':
+      return {
+        ...base,
+        investorSharePercent: 0,
+        arunamiFeePercent: 0,
+        type: 'fixed_schedule' as const,
+        scheduledPayments: (data.scheduledPayments ?? []) as ScheduledPayment[],
+      }
+
+    case 'annual_dividend':
+      return {
+        ...base,
+        investorSharePercent: 0,
+        arunamiFeePercent: 0,
+        type: 'annual_dividend' as const,
+        dividendHistory: [],
+      }
+
+    case 'custom':
+      return {
+        ...base,
+        type: 'custom' as const,
+        variables: (data.customVariables ?? []) as CustomVariable[],
+        formula: data.formula ?? '',
+        distributionFrequency: (data.distributionFrequency ?? 'bulanan') as ReportingFrequency | 'custom',
+        customScheduleDates: [],
+      }
+
+    default:
+      return { ...base, type: 'net_profit_share' as const }
+  }
+}
 
 export default function PortfolioSetupWizard() {
   const navigate = useNavigate()
@@ -83,8 +182,13 @@ export default function PortfolioSetupWizard() {
       description: '',
       revenueCategories: INDUSTRY_PRESETS.retail.revenueCategories,
       kpiMetrics: INDUSTRY_PRESETS.retail.kpiMetrics,
+      returnModel: 'net_profit_share',
       investorSharePercent: 70,
       arunamiFeePercent: 10,
+      principalReference: 'invested_amount',
+      scheduledPayments: [],
+      customVariables: [],
+      distributionFrequency: 'bulanan',
     },
     mode: 'onBlur',
   })
@@ -131,18 +235,18 @@ export default function PortfolioSetupWizard() {
         assignedAnalysts: [],
       })
 
-      const investorConfig: InvestorConfigUnion = {
-        type: 'percentage_based',
-        investorSharePercent: data.investorSharePercent,
-        arunamiFeePercent: data.arunamiFeePercent,
-      }
+      const investorConfig = buildInvestorConfig(data)
+      const reportingFrequency: ReportingFrequency =
+        data.returnModel === 'custom' && data.distributionFrequency && data.distributionFrequency !== 'custom'
+          ? data.distributionFrequency as ReportingFrequency
+          : 'bulanan'
 
       await savePortfolioConfig(portfolioId, {
         industryType: data.industryType as IndustryType,
         revenueCategories: data.revenueCategories as RevenueCategory[],
-        returnModel: 'percentage_based' as ReturnModelType,
+        returnModel: data.returnModel as ReturnModelType,
         investorConfig,
-        reportingFrequency: 'bulanan' as ReportingFrequency,
+        reportingFrequency,
         kpiMetrics: data.kpiMetrics as KpiMetric[],
       })
 

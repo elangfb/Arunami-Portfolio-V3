@@ -7,7 +7,16 @@ export type UserRole = 'admin' | 'analyst' | 'investor'
 // ─── Portfolio Configuration ──────────────────────────────────────────────
 
 export type IndustryType = 'retail' | 'saas' | 'fnb' | 'jasa' | 'manufaktur' | 'lainnya'
-export type ReturnModelType = 'slot_based' | 'percentage_based' | 'fixed_return'
+export type ReturnModelType =
+  | 'slot_based'          // legacy
+  | 'percentage_based'    // legacy alias → treated as net_profit_share
+  | 'fixed_return'        // legacy
+  | 'net_profit_share'
+  | 'fixed_yield'
+  | 'revenue_share'
+  | 'fixed_schedule'
+  | 'annual_dividend'
+  | 'custom'
 export type ReportingFrequency = 'bulanan' | 'kuartalan' | 'semesteran'
 
 export interface RevenueCategory {
@@ -44,7 +53,85 @@ export interface FixedReturnConfig extends InvestorConfigBase {
   payoutFrequency: ReportingFrequency
 }
 
-export type InvestorConfigUnion = SlotBasedConfig | PercentageBasedConfig | FixedReturnConfig
+// ─── New Distribution Model Configs ───────────────────────────────────────
+
+export interface NetProfitShareConfig extends InvestorConfigBase {
+  type: 'net_profit_share'
+}
+
+export interface FixedYieldConfig extends InvestorConfigBase {
+  type: 'fixed_yield'
+  fixedYieldPercent: number
+  principalReference: 'invested_amount' | 'investasi_awal'
+}
+
+export interface RevenueShareConfig extends InvestorConfigBase {
+  type: 'revenue_share'
+  revenueSharePercent: number
+}
+
+export interface ScheduledPayment {
+  id: string
+  dueDate: string
+  amount: number
+  label?: string
+  status: 'pending' | 'paid'
+  paidAt?: Timestamp
+}
+
+export interface FixedScheduleConfig extends InvestorConfigBase {
+  type: 'fixed_schedule'
+  scheduledPayments: ScheduledPayment[]
+}
+
+export interface DividendEntry {
+  id: string
+  year: number
+  totalAmount: number
+  approvedAt: Timestamp
+  approvedBy: string
+  notes?: string
+}
+
+export interface AnnualDividendConfig extends InvestorConfigBase {
+  type: 'annual_dividend'
+  dividendHistory: DividendEntry[]
+}
+
+export type CustomVariableSource =
+  | 'manual'
+  | 'from_pnl_revenue'
+  | 'from_pnl_net_profit'
+  | 'from_pnl_gross_profit'
+  | 'from_invested_amount'
+  | 'from_investasi_awal'
+
+export interface CustomVariable {
+  id: string
+  name: string
+  type: 'currency' | 'percentage' | 'number'
+  defaultValue: number
+  source: CustomVariableSource
+}
+
+export interface CustomConfig extends InvestorConfigBase {
+  type: 'custom'
+  variables: CustomVariable[]
+  formula: string
+  distributionFrequency: ReportingFrequency | 'custom'
+  customScheduleDates?: string[]
+}
+
+export type InvestorConfigUnion =
+  | SlotBasedConfig
+  | PercentageBasedConfig
+  | FixedReturnConfig
+  | NetProfitShareConfig
+  | FixedYieldConfig
+  | RevenueShareConfig
+  | FixedScheduleConfig
+  | AnnualDividendConfig
+  | CustomConfig
 
 export interface PortfolioConfig {
   industryType: IndustryType
@@ -66,6 +153,7 @@ export interface AppUser {
   email: string
   displayName: string
   role: UserRole
+  isArunamiTeam?: boolean
   createdBy: string
   createdAt: Timestamp
 }
@@ -134,8 +222,9 @@ export interface RadarDataPoint {
 }
 
 export interface InvestorConfig {
-  totalSlots: number
-  nominalPerSlot: number
+  returnModel?: ReturnModelType
+  totalSlots?: number
+  nominalPerSlot?: number
   investorSharePercent: number
   arunamiFeePercent: number
 }

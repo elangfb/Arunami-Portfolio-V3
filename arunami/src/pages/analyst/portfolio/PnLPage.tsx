@@ -19,6 +19,9 @@ import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { PnLReviewTable } from '@/components/PnLReviewTable'
 import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
+import SchedulePaymentConfirm from './SchedulePaymentConfirm'
+import DividendDeclaration from './DividendDeclaration'
+import CustomVariableInput from './CustomVariableInput'
 import type { PnLExtractedData, OpexItem, PortfolioReport, Portfolio, PortfolioConfig, RevenueCategory } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -294,8 +297,57 @@ export default function PnLPage() {
   const updateOpexItem = (i: number, field: keyof OpexItem, val: string | number) =>
     setOpexItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item))
 
+  // Alternative UIs for models that don't need full P&L
+  const returnModel = portfolioConfig?.returnModel
+  if (returnModel === 'fixed_schedule' && portfolioId && portfolioConfig) {
+    return (
+      <div className="p-6">
+        <SchedulePaymentConfirm
+          portfolioId={portfolioId}
+          config={portfolioConfig}
+          onConfigUpdated={fetchConfig}
+        />
+      </div>
+    )
+  }
+  if (returnModel === 'annual_dividend' && portfolioId && portfolioConfig) {
+    return (
+      <div className="p-6">
+        <DividendDeclaration
+          portfolioId={portfolioId}
+          config={portfolioConfig}
+          onConfigUpdated={fetchConfig}
+        />
+      </div>
+    )
+  }
+  if (returnModel === 'custom' && portfolioId && portfolio && portfolioConfig) {
+    return (
+      <div className="p-6 space-y-6">
+        <CustomVariableInput
+          portfolio={portfolio}
+          portfolioId={portfolioId}
+          config={portfolioConfig}
+          onConfigUpdated={fetchConfig}
+        />
+        <p className="text-xs text-muted-foreground">
+          Jika variabel mengambil data dari P&L, upload laporan PnL melalui tab PnL standar.
+        </p>
+      </div>
+    )
+  }
+
+  // Standard P&L flow for net_profit_share, revenue_share, fixed_yield, etc.
   return (
     <div className="p-6 space-y-6">
+      {returnModel === 'fixed_yield' && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm text-blue-800">
+            <strong>Fixed Yield:</strong> Distribusi untuk model ini tidak bergantung pada P&L.
+            Upload P&L tetap dapat dilakukan untuk transparansi dan pelaporan.
+          </p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Laporan PnL</h2>
         <Button onClick={openManualInput} size="sm">

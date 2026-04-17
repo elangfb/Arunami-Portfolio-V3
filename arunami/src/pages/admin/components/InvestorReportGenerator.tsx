@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { saveCommunication } from '@/lib/firestore'
-import { calculateInvestorROI } from '@/lib/roi'
+import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
 import { formatPeriod } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
@@ -11,12 +11,13 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { ClipboardCopy, Printer, Mail } from 'lucide-react'
-import type { AppUser, InvestorAllocation, FinancialData, PortfolioConfig, SlotBasedConfig } from '@/types'
+import type { AppUser, InvestorAllocation, FinancialData, PortfolioConfig, Portfolio } from '@/types'
 
 interface PortfolioData {
   allocation: InvestorAllocation
   financial: FinancialData | null
   config: PortfolioConfig | null
+  portfolio: Portfolio | null
 }
 
 interface Props {
@@ -61,28 +62,30 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
 
   const reportLines: ReportLine[] = portfolioData
     .filter(p => selectedPortfolios.has(p.allocation.portfolioId))
-    .map(({ allocation, financial, config }) => {
+    .map(({ allocation, financial, config, portfolio: ptf }) => {
       let netProfit = 0
       let earnings = 0
       let monthlyROI = 0
 
-      if (financial && config?.investorConfig?.type === 'slot_based') {
-        const sc = config.investorConfig as SlotBasedConfig
+      if (financial && config?.investorConfig && ptf) {
         const profitPoint = financial.profitData.find(d => d.month === periodKey)
+        const revPoint = financial.revenueData.find(d => d.month === periodKey)
         netProfit = profitPoint?.aktual ?? 0
 
-        if (netProfit !== 0) {
-          const roi = calculateInvestorROI(
+        const result = calculateDistribution({
+          reportData: {
+            period: periodKey,
+            revenue: revPoint?.aktual ?? 0,
             netProfit,
-            allocation.slots,
-            sc.totalSlots,
-            sc.investorSharePercent,
-            sc.arunamiFeePercent,
-            sc.nominalPerSlot,
-          )
-          earnings = roi.earnings
-          monthlyROI = roi.monthlyROI
-        }
+            grossProfit: 0,
+          },
+          config: config.investorConfig,
+          allocation,
+          portfolio: ptf,
+          isArunamiTeam: investor.isArunamiTeam,
+        })
+        earnings = result.perInvestorAmount
+        monthlyROI = result.roiPercent
       }
 
       return {

@@ -43,6 +43,8 @@ export default function AdminUsers() {
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AppUser | null>(null)
+  const [createIsTeam, setCreateIsTeam] = useState(false)
+  const [editIsTeam, setEditIsTeam] = useState(false)
 
   const createForm = useForm<CreateFormData>({
     resolver: zodResolver(createSchema),
@@ -63,9 +65,10 @@ export default function AdminUsers() {
 
   const onCreate = async (data: CreateFormData) => {
     try {
-      await createUser(data.email, data.password, data.displayName, data.role, user!.uid)
+      await createUser(data.email, data.password, data.displayName, data.role, user!.uid, createIsTeam)
       toast.success('Pengguna berhasil dibuat')
       createForm.reset()
+      setCreateIsTeam(false)
       setOpen(false)
       fetchUsers()
     } catch (e: unknown) {
@@ -76,13 +79,14 @@ export default function AdminUsers() {
   const openEdit = (u: AppUser) => {
     setEditTarget(u)
     editForm.reset({ displayName: u.displayName, role: u.role as 'admin' | 'analyst' | 'investor' })
+    setEditIsTeam(u.isArunamiTeam ?? false)
     setEditOpen(true)
   }
 
   const onEdit = async (data: EditFormData) => {
     if (!editTarget) return
     try {
-      await updateUser(editTarget.uid, data)
+      await updateUser(editTarget.uid, { ...data, isArunamiTeam: editIsTeam })
       toast.success('Pengguna berhasil diperbarui')
       setEditOpen(false)
       fetchUsers()
@@ -152,6 +156,15 @@ export default function AdminUsers() {
                   </SelectContent>
                 </Select>
               </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={createIsTeam}
+                  onChange={(e) => setCreateIsTeam(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-sm">Tim Arunami (Bebas Fee)</span>
+              </label>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button>
                 <Button type="submit" disabled={createForm.formState.isSubmitting}>
@@ -188,6 +201,9 @@ export default function AdminUsers() {
                     <p className="text-sm text-muted-foreground truncate">{u.email}</p>
                   </div>
                   <Badge variant={roleBadgeVariant(u.role)} className="capitalize">{u.role}</Badge>
+                  {u.isArunamiTeam && (
+                    <Badge variant="outline" className="border-green-600 text-green-700 text-xs">Tim Arunami</Badge>
+                  )}
                   {u.role !== 'admin' && (
                     <div className="flex gap-1 shrink-0">
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(u)}>
@@ -233,6 +249,15 @@ export default function AdminUsers() {
                 </SelectContent>
               </Select>
             </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editIsTeam}
+                onChange={(e) => setEditIsTeam(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <span className="text-sm">Tim Arunami (Bebas Fee)</span>
+            </label>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Batal</Button>
               <Button type="submit" disabled={editForm.formState.isSubmitting}>
