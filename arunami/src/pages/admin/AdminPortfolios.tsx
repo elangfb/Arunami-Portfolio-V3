@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
-import { PlusCircle, Users, Pencil, Trash2, UserPlus, Minus, UserCog } from 'lucide-react'
+import { PlusCircle, Users, Pencil, Trash2, UserPlus, Minus, UserCog, Search, ChevronDown, X } from 'lucide-react'
 import type { Portfolio, InvestorAllocation, AppUser } from '@/types'
 
 const portfolioSchema = z.object({
@@ -58,6 +58,24 @@ export default function AdminPortfolios() {
   const [editAllocId, setEditAllocId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
   const [editPercent, setEditPercent] = useState('')
+
+  // Search states
+  const [portfolioSearch, setPortfolioSearch] = useState('')
+  const [investorSearch, setInvestorSearch] = useState('')
+  const [investorDropdownOpen, setInvestorDropdownOpen] = useState(false)
+  const [analystSearch, setAnalystSearch] = useState('')
+  const investorDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!investorDropdownOpen) return
+    const handler = (e: MouseEvent) => {
+      if (investorDropdownRef.current && !investorDropdownRef.current.contains(e.target as Node)) {
+        setInvestorDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [investorDropdownOpen])
 
   const editForm = useForm<PortfolioFormData>({
     resolver: zodResolver(portfolioSchema) as never,
@@ -106,6 +124,7 @@ export default function AdminPortfolios() {
   const openAnalystDialog = (p: Portfolio) => {
     setAnalystTarget(p)
     setSelectedAnalystUids(new Set(p.assignedAnalysts ?? []))
+    setAnalystSearch('')
     setAnalystDialogOpen(true)
   }
 
@@ -153,6 +172,8 @@ export default function AdminPortfolios() {
     setNewInvestorUid('')
     setNewAmount('')
     setNewPercent('')
+    setInvestorSearch('')
+    setInvestorDropdownOpen(false)
 
     const allocs = await getAllocationsForPortfolio(portfolio.id)
     setAllocations(allocs)
@@ -162,6 +183,21 @@ export default function AdminPortfolios() {
   const availableInvestors = investors.filter(
     inv => !allocations.some(a => a.investorUid === inv.uid),
   )
+
+  const filteredPortfolios = portfolios.filter(p => {
+    const q = portfolioSearch.toLowerCase()
+    return p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.brandName ?? '').toLowerCase().includes(q)
+  })
+
+  const filteredAvailableInvestors = availableInvestors.filter(inv => {
+    const q = investorSearch.toLowerCase()
+    return inv.displayName.toLowerCase().includes(q) || inv.email.toLowerCase().includes(q)
+  })
+
+  const filteredAnalysts = analysts.filter(a => {
+    const q = analystSearch.toLowerCase()
+    return a.displayName.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+  })
 
   const handleAddAllocation = async () => {
     if (!allocPortfolio) return
@@ -260,20 +296,31 @@ export default function AdminPortfolios() {
           <p className="text-muted-foreground">Buat dan kelola portofolio investasi</p>
         </div>
 
-        <Button onClick={() => navigate('/admin/portfolios/new')}>
-          <PlusCircle className="mr-2 h-4 w-4" />Buat Portofolio
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Cari portofolio..."
+              value={portfolioSearch}
+              onChange={e => setPortfolioSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button onClick={() => navigate('/admin/portfolios/new')}>
+            <PlusCircle className="mr-2 h-4 w-4" />Buat Portofolio
+          </Button>
+        </div>
       </div>
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => <div key={i} className="h-40 animate-pulse rounded-lg bg-muted" />)}
         </div>
-      ) : portfolios.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">Belum ada portofolio</CardContent></Card>
+      ) : filteredPortfolios.length === 0 ? (
+        <Card><CardContent className="py-12 text-center text-muted-foreground">{portfolioSearch ? 'Tidak ada portofolio yang cocok' : 'Belum ada portofolio'}</CardContent></Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {portfolios.map(p => (
+          {filteredPortfolios.map(p => (
             <Card key={p.id} className="relative">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
@@ -485,18 +532,52 @@ export default function AdminPortfolios() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Investor</Label>
-                    <select
-                      value={newInvestorUid}
-                      onChange={e => setNewInvestorUid(e.target.value)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Pilih investor...</option>
-                      {availableInvestors.map(inv => (
-                        <option key={inv.uid} value={inv.uid}>
-                          {inv.displayName} ({inv.email})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative" ref={investorDropdownRef}>
+                      <div
+                        className="flex items-center w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer"
+                        onClick={() => setInvestorDropdownOpen(!investorDropdownOpen)}
+                      >
+                        <span className={`flex-1 truncate ${!newInvestorUid ? 'text-muted-foreground' : ''}`}>
+                          {newInvestorUid
+                            ? (() => { const inv = investors.find(i => i.uid === newInvestorUid); return inv ? `${inv.displayName}` : 'Pilih investor...' })()
+                            : 'Pilih investor...'}
+                        </span>
+                        {newInvestorUid ? (
+                          <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground shrink-0 ml-1" onClick={(e) => { e.stopPropagation(); setNewInvestorUid(''); setInvestorSearch('') }} />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-1" />
+                        )}
+                      </div>
+                      {investorDropdownOpen && (
+                        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+                          <div className="p-2">
+                            <Input
+                              placeholder="Cari investor..."
+                              value={investorSearch}
+                              onChange={e => setInvestorSearch(e.target.value)}
+                              className="h-8 text-xs"
+                              autoFocus
+                            />
+                          </div>
+                          <ul className="max-h-48 overflow-y-auto">
+                            {filteredAvailableInvestors.length === 0 ? (
+                              <li className="px-3 py-2 text-xs text-muted-foreground text-center">Tidak ditemukan</li>
+                            ) : (
+                              filteredAvailableInvestors.map(inv => (
+                                <li
+                                  key={inv.uid}
+                                  className="px-3 py-2 text-sm hover:bg-muted/50 cursor-pointer"
+                                  onClick={() => { setNewInvestorUid(inv.uid); setInvestorDropdownOpen(false); setInvestorSearch('') }}
+                                >
+                                  <p className="font-medium truncate">{inv.displayName}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{inv.email}</p>
+                                </li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Jumlah Investasi (IDR)</Label>
@@ -543,27 +624,42 @@ export default function AdminPortfolios() {
                 Belum ada akun analis terdaftar. Buat di halaman Manajemen Pengguna.
               </p>
             ) : (
-              <ul className="divide-y rounded-lg border">
-                {analysts.map(a => {
-                  const checked = selectedAnalystUids.has(a.uid)
-                  return (
-                    <li key={a.uid}>
-                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-muted/40">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleAnalyst(a.uid)}
-                          className="h-4 w-4 rounded border-gray-300 accent-[#1e5f3f]"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{a.displayName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{a.email}</p>
-                        </div>
-                      </label>
-                    </li>
-                  )
-                })}
-              </ul>
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari analis..."
+                    value={analystSearch}
+                    onChange={e => setAnalystSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <ul className="divide-y rounded-lg border max-h-64 overflow-y-auto">
+                  {filteredAnalysts.length === 0 ? (
+                    <li className="px-3 py-4 text-center text-sm text-muted-foreground">Tidak ada analis yang cocok</li>
+                  ) : (
+                    filteredAnalysts.map(a => {
+                      const checked = selectedAnalystUids.has(a.uid)
+                      return (
+                        <li key={a.uid}>
+                          <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-muted/40">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleAnalyst(a.uid)}
+                              className="h-4 w-4 rounded border-gray-300 accent-[#1e5f3f]"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{a.displayName}</p>
+                              <p className="text-xs text-muted-foreground truncate">{a.email}</p>
+                            </div>
+                          </label>
+                        </li>
+                      )
+                    })
+                  )}
+                </ul>
+              </>
             )}
             <p className="text-xs text-muted-foreground">
               Hanya analis yang dipilih yang dapat membuka dan mengedit portofolio ini.

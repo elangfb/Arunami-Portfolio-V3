@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, Pencil, FileText } from 'lucide-react'
+import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, Pencil, FileText, Search } from 'lucide-react'
 import InvestorReportGenerator from './components/InvestorReportGenerator'
 import type {
   AppUser, InvestorAllocation, FinancialData as FinancialDataType,
@@ -45,6 +45,10 @@ export default function AdminInvestorDetail() {
 
   // Report dialog
   const [reportOpen, setReportOpen] = useState(false)
+
+  // Communication filters
+  const [commsSearch, setCommsSearch] = useState('')
+  const [commsTypeFilter, setCommsTypeFilter] = useState<'all' | 'report' | 'message'>('all')
 
   const loadData = async () => {
     if (!uid) return
@@ -167,6 +171,12 @@ export default function AdminInvestorDetail() {
     download: 'Cetak/Unduh',
     email: 'Email',
   }
+
+  const filteredComms = communications.filter(comm => {
+    if (commsTypeFilter !== 'all' && comm.type !== commsTypeFilter) return false
+    if (commsSearch && !comm.subject.toLowerCase().includes(commsSearch.toLowerCase())) return false
+    return true
+  })
 
   return (
     <div className="p-8 space-y-6">
@@ -354,12 +364,46 @@ export default function AdminInvestorDetail() {
       {/* Communication History */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Riwayat Komunikasi</CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="text-base">Riwayat Komunikasi ({filteredComms.length})</CardTitle>
+            {communications.length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-md border">
+                  {([['all', 'Semua'], ['report', 'Laporan'], ['message', 'Pesan']] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      onClick={() => setCommsTypeFilter(value)}
+                      className={`px-3 py-1 text-xs font-medium transition-colors ${
+                        commsTypeFilter === value
+                          ? 'bg-[#1e5f3f] text-white'
+                          : 'hover:bg-muted/50'
+                      } ${value === 'all' ? 'rounded-l-md' : value === 'message' ? 'rounded-r-md' : ''}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative w-48">
+                  <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari subjek..."
+                    value={commsSearch}
+                    onChange={e => setCommsSearch(e.target.value)}
+                    className="pl-9 h-8 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {communications.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Belum ada riwayat komunikasi
+            </p>
+          ) : filteredComms.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Tidak ada komunikasi yang cocok
             </p>
           ) : (
             <div className="rounded-lg border overflow-hidden">
@@ -373,7 +417,7 @@ export default function AdminInvestorDetail() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {communications.map(comm => (
+                  {filteredComms.map(comm => (
                     <tr key={comm.id} className="hover:bg-muted/30">
                       <td className="py-2.5 px-3">{formatCommsDate(comm)}</td>
                       <td className="py-2.5 px-3">

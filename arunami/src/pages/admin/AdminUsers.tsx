@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { UserPlus, Pencil, Trash2 } from 'lucide-react'
+import { UserPlus, Pencil, Trash2, Search } from 'lucide-react'
 import type { AppUser } from '@/types'
 
 const createSchema = z.object({
@@ -45,6 +45,7 @@ export default function AdminUsers() {
   const [editTarget, setEditTarget] = useState<AppUser | null>(null)
   const [createIsTeam, setCreateIsTeam] = useState(false)
   const [editIsTeam, setEditIsTeam] = useState(false)
+  const [search, setSearch] = useState('')
 
   const createForm = useForm<CreateFormData>({
     resolver: zodResolver(createSchema),
@@ -62,6 +63,11 @@ export default function AdminUsers() {
   }
 
   useEffect(() => { fetchUsers() }, [])
+
+  const filtered = users.filter(u => {
+    const q = search.toLowerCase()
+    return u.displayName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+  })
 
   const onCreate = async (data: CreateFormData) => {
     try {
@@ -113,6 +119,17 @@ export default function AdminUsers() {
           <h1 className="text-2xl font-bold">Manajemen Pengguna</h1>
           <p className="text-muted-foreground">Kelola akun analis dan investor</p>
         </div>
+
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Cari pengguna..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
         {/* Create User Dialog */}
         <Dialog open={open} onOpenChange={setOpen}>
@@ -174,11 +191,12 @@ export default function AdminUsers() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Daftar Pengguna ({users.length})</CardTitle>
+          <CardTitle className="text-base">Daftar Pengguna ({filtered.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -187,11 +205,11 @@ export default function AdminUsers() {
                 <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
               ))}
             </div>
-          ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada pengguna</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{search ? 'Tidak ada pengguna yang cocok' : 'Belum ada pengguna'}</p>
           ) : (
             <div className="divide-y">
-              {users.map(u => (
+              {filtered.map(u => (
                 <div key={u.uid} className="flex items-center gap-4 py-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1e5f3f]/10 text-[#1e5f3f] font-bold shrink-0">
                     {u.displayName?.charAt(0).toUpperCase()}
