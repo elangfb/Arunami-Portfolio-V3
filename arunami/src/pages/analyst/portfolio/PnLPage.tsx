@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check, ChevronUp, ChevronDown } from 'lucide-react'
+import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check } from 'lucide-react'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { PnLReviewTable } from '@/components/PnLReviewTable'
 import { CustomCategoryBlock } from '@/components/CustomCategoryBlock'
@@ -31,6 +31,7 @@ import {
   addSubItem as addSubItemInList,
   removeSubItem as removeSubItemInList,
   unionCogsSubItems,
+  unionRevenueSubItems,
   slugifyCategory,
 } from '@/lib/customCategories'
 import {
@@ -74,12 +75,22 @@ export default function PnLPage() {
   const [inlineData, setInlineData] = useState<Record<string, number>>({})
   const [inlineCategories, setInlineCategories] = useState<CustomCategory[]>([])
   const [inlineCogsSubItems, setInlineCogsSubItems] = useState<CustomSubItem[]>([])
+  const [inlineRevenueSubItems, setInlineRevenueSubItems] = useState<CustomSubItem[]>([])
   // Opex items added during the current inline edit that don't exist in any saved
   // report yet. Merged into the displayed opex name set so the new row shows up
   // immediately while the user is editing.
   const [inlineAddedOpexNames, setInlineAddedOpexNames] = useState<string[]>([])
   const [inlineSaving, setInlineSaving] = useState(false)
-  const [addCategoryOpen, setAddCategoryOpen] = useState(false)
+  const [addDialog, setAddDialog] = useState<{
+    open: boolean
+    lockedMode?: 'main' | 'sub'
+    presetParentId?: string
+  }>({ open: false })
+  // Accordion expand/collapse state — session-only, all expanded by default.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const isExpanded = (id: string) => expanded[id] !== false
+  const toggleExpanded = (id: string) =>
+    setExpanded(prev => ({ ...prev, [id]: prev[id] === false }))
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<PnLExtractedData>({
     defaultValues: {
@@ -182,6 +193,11 @@ export default function PnLPage() {
       if (c.type === 'income') customIncome += sum
       else customExpense += sum
     }
+    // When revenue breakdown exists, derive revenue from the sum of revSub:* keys.
+    const revKeys = Object.keys(next).filter(k => k.startsWith('revSub:'))
+    if (revKeys.length > 0) {
+      next.revenue = revKeys.reduce((s, k) => s + (next[k] || 0), 0)
+    }
     // When cogs breakdown exists, derive cogs from the sum of cogsSub:* keys.
     const cogsKeys = Object.keys(next).filter(k => k.startsWith('cogsSub:'))
     if (cogsKeys.length > 0) {
@@ -239,8 +255,17 @@ export default function PnLPage() {
     for (const sub of cogsUnion) {
       data[`cogsSub:${sub.id}`] = ownCogs.find(s => s.id === sub.id)?.amount ?? 0
     }
+    // Seed revenue sub-items the same way.
+    const revUnion = unionRevenueSubItems(
+      reports.map(r => (r.extractedData as PnLExtractedData).revenueSubItems),
+    )
+    const ownRev = d.revenueSubItems ?? []
+    for (const sub of revUnion) {
+      data[`revSub:${sub.id}`] = ownRev.find(s => s.id === sub.id)?.amount ?? 0
+    }
     setInlineCategories(catsUnion)
     setInlineCogsSubItems(cogsUnion)
+    setInlineRevenueSubItems(revUnion)
     setInlineData(recalcPnl(data, catsUnion))
     setInlineEditId(report.id)
   }
@@ -260,6 +285,10 @@ export default function PnLPage() {
       handleInlineAddCategory(payload.name, payload.type)
       return
     }
+    if (payload.parentId === '__revenue__') {
+      handleInlineAddRevenueSub(payload.name)
+      return
+    }
     if (payload.parentId === '__cogs__') {
       handleInlineAddCogsSub(payload.name)
       return
@@ -276,6 +305,33 @@ export default function PnLPage() {
     if (!subId) return
     setInlineCategories(nextCats)
     setInlineData(prev => recalcPnl({ ...prev, [`custom:${payload.parentId}:${subId}`]: 0 }, nextCats))
+  }
+
+  // ── Revenue breakdown handlers (inline edit) ────────────────────────────
+  const handleInlineAddRevenueSub = (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    if (inlineRevenueSubItems.some(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('Komponen revenue dengan nama ini sudah ada')
+      return
+    }
+    const existingIds = new Set(inlineRevenueSubItems.map(s => s.id))
+    const base = slugifyCategory(trimmed) || `rev-${Date.now()}`
+    let subId = base
+    let i = 2
+    while (existingIds.has(subId)) subId = `${base}-${i++}`
+    const next = [...inlineRevenueSubItems, { id: subId, name: trimmed, amount: 0 }]
+    setInlineRevenueSubItems(next)
+    setInlineData(prev => recalcPnl({ ...prev, [`revSub:${subId}`]: 0 }, inlineCategories))
+  }
+
+  const handleInlineRevenueRemoveSub = (_catId: string, subId: string) => {
+    setInlineRevenueSubItems(prev => prev.filter(s => s.id !== subId))
+    setInlineData(prev => {
+      const { [`revSub:${subId}`]: _removed, ...rest } = prev
+      void _removed
+      return recalcPnl(rest, inlineCategories)
+    })
   }
 
   const handleInlineRemoveCategory = (catId: string) => {
@@ -326,12 +382,6 @@ export default function PnLPage() {
     const next = [...inlineCogsSubItems, { id: subId, name: trimmed, amount: 0 }]
     setInlineCogsSubItems(next)
     setInlineData(prev => recalcPnl({ ...prev, [`cogsSub:${subId}`]: 0 }, inlineCategories))
-  }
-
-  const handleInlineCogsAddPrompt = () => {
-    const name = window.prompt('Nama komponen COGS baru (misal: Bahan Baku):')
-    if (!name?.trim()) return
-    handleInlineAddCogsSub(name)
   }
 
   const handleInlineCogsRemoveSub = (_catId: string, subId: string) => {
@@ -386,6 +436,12 @@ export default function PnLPage() {
         amount: inlineData[`cogsSub:${sub.id}`] ?? 0,
       }))
 
+      const revenueSubItems: CustomSubItem[] = inlineRevenueSubItems.map(sub => ({
+        id: sub.id,
+        name: sub.name,
+        amount: inlineData[`revSub:${sub.id}`] ?? 0,
+      }))
+
       const extractedData: PnLExtractedData = {
         ...d,
         revenue: inlineData.revenue ?? d.revenue,
@@ -399,6 +455,7 @@ export default function PnLPage() {
         netProfit: inlineData.netProfit ?? d.netProfit,
         customCategories,
         cogsSubItems,
+        revenueSubItems,
       }
 
       await updateReport(portfolioId, report.id, { extractedData })
@@ -407,6 +464,7 @@ export default function PnLPage() {
       setInlineData({})
       setInlineCategories([])
       setInlineCogsSubItems([])
+      setInlineRevenueSubItems([])
       setInlineAddedOpexNames([])
       fetchReports()
       toast.success('Laporan PnL berhasil diperbarui')
@@ -422,6 +480,7 @@ export default function PnLPage() {
     setInlineData({})
     setInlineCategories([])
     setInlineCogsSubItems([])
+    setInlineRevenueSubItems([])
     setInlineAddedOpexNames([])
   }
 
@@ -745,64 +804,112 @@ export default function PnLPage() {
                 }
                 return (d[key as keyof PnLExtractedData] as number) ?? 0
               }
-              // COGS can be either flat (one number) or broken down into sub-items.
-              // When editing, use inlineCogsSubItems; else union across saved reports.
+              // Revenue / COGS can be either flat or broken down into sub-items.
+              // When editing, use inline*SubItems; else union across saved reports.
+              const rawRevenueSubItems = inlineEditId
+                ? inlineRevenueSubItems
+                : unionRevenueSubItems(
+                    sorted.map(r => (r.extractedData as PnLExtractedData).revenueSubItems),
+                  )
               const rawCogsSubItems = inlineEditId
                 ? inlineCogsSubItems
                 : unionCogsSubItems(
                     sorted.map(r => (r.extractedData as PnLExtractedData).cogsSubItems),
                   )
-              const hasCogsBreakdown = rawCogsSubItems.length > 0
+              const revenueCategory: CustomCategory = {
+                id: '__revenue__',
+                name: 'Revenue',
+                type: 'income',
+                subItems: rawRevenueSubItems,
+              }
               const cogsCategory: CustomCategory = {
                 id: '__cogs__',
                 name: 'COGS',
                 type: 'expense',
                 subItems: rawCogsSubItems,
               }
-              const rowsBeforeCogs: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
-                { label: 'Revenue', key: 'revenue', bold: true, editable: true },
-              ]
-              const flatCogsRow = hasCogsBreakdown
-                ? null
-                : { label: 'COGS', key: 'cogs', className: 'text-red-600', editable: true }
-              const rowsAfterCogs: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
-                { label: 'Gross Profit', key: 'grossProfit', bold: true, className: 'text-green-700' },
-              ]
-              const rowsAfterBody: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
-                { label: 'Total Opex', key: 'totalOpex', className: 'text-red-600' },
-                { label: 'Operating Profit', key: 'operatingProfit', bold: true },
-                { label: 'Interest', key: 'interest', className: 'text-red-600', editable: true },
-                { label: 'Taxes', key: 'taxes', className: 'text-red-600', editable: true },
-              ]
-              const netProfitRow = { label: 'Net Profit', key: 'netProfit', bold: true }
+              const opexCategory: CustomCategory = {
+                id: '__opex__',
+                name: 'Operating Expenses',
+                type: 'expense',
+                subItems: rawOpexNames.map(n => ({ id: n, name: n, amount: 0 })),
+              }
               // Categories shown in the table:
               //   - When NOT editing: union across all saved reports.
-              //   - When editing: inlineCategories (which starts as the union, but may have
-              //     in-flight additions/removals scoped to the current edit).
+              //   - When editing: inlineCategories (starts as union, with in-flight edits).
               const rawDisplayCategories = inlineEditId
                 ? inlineCategories
                 : unionCategories(
                     sorted.map(r => (r.extractedData as PnLExtractedData).customCategories),
                   )
               const categoryIds = rawDisplayCategories.map(c => c.id)
-              const bodyOrder = resolveBodyOrder(rawOpexNames, categoryIds, rowOrder)
+              // Body zone only orders custom categories; opex is now under a pinned block.
+              const bodyOrder = resolveBodyOrder([], categoryIds, rowOrder).filter(e => e.type === 'cat')
               const catById = new Map(rawDisplayCategories.map(c => [c.id, c]))
-              const getCustomAmount = (reportId: string, catId: string, subId: string): number => {
-                if (inlineEditId === reportId) {
-                  return inlineData[`custom:${catId}:${subId}`] ?? 0
-                }
+              const columns = sorted.map(r => ({ key: r.id, editable: inlineEditId === r.id }))
+              const showGrandTotal = false
+
+              // Per-report amount getters for the three pinned blocks + custom blocks
+              const getRevenueSubAmount = (reportId: string, _catId: string, subId: string): number => {
+                if (inlineEditId === reportId) return inlineData[`revSub:${subId}`] ?? 0
                 const r = sorted.find(x => x.id === reportId)
-                if (!r) return 0
-                const d = r.extractedData as PnLExtractedData
-                const cat = d.customCategories?.find(c => c.id === catId)
+                const d = r?.extractedData as PnLExtractedData | undefined
+                return d?.revenueSubItems?.find(s => s.id === subId)?.amount ?? 0
+              }
+              const getCogsSubAmount = (reportId: string, _catId: string, subId: string): number => {
+                if (inlineEditId === reportId) return inlineData[`cogsSub:${subId}`] ?? 0
+                const r = sorted.find(x => x.id === reportId)
+                const d = r?.extractedData as PnLExtractedData | undefined
+                return d?.cogsSubItems?.find(s => s.id === subId)?.amount ?? 0
+              }
+              const getOpexAmount = (reportId: string, _catId: string, subId: string): number => {
+                if (inlineEditId === reportId) return inlineData[`opex:${subId}`] ?? 0
+                const r = sorted.find(x => x.id === reportId)
+                const d = r?.extractedData as PnLExtractedData | undefined
+                return d?.opex?.find(o => o.name === subId)?.amount ?? 0
+              }
+              const getCustomAmount = (reportId: string, catId: string, subId: string): number => {
+                if (inlineEditId === reportId) return inlineData[`custom:${catId}:${subId}`] ?? 0
+                const r = sorted.find(x => x.id === reportId)
+                const d = r?.extractedData as PnLExtractedData | undefined
+                const cat = d?.customCategories?.find(c => c.id === catId)
                 return cat?.subItems.find(s => s.id === subId)?.amount ?? 0
               }
-              const moveOpex = (opexName: string, direction: MoveDirection) => {
-                const next = moveInBody(rowOrder, rawOpexNames, categoryIds, { type: 'opex', id: opexName }, direction)
-                handleRowOrderChange({ ...(rowOrder ?? {}), body: next })
+
+              // Column subtotal overrides: when a specific report has no sub-item
+              // breakdown for a pinned category, show the stored flat number instead
+              // of a misleading 0.
+              const revenueColumnOverride = (reportId: string): number | undefined => {
+                if (inlineEditId === reportId) {
+                  return inlineRevenueSubItems.length > 0 ? undefined : (inlineData.revenue ?? 0)
+                }
+                const r = sorted.find(x => x.id === reportId)
+                const d = r?.extractedData as PnLExtractedData | undefined
+                if (!d) return undefined
+                return (d.revenueSubItems?.length ?? 0) > 0 ? undefined : (Number(d.revenue) || 0)
               }
+              const cogsColumnOverride = (reportId: string): number | undefined => {
+                if (inlineEditId === reportId) {
+                  return inlineCogsSubItems.length > 0 ? undefined : (inlineData.cogs ?? 0)
+                }
+                const r = sorted.find(x => x.id === reportId)
+                const d = r?.extractedData as PnLExtractedData | undefined
+                if (!d) return undefined
+                return (d.cogsSubItems?.length ?? 0) > 0 ? undefined : (Number(d.cogs) || 0)
+              }
+              const opexColumnOverride = (reportId: string): number | undefined => {
+                if (inlineEditId === reportId) {
+                  // Total Opex is already computed into inlineData.totalOpex.
+                  return inlineData.totalOpex ?? 0
+                }
+                const r = sorted.find(x => x.id === reportId)
+                const d = r?.extractedData as PnLExtractedData | undefined
+                if (!d) return undefined
+                return (d.opex ?? []).reduce((s, o) => s + (Number(o.amount) || 0), 0)
+              }
+
               const moveCategory = (catId: string, direction: MoveDirection) => {
-                const next = moveInBody(rowOrder, rawOpexNames, categoryIds, { type: 'cat', id: catId }, direction)
+                const next = moveInBody(rowOrder, [], categoryIds, { type: 'cat', id: catId }, direction)
                 handleRowOrderChange({ ...(rowOrder ?? {}), body: next })
               }
               const moveSubItem = (catId: string, subId: string, direction: MoveDirection) => {
@@ -812,7 +919,13 @@ export default function PnLPage() {
                 const next = moveSubItemInCategory(rowOrder?.customSubItems?.[catId], availableIds, subId, direction)
                 handleRowOrderChange(setSubItemOrder(rowOrder, catId, next))
               }
-              const renderStandardRow = (row: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }) => (
+              const moveOpexSub = (_catId: string, subId: string, direction: MoveDirection) => {
+                const availableIds = opexCategory.subItems.map(s => s.id)
+                const next = moveSubItemInCategory(rowOrder?.customSubItems?.['__opex__'], availableIds, subId, direction)
+                handleRowOrderChange(setSubItemOrder(rowOrder, '__opex__', next))
+              }
+
+              const renderComputedRow = (row: { label: string; key: string; bold?: boolean; className?: string }) => (
                 <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
                   <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''}`}>
                     {row.label}
@@ -820,14 +933,74 @@ export default function PnLPage() {
                   {sorted.map(r => {
                     const isEditing = inlineEditId === r.id
                     const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
-                    const colorClass = row.className ?? ''
+                    const colorClass = row.key === 'netProfit'
+                      ? (val >= 0 ? 'text-green-600' : 'text-red-600')
+                      : (row.className ?? '')
                     return (
                       <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
-                        {isEditing && row.editable ? (
+                        {formatCurrencyExact(val)}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+              const renderEditableRow = (row: { label: string; key: string; className?: string }) => (
+                <tr key={row.key} className="hover:bg-muted/10">
+                  <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r">{row.label}</td>
+                  {sorted.map(r => {
+                    const isEditing = inlineEditId === r.id
+                    const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
+                    return (
+                      <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${row.className ?? ''}`}>
+                        {isEditing ? (
                           <Input
                             type="number"
                             value={inlineData[row.key] ?? 0}
                             onChange={e => handleInlineChange(row.key, Number(e.target.value) || 0)}
+                            className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        ) : (
+                          formatCurrencyExact(val)
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+              // Flat editable row for Revenue/COGS when no sub-item breakdown exists.
+              const renderFlatMainRow = (
+                label: string,
+                flatKey: 'revenue' | 'cogs',
+                parentId: '__revenue__' | '__cogs__',
+              ) => (
+                <tr key={`flat-${parentId}`} className="bg-muted/20">
+                  <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+                    <div className="flex items-center gap-1">
+                      <span className="flex-1 truncate">{label}</span>
+                      {inlineEditId && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+                          onClick={() => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: parentId })}
+                          title="Tambah sub-kategori"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                  {sorted.map(r => {
+                    const isEditing = inlineEditId === r.id
+                    const val = isEditing ? (inlineData[flatKey] ?? 0) : getCell(r, flatKey)
+                    return (
+                      <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums font-semibold`}>
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            value={inlineData[flatKey] ?? 0}
+                            onChange={e => handleInlineChange(flatKey, Number(e.target.value) || 0)}
                             className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         ) : (
@@ -888,111 +1061,112 @@ export default function PnLPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {rowsBeforeCogs.map(renderStandardRow)}
-
-                        {/* COGS — pinned block when breakdown exists, else flat row */}
-                        {hasCogsBreakdown ? (
+                        {/* Revenue — block when breakdown exists, flat editable row when not */}
+                        {rawRevenueSubItems.length > 0 ? (
                           <CustomCategoryBlock
-                            key="body-cogs-pinned"
-                            category={cogsCategory}
-                            columns={sorted.map(r => ({
-                              key: r.id,
-                              editable: inlineEditId === r.id,
-                            }))}
-                            showGrandTotal={false}
-                            getAmount={(columnKey, _catId, subId) => {
-                              if (inlineEditId === columnKey) {
-                                return inlineData[`cogsSub:${subId}`] ?? 0
-                              }
-                              const r = sorted.find(x => x.id === columnKey)
-                              if (!r) return 0
-                              const d = r.extractedData as PnLExtractedData
-                              return d.cogsSubItems?.find(s => s.id === subId)?.amount ?? 0
+                            key="pinned-revenue"
+                            category={revenueCategory}
+                            columns={columns}
+                            showGrandTotal={showGrandTotal}
+                            getAmount={getRevenueSubAmount}
+                            onAmountChange={(columnKey, _catId, subId, value) => {
+                              if (inlineEditId !== columnKey) return
+                              handleInlineChange(`revSub:${subId}`, value)
                             }}
+                            onRemoveCategory={() => {}}
+                            onAddSubItem={() => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: '__revenue__' })}
+                            onRemoveSubItem={handleInlineRevenueRemoveSub}
+                            pinned
+                            hideTypeBadge
+                            hideAddSubButton={!inlineEditId}
+                            allowRemoveSubItem={!!inlineEditId}
+                            isExpanded={isExpanded('__revenue__')}
+                            onToggleExpand={() => toggleExpanded('__revenue__')}
+                            onInlineAddSubItem={inlineEditId
+                              ? catId => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: catId })
+                              : undefined}
+                            columnSubtotalOverride={revenueColumnOverride}
+                            sumTone="neutral"
+                          />
+                        ) : (
+                          renderFlatMainRow('Revenue', 'revenue', '__revenue__')
+                        )}
+
+                        {/* COGS — block when breakdown exists, flat editable row when not */}
+                        {rawCogsSubItems.length > 0 ? (
+                          <CustomCategoryBlock
+                            key="pinned-cogs"
+                            category={cogsCategory}
+                            columns={columns}
+                            showGrandTotal={showGrandTotal}
+                            getAmount={getCogsSubAmount}
                             onAmountChange={(columnKey, _catId, subId, value) => {
                               if (inlineEditId !== columnKey) return
                               handleInlineChange(`cogsSub:${subId}`, value)
                             }}
                             onRemoveCategory={() => {}}
-                            onAddSubItem={handleInlineCogsAddPrompt}
+                            onAddSubItem={() => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: '__cogs__' })}
                             onRemoveSubItem={handleInlineCogsRemoveSub}
                             pinned
                             hideTypeBadge
                             hideAddSubButton={!inlineEditId}
                             allowRemoveSubItem={!!inlineEditId}
-                            columnSubtotalOverride={columnKey => {
-                              // Legacy/mixed columns without their own breakdown: show the
-                              // stored flat cogs instead of a misleading 0.
-                              if (inlineEditId === columnKey) return undefined
-                              const r = sorted.find(x => x.id === columnKey)
-                              if (!r) return undefined
-                              const d = r.extractedData as PnLExtractedData
-                              return (d.cogsSubItems?.length ?? 0) > 0 ? undefined : (Number(d.cogs) || 0)
-                            }}
+                            isExpanded={isExpanded('__cogs__')}
+                            onToggleExpand={() => toggleExpanded('__cogs__')}
+                            onInlineAddSubItem={inlineEditId
+                              ? catId => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: catId })
+                              : undefined}
+                            columnSubtotalOverride={cogsColumnOverride}
+                            sumTone="expense"
                           />
                         ) : (
-                          flatCogsRow && renderStandardRow(flatCogsRow)
+                          renderFlatMainRow('COGS', 'cogs', '__cogs__')
                         )}
 
-                        {rowsAfterCogs.map(renderStandardRow)}
+                        {renderComputedRow({ label: 'Gross Profit', key: 'grossProfit', bold: true, className: 'text-green-700' })}
 
-                        {/* Interleaved body: opex rows + custom category blocks */}
+                        {/* Operating Expenses — always a pinned accordion block */}
+                        <CustomCategoryBlock
+                          key="pinned-opex"
+                          category={applySubItemOrder(opexCategory, rowOrder?.customSubItems?.['__opex__'])}
+                          columns={columns}
+                          showGrandTotal={showGrandTotal}
+                          getAmount={getOpexAmount}
+                          onAmountChange={(columnKey, _catId, subId, value) => {
+                            if (inlineEditId !== columnKey) return
+                            handleInlineChange(`opex:${subId}`, value)
+                          }}
+                          onRemoveCategory={() => {}}
+                          onAddSubItem={() => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: '__opex__' })}
+                          onRemoveSubItem={(_catId, subId) => {
+                            // Opex can be removed during inline edit. Strip from inlineData.
+                            setInlineData(prev => {
+                              const { [`opex:${subId}`]: _removed, ...rest } = prev
+                              void _removed
+                              return recalcPnl(rest, inlineCategories)
+                            })
+                            setInlineAddedOpexNames(prev => prev.filter(n => n !== subId))
+                          }}
+                          onMoveSubItem={moveOpexSub}
+                          pinned
+                          hideTypeBadge
+                          hideAddSubButton={!inlineEditId}
+                          allowRemoveSubItem={!!inlineEditId}
+                          isExpanded={isExpanded('__opex__')}
+                          onToggleExpand={() => toggleExpanded('__opex__')}
+                          onInlineAddSubItem={inlineEditId
+                            ? catId => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: catId })
+                            : undefined}
+                          columnSubtotalOverride={opexColumnOverride}
+                          sumTone="expense"
+                        />
+
+                        {renderComputedRow({ label: 'Operating Profit', key: 'operatingProfit', bold: true })}
+
+                        {/* Custom income/expense category blocks */}
                         {bodyOrder.map((entry, bodyIdx) => {
                           const isFirstInBody = bodyIdx === 0
                           const isLastInBody = bodyIdx === bodyOrder.length - 1
-
-                          if (entry.type === 'opex') {
-                            const opexName = entry.id
-                            const key = `opex:${opexName}`
-                            return (
-                              <tr key={`body-opex-${opexName}`} className="hover:bg-muted/10">
-                                <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r pl-8 text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <div className="flex flex-col shrink-0">
-                                      <button
-                                        type="button"
-                                        disabled={isFirstInBody}
-                                        onClick={() => moveOpex(opexName, 'up')}
-                                        className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-                                        title="Pindah ke atas"
-                                      >
-                                        <ChevronUp className="h-3 w-3" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={isLastInBody}
-                                        onClick={() => moveOpex(opexName, 'down')}
-                                        className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-                                        title="Pindah ke bawah"
-                                      >
-                                        <ChevronDown className="h-3 w-3" />
-                                      </button>
-                                    </div>
-                                    <span className="flex-1">{opexName}</span>
-                                  </div>
-                                </td>
-                                {sorted.map(r => {
-                                  const isEditing = inlineEditId === r.id
-                                  const val = isEditing ? (inlineData[key] ?? 0) : getCell(r, key)
-                                  return (
-                                    <td key={r.id} className="px-3 py-1.5 text-right whitespace-nowrap tabular-nums text-xs text-muted-foreground">
-                                      {isEditing ? (
-                                        <Input
-                                          type="number"
-                                          value={inlineData[key] ?? 0}
-                                          onChange={e => handleInlineChange(key, Number(e.target.value) || 0)}
-                                          className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        />
-                                      ) : (
-                                        formatCurrencyExact(val)
-                                      )}
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            )
-                          }
-
                           const cat = catById.get(entry.id)
                           if (!cat) return null
                           const ordered = applySubItemOrder(cat, rowOrder?.customSubItems?.[cat.id])
@@ -1000,11 +1174,8 @@ export default function PnLPage() {
                             <CustomCategoryBlock
                               key={`body-cat-${cat.id}`}
                               category={ordered}
-                              columns={sorted.map(r => ({
-                                key: r.id,
-                                editable: inlineEditId === r.id,
-                              }))}
-                              showGrandTotal={false}
+                              columns={columns}
+                              showGrandTotal={showGrandTotal}
                               getAmount={getCustomAmount}
                               onAmountChange={(columnKey, catId, subId, value) => {
                                 if (inlineEditId !== columnKey) return
@@ -1017,29 +1188,21 @@ export default function PnLPage() {
                               isFirstInBody={isFirstInBody}
                               isLastInBody={isLastInBody}
                               onMoveSubItem={moveSubItem}
+                              isExpanded={isExpanded(cat.id)}
+                              onToggleExpand={() => toggleExpanded(cat.id)}
+                              onInlineAddSubItem={inlineEditId
+                                ? catId => setAddDialog({ open: true, lockedMode: 'sub', presetParentId: catId })
+                                : undefined}
+                              hideAddSubButton={!inlineEditId}
+                              allowRemoveSubItem={!!inlineEditId}
                             />
                           )
                         })}
 
-                        {rowsAfterBody.map(renderStandardRow)}
+                        {renderEditableRow({ label: 'Interest', key: 'interest', className: 'text-red-600' })}
+                        {renderEditableRow({ label: 'Taxes', key: 'taxes', className: 'text-red-600' })}
 
-                        {/* Net Profit row */}
-                        <tr className="bg-muted/20">
-                          <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
-                            {netProfitRow.label}
-                          </td>
-                          {sorted.map(r => {
-                            const isEditing = inlineEditId === r.id
-                            const val = isEditing ? (inlineData.netProfit ?? 0) : getCell(r, 'netProfit')
-                            return (
-                              <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums font-semibold ${
-                                val >= 0 ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {formatCurrencyExact(val)}
-                              </td>
-                            )
-                          })}
-                        </tr>
+                        {renderComputedRow({ label: 'Net Profit', key: 'netProfit', bold: true })}
                       </tbody>
                       {inlineEditId && (
                         <tfoot>
@@ -1049,9 +1212,9 @@ export default function PnLPage() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setAddCategoryOpen(true)}
+                                onClick={() => setAddDialog({ open: true, lockedMode: 'main' })}
                               >
-                                <Plus className="h-3 w-3 mr-1" /> Tambah Kategori
+                                <Plus className="h-3 w-3 mr-1" /> Tambah Kategori Utama
                               </Button>
                             </td>
                           </tr>
@@ -1177,14 +1340,17 @@ export default function PnLPage() {
       </Dialog>
 
       <AddCustomCategoryDialog
-        open={addCategoryOpen}
-        onOpenChange={setAddCategoryOpen}
+        open={addDialog.open}
+        onOpenChange={open => setAddDialog(prev => ({ ...prev, open }))}
         onSubmit={handleInlineDialogSubmit}
+        lockedMode={addDialog.lockedMode}
+        presetParentId={addDialog.presetParentId}
         existingMainCategories={[
+          { id: '__revenue__', name: 'Revenue', type: 'income', subItems: inlineRevenueSubItems },
           { id: '__cogs__', name: 'COGS', type: 'expense', subItems: inlineCogsSubItems },
           {
             id: '__opex__',
-            name: 'OPEX',
+            name: 'Operating Expenses',
             type: 'expense',
             subItems: [
               ...new Set([

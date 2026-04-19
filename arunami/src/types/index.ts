@@ -296,6 +296,8 @@ export interface PnLExtractedData {
   notes: string
   customCategories?: CustomCategory[]
   cogsSubItems?: CustomSubItem[]
+  /** Optional revenue breakdown — when present, `revenue` = sum of subItems. */
+  revenueSubItems?: CustomSubItem[]
 }
 
 export interface MonthlyPnLRow {
@@ -311,6 +313,7 @@ export interface MonthlyPnLRow {
   netProfit: number
   customCategories?: CustomCategory[]
   cogsSubItems?: CustomSubItem[]
+  revenueSubItems?: CustomSubItem[]
 }
 
 export interface PnLUploadPending {

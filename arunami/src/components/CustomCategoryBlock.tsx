@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, ChevronRight, Plus, X } from 'lucide-react'
 import type { CustomCategory } from '@/types'
 import type { MoveDirection } from '@/lib/rowOrder'
 
@@ -38,6 +38,13 @@ interface Props {
   hideAddSubButton?: boolean
   /** When false, hides the X remove button on each sub-item row. */
   allowRemoveSubItem?: boolean
+  /** When provided, renders a chevron toggle on the header and gates sub-items visibility. */
+  isExpanded?: boolean
+  onToggleExpand?: () => void
+  /** When provided, renders a small + button on the header row (opens parent-preset add flow). */
+  onInlineAddSubItem?: (catId: string) => void
+  /** Sum color / label: use 'income' for green, 'expense' for red, 'neutral' for muted (Revenue). */
+  sumTone?: 'income' | 'expense' | 'neutral'
 }
 
 export function CustomCategoryBlock({
@@ -58,13 +65,22 @@ export function CustomCategoryBlock({
   columnSubtotalOverride,
   hideAddSubButton = false,
   allowRemoveSubItem = true,
+  isExpanded,
+  onToggleExpand,
+  onInlineAddSubItem,
+  sumTone,
 }: Props) {
+  const expanded = isExpanded ?? true
   const colCount = columns.length + (showGrandTotal ? 2 : 1)
   const isIncome = cat.type === 'income'
   const badgeClass = isIncome
     ? 'border-transparent bg-green-100 text-green-800'
     : 'border-transparent bg-red-100 text-red-800'
-  const sumClass = isIncome ? 'text-green-700' : 'text-red-700'
+  const resolvedTone = sumTone ?? (isIncome ? 'income' : 'expense')
+  const sumClass =
+    resolvedTone === 'income' ? 'text-green-700'
+      : resolvedTone === 'expense' ? 'text-red-700'
+      : 'text-foreground'
 
   const columnSubtotal = (columnKey: string): number =>
     cat.subItems.reduce((s, sub) => s + (getAmount(columnKey, cat.id, sub.id) || 0), 0)
@@ -84,6 +100,18 @@ export function CustomCategoryBlock({
       <tr className="bg-muted/20">
         <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
           <div className="flex items-center gap-1">
+            {onToggleExpand && (
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                className="text-muted-foreground hover:text-foreground shrink-0 leading-none"
+                title={expanded ? 'Ciutkan' : 'Luaskan'}
+              >
+                {expanded
+                  ? <ChevronDown className="h-3.5 w-3.5" />
+                  : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            )}
             {!pinned && onMoveCategory && (
               <div className="flex flex-col shrink-0">
                 <button
@@ -111,6 +139,18 @@ export function CustomCategoryBlock({
               <Badge className={`text-[10px] px-1.5 py-0 ${badgeClass}`}>
                 {isIncome ? 'Income' : 'Expense'}
               </Badge>
+            )}
+            {onInlineAddSubItem && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={() => onInlineAddSubItem(cat.id)}
+                title="Tambah sub-kategori"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
             )}
             {!pinned && (
               <Button
@@ -148,7 +188,7 @@ export function CustomCategoryBlock({
       </tr>
 
       {/* Sub-item rows */}
-      {cat.subItems.map((sub, subIdx) => {
+      {expanded && cat.subItems.map((sub, subIdx) => {
         const isFirstSub = subIdx === 0
         const isLastSub = subIdx === cat.subItems.length - 1
         return (
@@ -223,7 +263,7 @@ export function CustomCategoryBlock({
       })}
 
       {/* Add sub-item row */}
-      {!hideAddSubButton && (
+      {expanded && !hideAddSubButton && (
         <tr>
           <td colSpan={colCount} className="px-4 py-1.5 pl-8 border-b">
             <Button
