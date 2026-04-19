@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { toast } from 'sonner'
 import {
-  getManagementReports, saveManagementReport, deleteManagementReport,
+  getManagementReports, saveManagementReport, updateManagementReport, deleteManagementReport,
   getReports, getNotes,
 } from '@/lib/firestore'
 import { generateManagementReport } from '@/lib/gemini'
@@ -13,12 +13,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle, Trash2, Sparkles } from 'lucide-react'
+import { PlusCircle, Trash2, Sparkles, Pencil } from 'lucide-react'
 import type {
   ManagementReport, IssueSeverity, ActionStatus, ActionCategory, Portfolio,
   PnLExtractedData, ProjectionExtractedData,
@@ -26,11 +25,22 @@ import type {
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
-const severityVariant = (s: IssueSeverity) =>
-  s === 'high' ? 'danger' : s === 'medium' ? 'warning' : 'success'
+const severityBadgeClass = (s: IssueSeverity) =>
+  s === 'high'
+    ? 'bg-red-100 text-red-700 hover:bg-red-200'
+    : s === 'medium'
+    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+    : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
 
-const statusVariant = (s: ActionStatus) =>
-  s === 'done' ? 'success' : s === 'in_progress' ? 'default' : 'outline'
+const statusBadgeClass = (s: ActionStatus) =>
+  s === 'done'
+    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+    : s === 'in_progress'
+    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+    : 'bg-muted text-foreground/80 hover:bg-muted/80'
+
+const statusLabel = (s: ActionStatus) =>
+  s === 'done' ? 'Done' : s === 'in_progress' ? 'In Progress' : 'Pending'
 
 type FormData = Omit<ManagementReport, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>
 
@@ -41,13 +51,16 @@ export default function ManagementPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  const defaultFormValues: FormData = {
+    period: '', businessSummary: '',
+    issues: [{ id: crypto.randomUUID(), title: '', severity: 'medium', description: '' }],
+    actionItems: [{ id: crypto.randomUUID(), title: '', status: 'pending', assignee: '', dueDate: '', category: 'business' }],
+  }
 
   const { register, handleSubmit, control, reset, setValue, watch } = useForm<FormData>({
-    defaultValues: {
-      period: '', businessSummary: '',
-      issues: [{ id: crypto.randomUUID(), title: '', severity: 'medium', description: '' }],
-      actionItems: [{ id: crypto.randomUUID(), title: '', status: 'pending', assignee: '', dueDate: '', category: 'business' }],
-    },
+    defaultValues: defaultFormValues,
   })
 
   const { fields: issueFields, append: appendIssue, remove: removeIssue } = useFieldArray({ control, name: 'issues' })
@@ -65,14 +78,36 @@ export default function ManagementPage() {
     if (!portfolioId || !user) return
     setSaving(true)
     try {
-      await saveManagementReport(portfolioId, { ...data, createdBy: user.uid })
-      toast.success('Management report berhasil disimpan')
-      reset(); setOpen(false); fetchReports()
+      if (editingId) {
+        await updateManagementReport(portfolioId, editingId, data)
+        toast.success('Report diperbarui')
+      } else {
+        await saveManagementReport(portfolioId, { ...data, createdBy: user.uid })
+        toast.success('Management report berhasil disimpan')
+      }
+      closeDialog(); fetchReports()
     } catch {
-      toast.error('Gagal menyimpan report')
+      toast.error(editingId ? 'Gagal memperbarui report' : 'Gagal menyimpan report')
     } finally {
       setSaving(false)
     }
+  }
+
+  const openEditDialog = (r: ManagementReport) => {
+    reset({
+      period: r.period,
+      businessSummary: r.businessSummary,
+      issues: r.issues.length > 0 ? r.issues : defaultFormValues.issues,
+      actionItems: r.actionItems.length > 0 ? r.actionItems : defaultFormValues.actionItems,
+    })
+    setEditingId(r.id)
+    setOpen(true)
+  }
+
+  const closeDialog = () => {
+    setOpen(false)
+    setEditingId(null)
+    reset(defaultFormValues)
   }
 
   const handleDelete = async (id: string) => {
@@ -83,6 +118,34 @@ export default function ManagementPage() {
       fetchReports()
     } catch {
       toast.error('Gagal menghapus report')
+    }
+  }
+
+  const patchIssueSeverity = async (reportId: string, issueId: string, severity: IssueSeverity) => {
+    if (!portfolioId) return
+    const current = reports.find(r => r.id === reportId)
+    if (!current) return
+    const nextIssues = current.issues.map(i => i.id === issueId ? { ...i, severity } : i)
+    setReports(prev => prev.map(r => r.id === reportId ? { ...r, issues: nextIssues } : r))
+    try {
+      await updateManagementReport(portfolioId, reportId, { issues: nextIssues })
+    } catch {
+      toast.error('Gagal update severity')
+      fetchReports()
+    }
+  }
+
+  const patchActionStatus = async (reportId: string, actionId: string, status: ActionStatus) => {
+    if (!portfolioId) return
+    const current = reports.find(r => r.id === reportId)
+    if (!current) return
+    const nextActions = current.actionItems.map(a => a.id === actionId ? { ...a, status } : a)
+    setReports(prev => prev.map(r => r.id === reportId ? { ...r, actionItems: nextActions } : r))
+    try {
+      await updateManagementReport(portfolioId, reportId, { actionItems: nextActions })
+    } catch {
+      toast.error('Gagal update status')
+      fetchReports()
     }
   }
 
@@ -122,29 +185,15 @@ export default function ManagementPage() {
         arunamiNotes: notes.map(n => n.content).filter(Boolean),
       })
 
-      // Save the AI output as a ManagementReport so it shows up in the
-      // existing list + is picked up by the Review & Publishing flow.
       await saveManagementReport(portfolioId, {
         period: latestPnl.period,
         businessSummary: generated.businessSummary,
-        issues: generated.issues.map(i => ({
-          id: crypto.randomUUID(),
-          title: i.title,
-          severity: i.severity,
-          description: i.description,
-        })),
-        actionItems: generated.actionItems.map(a => ({
-          id: crypto.randomUUID(),
-          title: a.title,
-          status: 'pending' as ActionStatus,
-          assignee: '',
-          dueDate: '',
-          category: a.category,
-        })),
+        issues: [],
+        actionItems: [],
         createdBy: user.uid,
       })
 
-      toast.success(`Report untuk ${formatPeriod(latestPnl.period)} berhasil dibuat oleh AI`)
+      toast.success(`Summary untuk ${formatPeriod(latestPnl.period)} berhasil dibuat. Tambahkan isu & action items via tombol edit.`)
       fetchReports()
     } catch (err) {
       console.error(err)
@@ -163,17 +212,19 @@ export default function ManagementPage() {
             <Sparkles className="mr-2 h-4 w-4" />
             {generating ? 'Menganalisis...' : 'Generate Report with AI'}
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { if (!o) closeDialog(); else setOpen(true) }}>
             <DialogTrigger asChild>
               <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Buat Report</Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Buat Portfolio Management Report</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>{editingId ? 'Edit Portfolio Management Report' : 'Buat Portfolio Management Report'}</DialogTitle>
+              </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-2">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs">Periode</Label>
-                  <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} />
+                  <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} disabled={!!editingId} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -193,7 +244,7 @@ export default function ManagementPage() {
                   <div key={field.id} className="border rounded-lg p-3 mb-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <Input placeholder="Judul isu" {...register(`issues.${i}.title`)} className="flex-1 text-sm" />
-                      <Select defaultValue="medium" onValueChange={v => setValue(`issues.${i}.severity`, v as IssueSeverity)}>
+                      <Select value={watch(`issues.${i}.severity`) ?? 'medium'} onValueChange={v => setValue(`issues.${i}.severity`, v as IssueSeverity)}>
                         <SelectTrigger className="w-28 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="high">High</SelectItem>
@@ -227,7 +278,7 @@ export default function ManagementPage() {
                       </Button>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <Select defaultValue="pending" onValueChange={v => setValue(`actionItems.${i}.status`, v as ActionStatus)}>
+                      <Select value={watch(`actionItems.${i}.status`) ?? 'pending'} onValueChange={v => setValue(`actionItems.${i}.status`, v as ActionStatus)}>
                         <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pending">Pending</SelectItem>
@@ -235,7 +286,7 @@ export default function ManagementPage() {
                           <SelectItem value="done">Done</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Select defaultValue="business" onValueChange={v => setValue(`actionItems.${i}.category`, v as ActionCategory)}>
+                      <Select value={watch(`actionItems.${i}.category`) ?? 'business'} onValueChange={v => setValue(`actionItems.${i}.category`, v as ActionCategory)}>
                         <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="business">Business</SelectItem>
@@ -251,8 +302,8 @@ export default function ManagementPage() {
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan'}</Button>
+                <Button type="button" variant="outline" onClick={closeDialog}>Batal</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan'}</Button>
               </div>
               </form>
             </DialogContent>
@@ -271,9 +322,14 @@ export default function ManagementPage() {
                   <CardTitle className="text-base">{formatPeriod(r.period)}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{r.businessSummary}</p>
                 </div>
-                <Button size="icon" variant="ghost" onClick={() => handleDelete(r.id)}>
-                  <Trash2 className="h-4 w-4 text-muted-foreground" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button size="icon" variant="ghost" onClick={() => openEditDialog(r)}>
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(r.id)}>
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {r.issues.length > 0 && (
@@ -282,7 +338,16 @@ export default function ManagementPage() {
                     <div className="space-y-1.5">
                       {r.issues.map(issue => (
                         <div key={issue.id} className="flex items-center gap-2">
-                          <Badge variant={severityVariant(issue.severity)} className="capitalize">{issue.severity}</Badge>
+                          <Select value={issue.severity} onValueChange={v => patchIssueSeverity(r.id, issue.id, v as IssueSeverity)}>
+                            <SelectTrigger className={`h-6 w-20 rounded-full border-0 px-2.5 text-xs font-medium capitalize gap-1 [&>svg]:h-3 [&>svg]:w-3 ${severityBadgeClass(issue.severity)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="low">Low</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <span className="text-sm">{issue.title}</span>
                         </div>
                       ))}
@@ -295,7 +360,16 @@ export default function ManagementPage() {
                     <div className="space-y-1.5">
                       {r.actionItems.map(action => (
                         <div key={action.id} className="flex items-center gap-2">
-                          <Badge variant={statusVariant(action.status)} className="capitalize">{action.status.replace('_', ' ')}</Badge>
+                          <Select value={action.status} onValueChange={v => patchActionStatus(r.id, action.id, v as ActionStatus)}>
+                            <SelectTrigger className={`h-6 w-28 rounded-full border-0 px-2.5 text-xs font-medium gap-1 [&>svg]:h-3 [&>svg]:w-3 ${statusBadgeClass(action.status)}`}>
+                              <span>{statusLabel(action.status)}</span>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="done">Done</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <span className="text-sm">{action.title}</span>
                           {action.assignee && <span className="text-xs text-muted-foreground">· {action.assignee}</span>}
                         </div>

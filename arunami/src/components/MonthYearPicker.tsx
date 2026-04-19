@@ -6,12 +6,13 @@ import {
 interface Props {
   value: string // "YYYY-MM"
   onChange: (value: string) => void
+  disabled?: boolean
 }
 
 const currentYear = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(currentYear - 2 + i))
 
-export function MonthYearPicker({ value, onChange }: Props) {
+export function MonthYearPicker({ value, onChange, disabled }: Props) {
   const parsed = parsePeriodKey(value)
   const selectedMonth = parsed?.month ?? ''
   const selectedYear = parsed?.year ?? ''
@@ -28,7 +29,7 @@ export function MonthYearPicker({ value, onChange }: Props) {
 
   return (
     <div className="flex gap-2">
-      <Select value={selectedMonth} onValueChange={handleMonth}>
+      <Select value={selectedMonth} onValueChange={handleMonth} disabled={disabled}>
         <SelectTrigger className="text-sm flex-1">
           <SelectValue placeholder="Bulan" />
         </SelectTrigger>
@@ -38,7 +39,7 @@ export function MonthYearPicker({ value, onChange }: Props) {
           ))}
         </SelectContent>
       </Select>
-      <Select value={selectedYear} onValueChange={handleYear}>
+      <Select value={selectedYear} onValueChange={handleYear} disabled={disabled}>
         <SelectTrigger className="text-sm w-[100px]">
           <SelectValue placeholder="Tahun" />
         </SelectTrigger>

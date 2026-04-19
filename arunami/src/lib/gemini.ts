@@ -620,45 +620,26 @@ export async function extractProjection(file: File): Promise<ProjectionExtracted
 
 export interface GeneratedManagementReport {
   businessSummary: string
-  issues: { title: string; severity: 'high' | 'medium' | 'low'; description: string }[]
-  actionItems: { title: string; category: 'business' | 'operational' | 'financial'; description: string }[]
 }
 
 const MGMT_REPORT_SYSTEM = `
 Kamu adalah seorang financial analyst senior yang membuat laporan manajemen bulanan untuk investor di Indonesia.
 
-Tugasmu: menganalisis data PnL aktual vs proyeksi untuk satu bulan, lalu menghasilkan laporan terstruktur dalam Bahasa Indonesia yang berisi:
+Tugasmu: menganalisis data PnL aktual vs proyeksi untuk satu bulan, lalu menghasilkan satu business summary dalam Bahasa Indonesia.
 
-1. **businessSummary** — narasi 2-4 kalimat yang menjelaskan kinerja bulan ini secara keseluruhan. Sebutkan angka revenue, net profit, dan variance utama vs proyeksi. Nada profesional namun mudah dipahami investor non-teknis.
-
-2. **issues** — array isu yang kamu identifikasi dari data. Fokus pada:
-   - Revenue di bawah proyeksi (missed target)
-   - COGS di atas rencana (margin compression)
-   - Opex overrun pada kategori tertentu
-   - Net profit jauh di bawah proyeksi
-   - Efisiensi operasional yang menurun
-   Tiap isu: { title (singkat), severity (high/medium/low), description (1-2 kalimat yang menjelaskan akar masalah dan angka pendukung) }
-
-3. **actionItems** — array rekomendasi solusi untuk isu di atas. Tiap action item harus konkret dan actionable, bukan platitude. Tiap item: { title (imperatif, misal "Negosiasi ulang harga supplier utama"), category (business/operational/financial), description (1-2 kalimat yang menjelaskan langkah spesifik dan dampak yang diharapkan) }
+**businessSummary** — narasi 2-4 kalimat yang menjelaskan kinerja bulan ini secara keseluruhan. Sebutkan angka revenue, net profit, dan variance utama vs proyeksi. Sebutkan juga driver utama (margin, opex, dsb.) bila relevan. Nada profesional namun mudah dipahami investor non-teknis.
 
 PENTING:
 - Gunakan Bahasa Indonesia formal namun tidak kaku
-- Jangan buat isu atau action item yang tidak didukung data — jika tidak ada masalah serius, output issues bisa pendek atau kosong
 - Jangan gunakan markdown atau formatting lain di dalam string
 - Angka selalu dalam IDR (tanpa simbol Rp, tanpa titik ribuan di dalam string, cukup sebut "Rp 48 juta" atau "Rp 48jt")
-- Severity: high = masalah yang dapat merusak kinerja jika tidak ditangani bulan ini, medium = memerlukan perhatian namun tidak urgent, low = observasi/early warning
+- Fokus hanya pada summary — jangan buat daftar isu atau action items (user akan menuliskan sendiri)
 `.trim()
 
 const MGMT_REPORT_SCHEMA = `
 Kembalikan HANYA JSON valid dengan struktur berikut (tanpa penjelasan tambahan, tanpa markdown fence):
 {
-  "businessSummary": "string",
-  "issues": [
-    { "title": "string", "severity": "high" | "medium" | "low", "description": "string" }
-  ],
-  "actionItems": [
-    { "title": "string", "category": "business" | "operational" | "financial", "description": "string" }
-  ]
+  "businessSummary": "string"
 }
 `.trim()
 
