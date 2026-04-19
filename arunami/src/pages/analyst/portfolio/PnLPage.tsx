@@ -42,9 +42,6 @@ import {
   setSubItemOrder,
   type MoveDirection,
 } from '@/lib/rowOrder'
-import SchedulePaymentConfirm from './SchedulePaymentConfirm'
-import DividendDeclaration from './DividendDeclaration'
-import CustomVariableInput from './CustomVariableInput'
 import type {
   PnLExtractedData, PnLUploadPending, OpexItem, PortfolioReport, Portfolio,
   PortfolioConfig, RevenueCategory, CustomCategory, CustomCategoryType, CustomSubItem,
@@ -664,47 +661,8 @@ export default function PnLPage() {
   const updateOpexItem = (i: number, field: keyof OpexItem, val: string | number) =>
     setOpexItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item))
 
-  // Alternative UIs for models that don't need full P&L
   const returnModel = portfolioConfig?.returnModel
-  if (returnModel === 'fixed_schedule' && portfolioId && portfolioConfig) {
-    return (
-      <div className="p-6">
-        <SchedulePaymentConfirm
-          portfolioId={portfolioId}
-          config={portfolioConfig}
-          onConfigUpdated={fetchConfig}
-        />
-      </div>
-    )
-  }
-  if (returnModel === 'annual_dividend' && portfolioId && portfolioConfig) {
-    return (
-      <div className="p-6">
-        <DividendDeclaration
-          portfolioId={portfolioId}
-          config={portfolioConfig}
-          onConfigUpdated={fetchConfig}
-        />
-      </div>
-    )
-  }
-  if (returnModel === 'custom' && portfolioId && portfolio && portfolioConfig) {
-    return (
-      <div className="p-6 space-y-6">
-        <CustomVariableInput
-          portfolio={portfolio}
-          portfolioId={portfolioId}
-          config={portfolioConfig}
-          onConfigUpdated={fetchConfig}
-        />
-        <p className="text-xs text-muted-foreground">
-          Jika variabel mengambil data dari P&L, upload laporan PnL melalui tab PnL standar.
-        </p>
-      </div>
-    )
-  }
 
-  // Standard P&L flow for net_profit_share, revenue_share, fixed_yield, etc.
   return (
     <div className="p-6 space-y-6">
       {returnModel === 'fixed_yield' && (

@@ -571,6 +571,15 @@ export type EquityReasonCategory =
   | 'renegotiation'
   | 'other'
 
+export type ConfigChangeKind =
+  | 'investor_share'
+  | 'arunami_fee'
+  | 'fixed_yield'
+  | 'revenue_share'
+  | 'scheduled_payment'
+  | 'dividend_declared'
+  | 'custom_formula'
+
 export interface EquityChangeEntry {
   id: string
   changedAt: Timestamp
@@ -583,4 +592,7 @@ export interface EquityChangeEntry {
   reasonCategory: EquityReasonCategory
   reasonNote?: string
   effectiveFromPeriod: string
+  changeKind?: ConfigChangeKind
+  fromValue?: string
+  toValue?: string
 }

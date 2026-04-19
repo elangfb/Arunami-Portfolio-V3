@@ -11,7 +11,8 @@ import type {
   PnLExtractedData, ProjectionExtractedData,
   MonthlyDataPoint, CostItem, TransactionDataPoint, RevenueMixItem,
   PortfolioConfig, InvestorCommunication,
-  InvestorReportDoc, EquityChangeEntry, EquityReasonCategory,
+  InvestorReportDoc, EquityChangeEntry,
+  InvestorConfigUnion, ConfigChangeKind,
 } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 
@@ -159,39 +160,41 @@ export async function savePortfolioConfig(portfolioId: string, config: Omit<Port
 
 // ─── Equity History (Profit Sharing change trail) ───────────────────────
 
+export async function getEquityHistory(portfolioId: string): Promise<EquityChangeEntry[]> {
+  const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'equityHistory'))
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }) as EquityChangeEntry)
+  return rows.sort((a, b) => (b.changedAt?.seconds ?? 0) - (a.changedAt?.seconds ?? 0))
+}
+
 /**
- * Updates the investor share on the portfolio config AND appends an
- * immutable history row in a single batch. The history row captures who
- * changed it, when, why, and the period the change takes effect in.
+ * Generic config change recorder. Merges the new investorConfig into the
+ * portfolio config and appends an audit row to equityHistory, all in one
+ * batch. Use for any change to the per-model return config (yield %, revenue
+ * share %, scheduled payments, dividends, custom formula, etc).
  */
-export async function updateInvestorShare(params: {
+export async function recordConfigChange(params: {
   portfolioId: string
   currentConfig: PortfolioConfig
-  newInvestorPercent: number
-  newArunamiPercent: number
-  reasonCategory: EquityReasonCategory
-  reasonNote?: string
+  newInvestorConfig: InvestorConfigUnion
+  changeKind: ConfigChangeKind
+  fromValue: string
+  toValue: string
+  reasonNote: string
   effectiveFromPeriod: string
   changedByUid: string
   changedByName: string
 }): Promise<void> {
   const {
-    portfolioId, currentConfig, newInvestorPercent, newArunamiPercent,
-    reasonCategory, reasonNote, effectiveFromPeriod, changedByUid, changedByName,
+    portfolioId, currentConfig, newInvestorConfig, changeKind,
+    fromValue, toValue, reasonNote, effectiveFromPeriod,
+    changedByUid, changedByName,
   } = params
 
   const batch = writeBatch(db)
   const configRef = doc(db, 'portfolios', portfolioId, 'config', 'current')
   batch.set(
     configRef,
-    {
-      ...currentConfig,
-      investorConfig: {
-        ...currentConfig.investorConfig,
-        investorSharePercent: newInvestorPercent,
-        arunamiFeePercent: newArunamiPercent,
-      },
-    },
+    { ...currentConfig, investorConfig: newInvestorConfig },
     { merge: true },
   )
 
@@ -203,22 +206,19 @@ export async function updateInvestorShare(params: {
     changedByUid,
     changedByName,
     fromInvestorPercent: currentConfig.investorConfig.investorSharePercent,
-    toInvestorPercent: newInvestorPercent,
+    toInvestorPercent: newInvestorConfig.investorSharePercent,
     fromArunamiPercent: currentConfig.investorConfig.arunamiFeePercent,
-    toArunamiPercent: newArunamiPercent,
-    reasonCategory,
+    toArunamiPercent: newInvestorConfig.arunamiFeePercent,
+    reasonCategory: 'other',
     effectiveFromPeriod,
+    changeKind,
+    fromValue,
+    toValue,
     ...(reasonNote && reasonNote.trim() ? { reasonNote: reasonNote.trim() } : {}),
   }
   batch.set(historyRef, entry)
 
   await batch.commit()
-}
-
-export async function getEquityHistory(portfolioId: string): Promise<EquityChangeEntry[]> {
-  const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'equityHistory'))
-  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }) as EquityChangeEntry)
-  return rows.sort((a, b) => (b.changedAt?.seconds ?? 0) - (a.changedAt?.seconds ?? 0))
 }
 
 // ─── Financial Data ───────────────────────────────────────────────────────
