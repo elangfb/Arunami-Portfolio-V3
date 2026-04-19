@@ -10,7 +10,7 @@ import type {
   ManagementReport, Note, TransferProof, InvestorAllocation,
   PnLExtractedData, ProjectionExtractedData,
   MonthlyDataPoint, CostItem, TransactionDataPoint, RevenueMixItem,
-  PortfolioConfig, SlotsSummary, InvestorCommunication,
+  PortfolioConfig, InvestorCommunication,
   InvestorReportDoc, EquityChangeEntry, EquityReasonCategory,
 } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -107,18 +107,16 @@ export async function getPortfolioConfig(portfolioId: string): Promise<Portfolio
   return snap.exists() ? (snap.data() as PortfolioConfig) : null
 }
 
-const LEGACY_RETAIL_CONFIG: Omit<PortfolioConfig, 'createdAt'> = {
+const DEFAULT_PORTFOLIO_CONFIG: Omit<PortfolioConfig, 'createdAt'> = {
   industryType: 'retail',
   revenueCategories: [
     { id: 'laptop', name: 'Laptop', color: '#38a169' },
     { id: 'service', name: 'Service', color: '#3182ce' },
     { id: 'aksesoris', name: 'Aksesoris', color: '#d69e2e' },
   ],
-  returnModel: 'slot_based',
+  returnModel: 'net_profit_share',
   investorConfig: {
-    type: 'slot_based',
-    totalSlots: 10,
-    nominalPerSlot: 5000000,
+    type: 'net_profit_share',
     investorSharePercent: 70,
     arunamiFeePercent: 10,
   },
@@ -133,8 +131,23 @@ const LEGACY_RETAIL_CONFIG: Omit<PortfolioConfig, 'createdAt'> = {
 
 export async function getPortfolioConfigOrDefault(portfolioId: string): Promise<PortfolioConfig> {
   const config = await getPortfolioConfig(portfolioId)
-  if (config) return config
-  return { ...LEGACY_RETAIL_CONFIG, createdAt: null as unknown as import('firebase/firestore').Timestamp }
+  if (!config) {
+    return { ...DEFAULT_PORTFOLIO_CONFIG, createdAt: null as unknown as import('firebase/firestore').Timestamp }
+  }
+  // Legacy coercion: map stale slot_based docs to net_profit_share at read time
+  const rawType = (config.investorConfig as { type?: string } | undefined)?.type
+  if ((config.returnModel as string) === 'slot_based' || rawType === 'slot_based') {
+    return {
+      ...config,
+      returnModel: 'net_profit_share',
+      investorConfig: {
+        type: 'net_profit_share',
+        investorSharePercent: config.investorConfig.investorSharePercent,
+        arunamiFeePercent: config.investorConfig.arunamiFeePercent,
+      },
+    }
+  }
+  return config
 }
 
 export async function savePortfolioConfig(portfolioId: string, config: Omit<PortfolioConfig, 'createdAt'>) {
@@ -317,60 +330,46 @@ export async function getAllocationsForInvestor(investorUid: string): Promise<In
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorAllocation)
 }
 
-/** Recalculates and writes slotsSummary + assignedInvestors on the portfolio doc. */
-async function refreshPortfolioSlotsSummary(portfolioId: string, totalSlots: number) {
+/** Recalculates assignedInvestors on the portfolio doc and flushes stale slotsSummary field. */
+async function refreshPortfolioInvestors(portfolioId: string) {
   const allocations = await getAllocationsForPortfolio(portfolioId)
-  const summary: SlotsSummary = {
-    totalSlots,
-    allocatedSlots: allocations.reduce((sum, a) => sum + a.slots, 0),
-    investorCount: allocations.length,
-  }
-  const investorUids = allocations.map(a => a.investorUid)
   await updateDoc(doc(db, 'portfolios', portfolioId), {
-    slotsSummary: summary,
-    assignedInvestors: investorUids,
+    assignedInvestors: allocations.map(a => a.investorUid),
+    slotsSummary: deleteField(),
     updatedAt: serverTimestamp(),
   })
 }
 
 export async function createAllocation(
   data: Omit<InvestorAllocation, 'id' | 'joinedAt' | 'updatedAt'>,
-  totalSlots: number,
 ) {
-  const batch = writeBatch(db)
-
-  const allocRef = doc(collection(db, 'investorAllocations'))
-  batch.set(allocRef, {
+  const allocRef = await addDoc(collection(db, 'investorAllocations'), {
     ...data,
     joinedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
-
-  await batch.commit()
-  await refreshPortfolioSlotsSummary(data.portfolioId, totalSlots)
+  await refreshPortfolioInvestors(data.portfolioId)
   return allocRef.id
 }
 
 export async function updateAllocation(
   allocationId: string,
-  data: Partial<Pick<InvestorAllocation, 'slots' | 'investedAmount' | 'ownershipPercent'>>,
+  data: Partial<Pick<InvestorAllocation, 'investedAmount' | 'ownershipPercent'>>,
   portfolioId: string,
-  totalSlots: number,
 ) {
   await updateDoc(doc(db, 'investorAllocations', allocationId), {
     ...data,
     updatedAt: serverTimestamp(),
   })
-  await refreshPortfolioSlotsSummary(portfolioId, totalSlots)
+  await refreshPortfolioInvestors(portfolioId)
 }
 
 export async function deleteAllocation(
   allocationId: string,
   portfolioId: string,
-  totalSlots: number,
 ) {
   await deleteDoc(doc(db, 'investorAllocations', allocationId))
-  await refreshPortfolioSlotsSummary(portfolioId, totalSlots)
+  await refreshPortfolioInvestors(portfolioId)
 }
 
 // ─── All Allocations (for CRM) ──────────────────────────────────────────
@@ -526,8 +525,6 @@ export async function syncFinancialData(portfolioId: string) {
   // Preserve existing investorConfig or build from portfolio config
   const investorConfig = existingData?.investorConfig ?? {
     returnModel: config.returnModel,
-    totalSlots: 'totalSlots' in config.investorConfig ? (config.investorConfig as any).totalSlots : undefined,
-    nominalPerSlot: 'nominalPerSlot' in config.investorConfig ? (config.investorConfig as any).nominalPerSlot : undefined,
     investorSharePercent: config.investorConfig.investorSharePercent,
     arunamiFeePercent: config.investorConfig.arunamiFeePercent,
   }

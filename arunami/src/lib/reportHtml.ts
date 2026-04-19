@@ -92,18 +92,6 @@ function buildDistributionSection(
           ${highlightRow('Net Investor', 'Bagian Anda untuk periode ini.', formatCurrencyExact(result.perInvestorAmount))}
         </table>`
 
-    case 'slot_based':
-      return `
-        <h2>Net Investor — ${periodLabel}</h2>
-        <table class="data">
-          ${descRow('Net Profit', 'Laba bersih proyek.', formatCurrencyExact(b.netProfit ?? 0))}
-          ${descRow('Investor Pool', 'Setelah dipotong share.', formatCurrencyExact(b.investorPool ?? 0))}
-          ${descRow('Slot Anda', 'Jumlah slot × total slot.', `${b.slots ?? 0} / ${b.totalSlots ?? 0}`)}
-          ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
-          ${feeRow}
-          ${highlightRow('Net Investor', 'Bagian Anda.', formatCurrencyExact(result.perInvestorAmount))}
-        </table>`
-
     case 'fixed_yield':
       return `
         <h2>Fixed Yield — ${periodLabel}</h2>

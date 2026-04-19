@@ -224,20 +224,16 @@ export default function AdminPortfolios() {
     }
 
     try {
-      await createAllocation(
-        {
-          investorUid: investor.uid,
-          investorName: investor.displayName,
-          investorEmail: investor.email,
-          portfolioId: expandedPortfolio.id,
-          portfolioName: expandedPortfolio.name,
-          portfolioCode: expandedPortfolio.code,
-          slots: 0,
-          investedAmount: amount,
-          ownershipPercent: percent,
-        },
-        0,
-      )
+      await createAllocation({
+        investorUid: investor.uid,
+        investorName: investor.displayName,
+        investorEmail: investor.email,
+        portfolioId: expandedPortfolio.id,
+        portfolioName: expandedPortfolio.name,
+        portfolioCode: expandedPortfolio.code,
+        investedAmount: amount,
+        ownershipPercent: percent,
+      })
       toast.success(`${investor.displayName} ditambahkan`)
       const allocs = await getAllocationsForPortfolio(expandedPortfolio.id)
       setAllocations(allocs)
@@ -275,7 +271,6 @@ export default function AdminPortfolios() {
         alloc.id,
         { investedAmount: amount, ownershipPercent: percent },
         expandedPortfolio.id,
-        0,
       )
       toast.success('Alokasi berhasil diperbarui')
       const allocs = await getAllocationsForPortfolio(expandedPortfolio.id)
@@ -292,7 +287,7 @@ export default function AdminPortfolios() {
     if (!window.confirm(`Hapus alokasi ${alloc.investorName}?`)) return
 
     try {
-      await deleteAllocation(alloc.id, expandedPortfolio.id, 0)
+      await deleteAllocation(alloc.id, expandedPortfolio.id)
       toast.success('Alokasi berhasil dihapus')
       const allocs = await getAllocationsForPortfolio(expandedPortfolio.id)
       setAllocations(allocs)

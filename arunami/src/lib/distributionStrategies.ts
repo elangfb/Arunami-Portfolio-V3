@@ -2,7 +2,7 @@ import { Parser } from 'expr-eval'
 import type {
   ReturnModelType, InvestorConfigUnion, InvestorAllocation, Portfolio,
   FixedYieldConfig, RevenueShareConfig, FixedScheduleConfig,
-  AnnualDividendConfig, CustomConfig, SlotBasedConfig,
+  AnnualDividendConfig, CustomConfig,
 } from '@/types'
 
 // ─── Core Interfaces ──────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ export interface DistributionStrategy {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function ownershipFraction(allocation: InvestorAllocation, portfolio: Portfolio): number {
+export function ownershipFraction(allocation: InvestorAllocation, portfolio: Portfolio): number {
   if (allocation.ownershipPercent != null) return allocation.ownershipPercent / 100
   if (portfolio.investasiAwal > 0) return allocation.investedAmount / portfolio.investasiAwal
   return 0
@@ -101,51 +101,6 @@ const netProfitShareStrategy: DistributionStrategy = {
         grossPerInvestor,
         arunamiFee,
         ownership: ownership * 100,
-        perInvestor,
-      },
-      label: this.displayName,
-    }
-  },
-}
-
-const slotBasedStrategy: DistributionStrategy = {
-  displayName: 'Slot-Based',
-  description: 'Bagi hasil berdasarkan jumlah slot kepemilikan investor.',
-  requiredReportFields: ['netProfit'],
-
-  calculate(input) {
-    const { reportData, config, allocation } = input
-    if (!reportData) return emptyResult(this.displayName)
-    const c = config as SlotBasedConfig
-    const isFeeExempt = input.isArunamiTeam === true
-
-    const netProfit = reportData.netProfit
-    const investorPool = netProfit * (c.investorSharePercent / 100)
-
-    const totalSlots = c.totalSlots || 1
-    const investorSlots = allocation.slots || 0
-    const grossPerInvestor = investorPool * (investorSlots / totalSlots)
-    const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * (c.arunamiFeePercent / 100)
-    const perInvestor = grossPerInvestor - arunamiFee
-
-    const invested = investorSlots * (c.nominalPerSlot || 0)
-    const monthlyROI = invested > 0 ? (perInvestor / invested) * 100 : 0
-
-    return {
-      totalDistribution: investorPool,
-      perInvestorAmount: perInvestor,
-      grossInvestorAmount: grossPerInvestor,
-      arunamiFeeAmount: arunamiFee,
-      isFeeExempt,
-      roiPercent: monthlyROI,
-      annualRoiPercent: monthlyROI * 12,
-      breakdown: {
-        netProfit,
-        investorPool,
-        grossPerInvestor,
-        arunamiFee,
-        slots: investorSlots,
-        totalSlots,
         perInvestor,
       },
       label: this.displayName,
@@ -439,7 +394,6 @@ const customStrategy: DistributionStrategy = {
 export const DISTRIBUTION_STRATEGIES: Record<ReturnModelType, DistributionStrategy> = {
   net_profit_share: netProfitShareStrategy,
   percentage_based: netProfitShareStrategy,
-  slot_based: slotBasedStrategy,
   fixed_return: fixedReturnStrategy,
   fixed_yield: fixedYieldStrategy,
   revenue_share: revenueShareStrategy,

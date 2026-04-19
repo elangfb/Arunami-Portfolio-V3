@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
-import { Search, Eye, Users, Wallet, Layers } from 'lucide-react'
+import { Search, Eye, Users, Wallet } from 'lucide-react'
 import type { InvestorAllocation, InvestorSummary } from '@/types'
 
 export default function AdminInvestors() {
@@ -33,7 +33,6 @@ export default function AdminInvestors() {
           user,
           allocations: allocs,
           totalInvested: allocs.reduce((s, a) => s + a.investedAmount, 0),
-          totalSlots: allocs.reduce((s, a) => s + a.slots, 0),
           portfolioCount: allocs.length,
         }
       })
@@ -50,7 +49,6 @@ export default function AdminInvestors() {
 
   const totalInvestors = summaries.length
   const totalInvested = summaries.reduce((s, i) => s + i.totalInvested, 0)
-  const totalSlots = summaries.reduce((s, i) => s + i.totalSlots, 0)
 
   return (
     <div className="p-8">
@@ -71,7 +69,7 @@ export default function AdminInvestors() {
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-3 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 py-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1e5f3f]/10">
@@ -91,17 +89,6 @@ export default function AdminInvestors() {
             <div>
               <p className="text-sm text-muted-foreground">Total Investasi</p>
               <p className="text-xl font-bold">{formatCurrencyCompact(totalInvested)}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1e5f3f]/10">
-              <Layers className="h-5 w-5 text-[#1e5f3f]" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Slot Teralokasi</p>
-              <p className="text-xl font-bold">{totalSlots}</p>
             </div>
           </CardContent>
         </Card>
@@ -130,7 +117,6 @@ export default function AdminInvestors() {
                   <tr>
                     <th className="text-left py-2.5 px-3 font-medium">Nama</th>
                     <th className="text-left py-2.5 px-3 font-medium">Portofolio Aktif</th>
-                    <th className="text-center py-2.5 px-3 font-medium">Total Slot</th>
                     <th className="text-right py-2.5 px-3 font-medium">Total Investasi</th>
                     <th className="text-right py-2.5 px-3 font-medium w-28">Aksi</th>
                   </tr>
@@ -156,14 +142,11 @@ export default function AdminInvestors() {
                           <div className="flex flex-wrap gap-1">
                             {s.allocations.map(a => (
                               <Badge key={a.id} variant="outline" className="text-xs">
-                                {a.portfolioCode} ({a.slots})
+                                {a.portfolioCode}
                               </Badge>
                             ))}
                           </div>
                         )}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <Badge variant="secondary">{s.totalSlots}</Badge>
                       </td>
                       <td className="py-2.5 px-3 text-right font-medium">
                         {formatCurrencyCompact(s.totalInvested)}

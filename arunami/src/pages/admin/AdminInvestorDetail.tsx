@@ -3,20 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getUser, getAllocationsForInvestor, getPortfolioConfig, getFinancialData,
-  getCommunicationsForInvestor, updateAllocation, getPortfolio,
+  getCommunicationsForInvestor, getPortfolio,
 } from '@/lib/firestore'
-import { calculateDistribution } from '@/lib/distributionStrategies'
+import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
 import { formatPeriod } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, Pencil, FileText, Search } from 'lucide-react'
+import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, FileText, Search } from 'lucide-react'
 import InvestorReportGenerator from './components/InvestorReportGenerator'
 import type {
   AppUser, InvestorAllocation, FinancialData as FinancialDataType,
-  PortfolioConfig, SlotBasedConfig, InvestorCommunication, Portfolio,
+  PortfolioConfig, InvestorCommunication, Portfolio,
 } from '@/types'
 
 interface PortfolioEnriched {
@@ -38,10 +38,6 @@ export default function AdminInvestorDetail() {
   const [portfolios, setPortfolios] = useState<PortfolioEnriched[]>([])
   const [communications, setCommunications] = useState<InvestorCommunication[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Inline edit
-  const [editAllocId, setEditAllocId] = useState<string | null>(null)
-  const [editSlots, setEditSlots] = useState(1)
 
   // Report dialog
   const [reportOpen, setReportOpen] = useState(false)
@@ -121,30 +117,6 @@ export default function AdminInvestorDetail() {
   const avgROI = portfolios.length > 0
     ? portfolios.reduce((s, p) => s + p.monthlyROI, 0) / portfolios.length
     : 0
-
-  const handleUpdateSlots = async (p: PortfolioEnriched) => {
-    if (!p.config?.investorConfig || p.config.investorConfig.type !== 'slot_based') return
-    const sc = p.config.investorConfig as SlotBasedConfig
-
-    if (editSlots <= 0 || editSlots > sc.totalSlots) {
-      toast.error(`Slot tidak valid. Maksimal ${sc.totalSlots} slot.`)
-      return
-    }
-
-    try {
-      await updateAllocation(
-        p.allocation.id,
-        { slots: editSlots, investedAmount: editSlots * sc.nominalPerSlot },
-        p.allocation.portfolioId,
-        sc.totalSlots,
-      )
-      toast.success('Alokasi berhasil diperbarui')
-      setEditAllocId(null)
-      loadData()
-    } catch {
-      toast.error('Gagal memperbarui alokasi')
-    }
-  }
 
   if (loading) {
     return (
@@ -273,18 +245,17 @@ export default function AdminInvestorDetail() {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left py-2.5 px-3 font-medium">Portofolio</th>
-                    <th className="text-center py-2.5 px-3 font-medium">Slot</th>
+                    <th className="text-right py-2.5 px-3 font-medium">Kepemilikan</th>
                     <th className="text-right py-2.5 px-3 font-medium">Investasi</th>
                     <th className="text-right py-2.5 px-3 font-medium">Earning Terakhir</th>
                     <th className="text-right py-2.5 px-3 font-medium">ROI Bulanan</th>
-                    <th className="text-right py-2.5 px-3 font-medium w-28">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {portfolios.map(p => {
-                    const sc = p.config?.investorConfig?.type === 'slot_based'
-                      ? (p.config.investorConfig as SlotBasedConfig)
-                      : null
+                    const ownershipPct = p.portfolio
+                      ? ownershipFraction(p.allocation, p.portfolio) * 100
+                      : (p.allocation.ownershipPercent ?? 0)
 
                     return (
                       <tr key={p.allocation.id} className="hover:bg-muted/30">
@@ -292,52 +263,17 @@ export default function AdminInvestorDetail() {
                           <p className="font-medium">{p.allocation.portfolioName}</p>
                           <p className="text-xs text-muted-foreground">{p.allocation.portfolioCode}</p>
                         </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {editAllocId === p.allocation.id ? (
-                            <Input
-                              type="number"
-                              min={1}
-                              max={sc?.totalSlots ?? 100}
-                              value={editSlots}
-                              onChange={e => setEditSlots(Number(e.target.value))}
-                              className="w-20 mx-auto h-8 text-center"
-                            />
-                          ) : (
-                            <Badge variant="secondary">{p.allocation.slots}</Badge>
-                          )}
+                        <td className="py-2.5 px-3 text-right">
+                          {formatPercent(ownershipPct)}
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          {editAllocId === p.allocation.id && sc
-                            ? formatCurrencyCompact(editSlots * sc.nominalPerSlot)
-                            : formatCurrencyCompact(p.allocation.investedAmount)
-                          }
+                          {formatCurrencyCompact(p.allocation.investedAmount)}
                         </td>
                         <td className="py-2.5 px-3 text-right font-medium">
                           {formatCurrencyExact(p.earnings)}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           {formatPercent(p.monthlyROI)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          {editAllocId === p.allocation.id ? (
-                            <div className="flex justify-end gap-1">
-                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditAllocId(null)}>
-                                Batal
-                              </Button>
-                              <Button size="sm" className="h-7 text-xs" onClick={() => handleUpdateSlots(p)}>
-                                Simpan
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              onClick={() => { setEditAllocId(p.allocation.id); setEditSlots(p.allocation.slots) }}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          )}
                         </td>
                       </tr>
                     )
@@ -346,13 +282,10 @@ export default function AdminInvestorDetail() {
                 <tfoot>
                   <tr className="bg-muted/30 font-medium">
                     <td className="py-2.5 px-3">Total</td>
-                    <td className="py-2.5 px-3 text-center">
-                      {portfolios.reduce((s, p) => s + p.allocation.slots, 0)}
-                    </td>
+                    <td></td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(totalInvested)}</td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalEarnings)}</td>
                     <td className="py-2.5 px-3 text-right">{formatPercent(avgROI)}</td>
-                    <td></td>
                   </tr>
                 </tfoot>
               </table>

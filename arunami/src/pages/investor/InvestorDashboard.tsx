@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
 import { getInvestorPortfolios, getAllocationsForInvestor } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
-import { formatCurrencyCompact } from '@/lib/utils'
+import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
+import { ownershipFraction } from '@/lib/distributionStrategies'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -93,9 +94,9 @@ export default function InvestorDashboard() {
                       </div>
                       {alloc && (
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Slot Saya</span>
+                          <span className="text-muted-foreground">Kepemilikan</span>
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary">{alloc.slots} slot</Badge>
+                            <Badge variant="secondary">{formatPercent(ownershipFraction(alloc, p) * 100)}</Badge>
                             <span className="font-medium text-xs">{formatCurrencyCompact(alloc.investedAmount)}</span>
                           </div>
                         </div>

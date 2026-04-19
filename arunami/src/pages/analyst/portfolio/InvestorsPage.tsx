@@ -60,7 +60,7 @@ export default function InvestorsPage() {
     const mockAlloc: InvestorAllocation = {
       id: '_summary', investorUid: '', investorName: '', investorEmail: '',
       portfolioId: portfolioId ?? '', portfolioName: portfolio.name, portfolioCode: portfolio.code,
-      slots: 0, investedAmount: totalInvestment, ownershipPercent: 100,
+      investedAmount: totalInvestment, ownershipPercent: 100,
       joinedAt: null as any, updatedAt: null as any,
     }
     const latestRev = [...data.revenueData].reverse().find(r => r.aktual > 0)

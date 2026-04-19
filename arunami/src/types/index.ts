@@ -8,7 +8,6 @@ export type UserRole = 'admin' | 'analyst' | 'investor'
 
 export type IndustryType = 'retail' | 'saas' | 'fnb' | 'jasa' | 'manufaktur' | 'lainnya'
 export type ReturnModelType =
-  | 'slot_based'          // legacy
   | 'percentage_based'    // legacy alias → treated as net_profit_share
   | 'fixed_return'        // legacy
   | 'net_profit_share'
@@ -35,12 +34,6 @@ export interface KpiMetric {
 export interface InvestorConfigBase {
   investorSharePercent: number
   arunamiFeePercent: number
-}
-
-export interface SlotBasedConfig extends InvestorConfigBase {
-  type: 'slot_based'
-  totalSlots: number
-  nominalPerSlot: number
 }
 
 export interface PercentageBasedConfig extends InvestorConfigBase {
@@ -123,7 +116,6 @@ export interface CustomConfig extends InvestorConfigBase {
 }
 
 export type InvestorConfigUnion =
-  | SlotBasedConfig
   | PercentageBasedConfig
   | FixedReturnConfig
   | NetProfitShareConfig
@@ -190,7 +182,6 @@ export interface Portfolio {
   isGracePeriod: boolean
   assignedInvestors: string[]
   assignedAnalysts: string[]
-  slotsSummary?: SlotsSummary
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -240,8 +231,6 @@ export interface RadarDataPoint {
 
 export interface InvestorConfig {
   returnModel?: ReturnModelType
-  totalSlots?: number
-  nominalPerSlot?: number
   investorSharePercent: number
   arunamiFeePercent: number
 }
@@ -529,18 +518,11 @@ export interface InvestorAllocation {
   portfolioId: string
   portfolioName: string
   portfolioCode: string
-  slots: number
   investedAmount: number
   ownershipPercent?: number
   isManual?: boolean
   joinedAt: Timestamp
   updatedAt: Timestamp
-}
-
-export interface SlotsSummary {
-  totalSlots: number
-  allocatedSlots: number
-  investorCount: number
 }
 
 // ─── Transfer Proof ───────────────────────────────────────────────────────
@@ -578,7 +560,6 @@ export interface InvestorSummary {
   user: AppUser
   allocations: InvestorAllocation[]
   totalInvested: number
-  totalSlots: number
   portfolioCount: number
 }
 

@@ -51,7 +51,6 @@ export default function CustomVariableInput({ portfolio, portfolioId, config, on
       portfolioId,
       portfolioName: portfolio.name,
       portfolioCode: portfolio.code,
-      slots: 1,
       investedAmount: portfolio.investasiAwal,
       joinedAt: null as any,
       updatedAt: null as any,

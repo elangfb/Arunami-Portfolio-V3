@@ -30,7 +30,6 @@ interface Props {
 interface ReportLine {
   portfolioName: string
   portfolioCode: string
-  slots: number
   invested: number
   netProfit: number
   earnings: number
@@ -91,7 +90,6 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
       return {
         portfolioName: allocation.portfolioName,
         portfolioCode: allocation.portfolioCode,
-        slots: allocation.slots,
         invested: allocation.investedAmount,
         netProfit,
         earnings,
@@ -110,7 +108,6 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
 
     for (const line of reportLines) {
       text += `📊 ${line.portfolioName} (${line.portfolioCode})\n`
-      text += `   Slot: ${line.slots}\n`
       text += `   Investasi: ${formatCurrencyExact(line.invested)}\n`
       text += `   Net Profit: ${formatCurrencyExact(line.netProfit)}\n`
       text += `   Earning Anda: ${formatCurrencyExact(line.earnings)}\n`
@@ -180,7 +177,6 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
             <thead>
               <tr>
                 <th>Portofolio</th>
-                <th class="text-right">Slot</th>
                 <th class="text-right">Investasi</th>
                 <th class="text-right">Net Profit</th>
                 <th class="text-right">Earning</th>
@@ -191,7 +187,6 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
               ${reportLines.map(l => `
                 <tr>
                   <td>${l.portfolioName} (${l.portfolioCode})</td>
-                  <td class="text-right">${l.slots}</td>
                   <td class="text-right">${formatCurrencyExact(l.invested)}</td>
                   <td class="text-right">${formatCurrencyExact(l.netProfit)}</td>
                   <td class="text-right">${formatCurrencyExact(l.earnings)}</td>
@@ -199,7 +194,7 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
                 </tr>
               `).join('')}
               <tr class="total-row">
-                <td colspan="3">Total</td>
+                <td colspan="2">Total</td>
                 <td class="text-right"></td>
                 <td class="text-right">${formatCurrencyExact(totalEarnings)}</td>
                 <td></td>
@@ -302,7 +297,6 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="text-left py-2 px-3 font-medium">Portofolio</th>
-                        <th className="text-center py-2 px-3 font-medium">Slot</th>
                         <th className="text-right py-2 px-3 font-medium">Net Profit</th>
                         <th className="text-right py-2 px-3 font-medium">Earning</th>
                         <th className="text-right py-2 px-3 font-medium">ROI</th>
@@ -315,7 +309,6 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
                             <p className="font-medium">{line.portfolioName}</p>
                             <p className="text-xs text-muted-foreground">{line.portfolioCode}</p>
                           </td>
-                          <td className="py-2 px-3 text-center">{line.slots}</td>
                           <td className="py-2 px-3 text-right">{formatCurrencyExact(line.netProfit)}</td>
                           <td className="py-2 px-3 text-right font-medium">{formatCurrencyExact(line.earnings)}</td>
                           <td className="py-2 px-3 text-right">{formatPercent(line.monthlyROI)}</td>
@@ -324,7 +317,7 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
                     </tbody>
                     <tfoot>
                       <tr className="bg-muted/30 font-medium">
-                        <td className="py-2 px-3" colSpan={3}>Total</td>
+                        <td className="py-2 px-3" colSpan={2}>Total</td>
                         <td className="py-2 px-3 text-right">{formatCurrencyExact(totalEarnings)}</td>
                         <td className="py-2 px-3 text-right"></td>
                       </tr>
