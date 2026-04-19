@@ -21,13 +21,14 @@ import {
   unionCategories,
 } from '@/lib/customCategories'
 import {
-  applyOrderToCategories,
-  applyOrderToNames,
-  moveInOrder,
+  resolveBodyOrder,
+  moveInBody,
+  applySubItemOrder,
+  moveSubItemInCategory,
   setSubItemOrder,
   type MoveDirection,
 } from '@/lib/rowOrder'
-import { CustomCategoryRows } from '@/components/CustomCategoryRows'
+import { CustomCategoryBlock } from '@/components/CustomCategoryBlock'
 import { AddCustomCategoryDialog } from '@/components/AddCustomCategoryDialog'
 
 interface Props {
@@ -96,17 +97,17 @@ export function PnLReviewTable({
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
 
   const rawOpexNames = [...new Set(months.flatMap(m => (m.opex ?? []).map(o => o.name)))]
-  const opexNames = applyOrderToNames(rawOpexNames, rowOrder?.opex)
+  const rawCategories = unionCategories(months.map(m => m.customCategories))
+  const categoryIds = rawCategories.map(c => c.id)
+  const bodyOrder = resolveBodyOrder(rawOpexNames, categoryIds, rowOrder)
+  const catById = new Map(rawCategories.map(c => [c.id, c]))
 
-  const rowsBeforeCustom: RowDef[] = [
+  const rowsBeforeBody: RowDef[] = [
     { label: 'Revenue', key: 'revenue', isBold: true },
     { label: 'COGS', key: 'cogs', className: 'text-red-600' },
     { label: 'Gross Profit', key: 'grossProfit', isBold: true, className: 'text-green-700', readOnly: true },
-    ...opexNames.map(n => ({
-      label: n,
-      key: `opex:${n}`,
-      className: 'text-muted-foreground text-xs',
-    })),
+  ]
+  const rowsAfterBody: RowDef[] = [
     { label: 'Total Opex', key: 'totalOpex', className: 'text-red-600 font-medium', readOnly: true },
     { label: 'Operating Profit', key: 'operatingProfit', isBold: true, readOnly: true },
     { label: 'Interest', key: 'interest', className: 'text-red-600' },
@@ -115,13 +116,6 @@ export function PnLReviewTable({
   const netProfitRow: RowDef = {
     label: 'Net Profit', key: 'netProfit', isBold: true, readOnly: true,
   }
-
-  const rawCustomCategories = unionCategories(months.map(m => m.customCategories))
-  const customCategories = applyOrderToCategories(
-    rawCustomCategories,
-    rowOrder?.customCategories,
-    rowOrder?.customSubItems,
-  )
 
   const getTotal = (key: string): number =>
     months.reduce((sum, m) => sum + getCellValue(m, key), 0)
@@ -136,7 +130,6 @@ export function PnLReviewTable({
   const handleAddOpex = () => {
     const name = window.prompt('Nama item opex baru:')
     if (!name?.trim()) return
-    // Add to ALL months with amount 0
     const nextMonths = months.map(m => {
       const exists = (m.opex ?? []).some(o => o.name === name.trim())
       if (exists) return m
@@ -146,7 +139,6 @@ export function PnLReviewTable({
   }
 
   const handleRemoveOpex = (opexName: string) => {
-    // Remove from ALL months
     const nextMonths = months.map(m =>
       recalculate({ ...m, opex: (m.opex ?? []).filter(o => o.name !== opexName) })
     )
@@ -155,23 +147,22 @@ export function PnLReviewTable({
 
   const handleMoveOpex = (opexName: string, direction: MoveDirection) => {
     if (!onRowOrderChange) return
-    const next = moveInOrder(rowOrder?.opex, rawOpexNames, opexName, direction)
-    onRowOrderChange({ ...(rowOrder ?? {}), opex: next })
+    const next = moveInBody(rowOrder, rawOpexNames, categoryIds, { type: 'opex', id: opexName }, direction)
+    onRowOrderChange({ ...(rowOrder ?? {}), body: next })
   }
 
   const handleMoveCategory = (catId: string, direction: MoveDirection) => {
     if (!onRowOrderChange) return
-    const availableIds = rawCustomCategories.map(c => c.id)
-    const next = moveInOrder(rowOrder?.customCategories, availableIds, catId, direction)
-    onRowOrderChange({ ...(rowOrder ?? {}), customCategories: next })
+    const next = moveInBody(rowOrder, rawOpexNames, categoryIds, { type: 'cat', id: catId }, direction)
+    onRowOrderChange({ ...(rowOrder ?? {}), body: next })
   }
 
   const handleMoveSubItem = (catId: string, subId: string, direction: MoveDirection) => {
     if (!onRowOrderChange) return
-    const cat = rawCustomCategories.find(c => c.id === catId)
+    const cat = catById.get(catId)
     if (!cat) return
     const availableIds = cat.subItems.map(s => s.id)
-    const next = moveInOrder(rowOrder?.customSubItems?.[catId], availableIds, subId, direction)
+    const next = moveSubItemInCategory(rowOrder?.customSubItems?.[catId], availableIds, subId, direction)
     onRowOrderChange(setSubItemOrder(rowOrder, catId, next))
   }
 
@@ -186,7 +177,7 @@ export function PnLReviewTable({
   }
 
   const handleAddSubItem = (catId: string) => {
-    const catName = customCategories.find(c => c.id === catId)?.name ?? 'Kategori'
+    const catName = catById.get(catId)?.name ?? 'Kategori'
     const name = window.prompt(`Nama sub-kategori baru untuk "${catName}":`)
     if (!name?.trim()) return
     const { months: nextMonths } = addSubItemAcrossMonths(months, catId, name)
@@ -242,6 +233,43 @@ export function PnLReviewTable({
     })
   }
 
+  const renderStandardRow = (row: RowDef) => {
+    const total = getTotal(row.key)
+    return (
+      <tr key={row.key} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
+        <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.isBold ? 'font-semibold bg-muted/20' : ''}`}>
+          {row.label}
+        </td>
+        {months.map((m, monthIdx) => {
+          const val = getCellValue(m, row.key)
+          return (
+            <td key={m.month} className="px-2 py-1 text-right whitespace-nowrap">
+              {row.readOnly ? (
+                <div className="h-8 flex items-center justify-end px-3 text-sm tabular-nums">
+                  {val.toLocaleString('id-ID')}
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  value={val}
+                  onChange={e => handleCellChange(monthIdx, row.key, Number(e.target.value) || 0)}
+                  className="h-8 text-right text-xs tabular-nums"
+                />
+              )}
+            </td>
+          )
+        })}
+        {months.length > 1 && (
+          <td className={`px-4 py-2 text-right whitespace-nowrap tabular-nums border-l font-semibold ${
+            row.className?.replace('text-xs', '') ?? ''
+          }`}>
+            {total.toLocaleString('id-ID')}
+          </td>
+        )}
+      </tr>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -278,41 +306,44 @@ export function PnLReviewTable({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rowsBeforeCustom.map(row => {
-                const total = getTotal(row.key)
-                const isOpexRow = row.key.startsWith('opex:')
-                const opexName = isOpexRow ? row.key.slice(5) : ''
-                const opexIdx = isOpexRow ? opexNames.indexOf(opexName) : -1
-                const isFirstOpex = opexIdx === 0
-                const isLastOpex = opexIdx === opexNames.length - 1
-                return (
-                  <tr key={row.key} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
-                    <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.isBold ? 'font-semibold bg-muted/20' : ''} ${row.className?.includes('text-xs') ? 'pl-8' : ''}`}>
-                      <div className="flex items-center gap-1">
-                        {isOpexRow && onRowOrderChange && (
-                          <div className="flex flex-col shrink-0">
-                            <button
-                              type="button"
-                              disabled={isFirstOpex}
-                              onClick={() => handleMoveOpex(opexName, 'up')}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-                              title="Pindah ke atas"
-                            >
-                              <ChevronUp className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isLastOpex}
-                              onClick={() => handleMoveOpex(opexName, 'down')}
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-                              title="Pindah ke bawah"
-                            >
-                              <ChevronDown className="h-3 w-3" />
-                            </button>
-                          </div>
-                        )}
-                        <span className="flex-1">{row.label}</span>
-                        {isOpexRow && (
+              {rowsBeforeBody.map(renderStandardRow)}
+
+              {/* Interleaved body zone: opex items + custom category blocks */}
+              {bodyOrder.map((entry, bodyIdx) => {
+                const isFirstInBody = bodyIdx === 0
+                const isLastInBody = bodyIdx === bodyOrder.length - 1
+
+                if (entry.type === 'opex') {
+                  const opexName = entry.id
+                  const key = `opex:${opexName}`
+                  const total = getTotal(key)
+                  return (
+                    <tr key={`body-opex-${opexName}`} className="hover:bg-muted/10">
+                      <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r pl-8 text-muted-foreground text-xs">
+                        <div className="flex items-center gap-1">
+                          {onRowOrderChange && (
+                            <div className="flex flex-col shrink-0">
+                              <button
+                                type="button"
+                                disabled={isFirstInBody}
+                                onClick={() => handleMoveOpex(opexName, 'up')}
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                                title="Pindah ke atas"
+                              >
+                                <ChevronUp className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isLastInBody}
+                                onClick={() => handleMoveOpex(opexName, 'down')}
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                                title="Pindah ke bawah"
+                              >
+                                <ChevronDown className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+                          <span className="flex-1">{opexName}</span>
                           <Button
                             type="button"
                             size="icon"
@@ -322,57 +353,59 @@ export function PnLReviewTable({
                           >
                             <X className="h-3 w-3" />
                           </Button>
-                        )}
-                      </div>
-                    </td>
-                    {months.map((m, monthIdx) => {
-                      const val = getCellValue(m, row.key)
-                      return (
-                        <td key={m.month} className="px-2 py-1 text-right whitespace-nowrap">
-                          {row.readOnly ? (
-                            <div className="h-8 flex items-center justify-end px-3 text-sm tabular-nums">
-                              {val.toLocaleString('id-ID')}
-                            </div>
-                          ) : (
+                        </div>
+                      </td>
+                      {months.map((m, monthIdx) => {
+                        const val = getCellValue(m, key)
+                        return (
+                          <td key={m.month} className="px-2 py-1 text-right whitespace-nowrap">
                             <Input
                               type="number"
                               value={val}
-                              onChange={e => handleCellChange(monthIdx, row.key, Number(e.target.value) || 0)}
+                              onChange={e => handleCellChange(monthIdx, key, Number(e.target.value) || 0)}
                               className="h-8 text-right text-xs tabular-nums"
                             />
-                          )}
+                          </td>
+                        )
+                      })}
+                      {months.length > 1 && (
+                        <td className="px-4 py-2 text-right whitespace-nowrap tabular-nums border-l font-semibold text-muted-foreground">
+                          {total.toLocaleString('id-ID')}
                         </td>
-                      )
-                    })}
-                    {months.length > 1 && (
-                      <td className={`px-4 py-2 text-right whitespace-nowrap tabular-nums border-l font-semibold ${
-                        row.className?.replace('text-xs', '') ?? ''
-                      }`}>
-                        {total.toLocaleString('id-ID')}
-                      </td>
-                    )}
-                  </tr>
+                      )}
+                    </tr>
+                  )
+                }
+
+                const cat = catById.get(entry.id)
+                if (!cat) return null
+                const ordered = applySubItemOrder(cat, rowOrder?.customSubItems?.[cat.id])
+                return (
+                  <CustomCategoryBlock
+                    key={`body-cat-${cat.id}`}
+                    category={ordered}
+                    columns={months.map(m => ({ key: m.month, editable: true }))}
+                    showGrandTotal={months.length > 1}
+                    getAmount={(monthKey, catId, subId) => {
+                      const m = months.find(mm => mm.month === monthKey)
+                      const c = m?.customCategories?.find(cc => cc.id === catId)
+                      return c?.subItems.find(s => s.id === subId)?.amount ?? 0
+                    }}
+                    onAmountChange={handleCustomAmountChange}
+                    onRemoveCategory={handleRemoveCategory}
+                    onAddSubItem={handleAddSubItem}
+                    onRemoveSubItem={handleRemoveSubItem}
+                    onMoveCategory={onRowOrderChange ? handleMoveCategory : undefined}
+                    isFirstInBody={isFirstInBody}
+                    isLastInBody={isLastInBody}
+                    onMoveSubItem={onRowOrderChange ? handleMoveSubItem : undefined}
+                  />
                 )
               })}
 
-              <CustomCategoryRows
-                categories={customCategories}
-                columns={months.map(m => ({ key: m.month, editable: true }))}
-                showGrandTotal={months.length > 1}
-                getAmount={(monthKey, catId, subId) => {
-                  const m = months.find(mm => mm.month === monthKey)
-                  const cat = m?.customCategories?.find(c => c.id === catId)
-                  return cat?.subItems.find(s => s.id === subId)?.amount ?? 0
-                }}
-                onAmountChange={handleCustomAmountChange}
-                onRemoveCategory={handleRemoveCategory}
-                onAddSubItem={handleAddSubItem}
-                onRemoveSubItem={handleRemoveSubItem}
-                onMoveCategory={onRowOrderChange ? handleMoveCategory : undefined}
-                onMoveSubItem={onRowOrderChange ? handleMoveSubItem : undefined}
-              />
+              {rowsAfterBody.map(renderStandardRow)}
 
-              {/* Net Profit row (rendered last so custom categories sit above it) */}
+              {/* Net Profit row */}
               <tr className="bg-muted/20">
                 <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
                   {netProfitRow.label}
@@ -498,7 +531,7 @@ export function PnLReviewTable({
         open={addCategoryOpen}
         onOpenChange={setAddCategoryOpen}
         onSubmit={handleAddCategory}
-        existingNames={customCategories.map(c => c.name)}
+        existingNames={rawCategories.map(c => c.name)}
       />
     </div>
   )

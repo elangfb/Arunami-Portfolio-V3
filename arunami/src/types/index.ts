@@ -134,9 +134,18 @@ export type InvestorConfigUnion =
   | CustomConfig
 
 export interface RowOrder {
-  opex?: string[]
-  customCategories?: string[]
+  /**
+   * Unified order for the movable body zone (between Gross Profit and
+   * Total Opex). Each entry is either `opex:<name>` for an opex line item
+   * or `cat:<id>` for a custom category block.
+   */
+  body?: string[]
+  /** Per-category sub-item order (keyed by category id). */
   customSubItems?: Record<string, string[]>
+  /** @deprecated — superseded by `body`. Preserved for backwards read. */
+  opex?: string[]
+  /** @deprecated — superseded by `body`. Preserved for backwards read. */
+  customCategories?: string[]
 }
 
 export interface PortfolioConfig {

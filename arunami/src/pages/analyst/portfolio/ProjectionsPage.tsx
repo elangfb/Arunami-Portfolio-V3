@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check, ChevronUp, ChevronDown } from 'lucide-react'
 import { ProjectionReviewTable } from '@/components/ProjectionReviewTable'
-import { CustomCategoryRows } from '@/components/CustomCategoryRows'
+import { CustomCategoryBlock } from '@/components/CustomCategoryBlock'
 import { AddCustomCategoryDialog } from '@/components/AddCustomCategoryDialog'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -29,9 +29,10 @@ import {
   removeSubItem as removeSubItemInList,
 } from '@/lib/customCategories'
 import {
-  applyOrderToCategories,
-  applyOrderToNames,
-  moveInOrder,
+  resolveBodyOrder,
+  moveInBody,
+  applySubItemOrder,
+  moveSubItemInCategory,
   setSubItemOrder,
   type MoveDirection,
 } from '@/lib/rowOrder'
@@ -521,7 +522,6 @@ export default function ProjectionsPage() {
                 return (d.projectedOpex ?? []).map(o => o.name)
               }))]
               const rowOrder = portfolioConfig?.projectionRowOrder
-              const opexNames = applyOrderToNames(rawOpexNames, rowOrder?.opex)
               const getCell = (r: PortfolioReport, key: string): number => {
                 const d = r.extractedData as ProjectionExtractedData
                 if (key.startsWith('opex:')) {
@@ -530,11 +530,12 @@ export default function ProjectionsPage() {
                 }
                 return (d[key as keyof ProjectionExtractedData] as number) ?? 0
               }
-              const rowsBeforeCustom: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
+              const rowsBeforeBody: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
                 { label: 'Projected Revenue', key: 'projectedRevenue', bold: true, editable: true },
                 { label: 'COGS', key: 'projectedCogs', className: 'text-red-600', editable: true },
                 { label: 'Gross Profit', key: 'projectedGrossProfit', bold: true, className: 'text-green-700' },
-                ...opexNames.map(n => ({ label: n, key: `opex:${n}`, className: 'text-xs text-muted-foreground', editable: true })),
+              ]
+              const rowsAfterBody: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
                 { label: 'Total Opex', key: 'projectedTotalOpex', className: 'text-red-600' },
               ]
               const netProfitRow = { label: 'Net Profit', key: 'projectedNetProfit', bold: true }
@@ -543,11 +544,9 @@ export default function ProjectionsPage() {
                 : unionCategories(
                     sorted.map(r => (r.extractedData as ProjectionExtractedData).customCategories),
                   )
-              const displayCategories = applyOrderToCategories(
-                rawDisplayCategories,
-                rowOrder?.customCategories,
-                rowOrder?.customSubItems,
-              )
+              const categoryIds = rawDisplayCategories.map(c => c.id)
+              const bodyOrder = resolveBodyOrder(rawOpexNames, categoryIds, rowOrder)
+              const catById = new Map(rawDisplayCategories.map(c => [c.id, c]))
               const getCustomAmount = (reportId: string, catId: string, subId: string): number => {
                 if (inlineEditId === reportId) {
                   return inlineData[`custom:${catId}:${subId}`] ?? 0
@@ -559,21 +558,46 @@ export default function ProjectionsPage() {
                 return cat?.subItems.find(s => s.id === subId)?.amount ?? 0
               }
               const moveOpex = (opexName: string, direction: MoveDirection) => {
-                const next = moveInOrder(rowOrder?.opex, rawOpexNames, opexName, direction)
-                handleRowOrderChange({ ...(rowOrder ?? {}), opex: next })
+                const next = moveInBody(rowOrder, rawOpexNames, categoryIds, { type: 'opex', id: opexName }, direction)
+                handleRowOrderChange({ ...(rowOrder ?? {}), body: next })
               }
               const moveCategory = (catId: string, direction: MoveDirection) => {
-                const availableIds = rawDisplayCategories.map(c => c.id)
-                const next = moveInOrder(rowOrder?.customCategories, availableIds, catId, direction)
-                handleRowOrderChange({ ...(rowOrder ?? {}), customCategories: next })
+                const next = moveInBody(rowOrder, rawOpexNames, categoryIds, { type: 'cat', id: catId }, direction)
+                handleRowOrderChange({ ...(rowOrder ?? {}), body: next })
               }
               const moveSubItem = (catId: string, subId: string, direction: MoveDirection) => {
-                const cat = rawDisplayCategories.find(c => c.id === catId)
+                const cat = catById.get(catId)
                 if (!cat) return
                 const availableIds = cat.subItems.map(s => s.id)
-                const next = moveInOrder(rowOrder?.customSubItems?.[catId], availableIds, subId, direction)
+                const next = moveSubItemInCategory(rowOrder?.customSubItems?.[catId], availableIds, subId, direction)
                 handleRowOrderChange(setSubItemOrder(rowOrder, catId, next))
               }
+              const renderStandardRow = (row: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }) => (
+                <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
+                  <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''}`}>
+                    {row.label}
+                  </td>
+                  {sorted.map(r => {
+                    const isEditing = inlineEditId === r.id
+                    const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
+                    const colorClass = row.className ?? ''
+                    return (
+                      <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
+                        {isEditing && row.editable ? (
+                          <Input
+                            type="number"
+                            value={inlineData[row.key] ?? 0}
+                            onChange={e => handleInlineChange(row.key, Number(e.target.value) || 0)}
+                            className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        ) : (
+                          formatCurrencyExact(val)
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
               return (
                 <div className="rounded-lg border overflow-hidden">
                   <div className="overflow-x-auto">
@@ -624,21 +648,24 @@ export default function ProjectionsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {rowsBeforeCustom.map(row => {
-                          const isOpexRow = row.key.startsWith('opex:')
-                          const opexName = isOpexRow ? row.key.slice(5) : ''
-                          const opexIdx = isOpexRow ? opexNames.indexOf(opexName) : -1
-                          const isFirstOpex = opexIdx === 0
-                          const isLastOpex = opexIdx === opexNames.length - 1
-                          return (
-                            <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
-                              <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''} ${row.className?.includes('text-xs') ? 'pl-8' : ''}`}>
-                                {isOpexRow ? (
+                        {rowsBeforeBody.map(renderStandardRow)}
+
+                        {/* Interleaved body: opex rows + custom category blocks */}
+                        {bodyOrder.map((entry, bodyIdx) => {
+                          const isFirstInBody = bodyIdx === 0
+                          const isLastInBody = bodyIdx === bodyOrder.length - 1
+
+                          if (entry.type === 'opex') {
+                            const opexName = entry.id
+                            const key = `opex:${opexName}`
+                            return (
+                              <tr key={`body-opex-${opexName}`} className="hover:bg-muted/10">
+                                <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r pl-8 text-xs text-muted-foreground">
                                   <div className="flex items-center gap-1">
                                     <div className="flex flex-col shrink-0">
                                       <button
                                         type="button"
-                                        disabled={isFirstOpex}
+                                        disabled={isFirstInBody}
                                         onClick={() => moveOpex(opexName, 'up')}
                                         className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
                                         title="Pindah ke atas"
@@ -647,7 +674,7 @@ export default function ProjectionsPage() {
                                       </button>
                                       <button
                                         type="button"
-                                        disabled={isLastOpex}
+                                        disabled={isLastInBody}
                                         onClick={() => moveOpex(opexName, 'down')}
                                         className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
                                         title="Pindah ke bawah"
@@ -655,53 +682,60 @@ export default function ProjectionsPage() {
                                         <ChevronDown className="h-3 w-3" />
                                       </button>
                                     </div>
-                                    <span className="flex-1">{row.label}</span>
+                                    <span className="flex-1">{opexName}</span>
                                   </div>
-                                ) : (
-                                  row.label
-                                )}
-                              </td>
-                              {sorted.map(r => {
-                                const isEditing = inlineEditId === r.id
-                                const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
-                                const colorClass = row.className ?? ''
-                                return (
-                                  <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
-                                    {isEditing && row.editable ? (
-                                      <Input
-                                        type="number"
-                                        value={inlineData[row.key] ?? 0}
-                                        onChange={e => handleInlineChange(row.key, Number(e.target.value) || 0)}
-                                        className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                      />
-                                    ) : (
-                                      formatCurrencyExact(val)
-                                    )}
-                                  </td>
-                                )
-                              })}
-                            </tr>
+                                </td>
+                                {sorted.map(r => {
+                                  const isEditing = inlineEditId === r.id
+                                  const val = isEditing ? (inlineData[key] ?? 0) : getCell(r, key)
+                                  return (
+                                    <td key={r.id} className="px-3 py-1.5 text-right whitespace-nowrap tabular-nums text-xs text-muted-foreground">
+                                      {isEditing ? (
+                                        <Input
+                                          type="number"
+                                          value={inlineData[key] ?? 0}
+                                          onChange={e => handleInlineChange(key, Number(e.target.value) || 0)}
+                                          className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
+                                      ) : (
+                                        formatCurrencyExact(val)
+                                      )}
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            )
+                          }
+
+                          const cat = catById.get(entry.id)
+                          if (!cat) return null
+                          const ordered = applySubItemOrder(cat, rowOrder?.customSubItems?.[cat.id])
+                          return (
+                            <CustomCategoryBlock
+                              key={`body-cat-${cat.id}`}
+                              category={ordered}
+                              columns={sorted.map(r => ({
+                                key: r.id,
+                                editable: inlineEditId === r.id,
+                              }))}
+                              showGrandTotal={false}
+                              getAmount={getCustomAmount}
+                              onAmountChange={(columnKey, catId, subId, value) => {
+                                if (inlineEditId !== columnKey) return
+                                handleInlineChange(`custom:${catId}:${subId}`, value)
+                              }}
+                              onRemoveCategory={handleInlineRemoveCategory}
+                              onAddSubItem={handleInlineAddSubItem}
+                              onRemoveSubItem={handleInlineRemoveSubItem}
+                              onMoveCategory={moveCategory}
+                              isFirstInBody={isFirstInBody}
+                              isLastInBody={isLastInBody}
+                              onMoveSubItem={moveSubItem}
+                            />
                           )
                         })}
 
-                        <CustomCategoryRows
-                          categories={displayCategories}
-                          columns={sorted.map(r => ({
-                            key: r.id,
-                            editable: inlineEditId === r.id,
-                          }))}
-                          showGrandTotal={false}
-                          getAmount={getCustomAmount}
-                          onAmountChange={(columnKey, catId, subId, value) => {
-                            if (inlineEditId !== columnKey) return
-                            handleInlineChange(`custom:${catId}:${subId}`, value)
-                          }}
-                          onRemoveCategory={handleInlineRemoveCategory}
-                          onAddSubItem={handleInlineAddSubItem}
-                          onRemoveSubItem={handleInlineRemoveSubItem}
-                          onMoveCategory={moveCategory}
-                          onMoveSubItem={moveSubItem}
-                        />
+                        {rowsAfterBody.map(renderStandardRow)}
 
                         {/* Net Profit row */}
                         <tr className="bg-muted/20">
