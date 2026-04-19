@@ -16,8 +16,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
-import { PlusCircle, Pencil, Trash2, UserPlus, Search, ChevronDown, X } from 'lucide-react'
+import { PlusCircle, Pencil, Trash2, UserPlus, Search, ChevronDown, X, Settings2 } from 'lucide-react'
 import type { Portfolio, InvestorAllocation, AppUser } from '@/types'
+import { useAuthStore } from '@/store/authStore'
+import ChangeReturnModelDialog from '@/pages/analyst/portfolio/profit-sharing/ChangeReturnModelDialog'
 
 const portfolioSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
@@ -33,12 +35,14 @@ type PortfolioFormData = z.infer<typeof portfolioSchema>
 
 export default function AdminPortfolios() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [investors, setInvestors] = useState<AppUser[]>([])
   const [analysts, setAnalysts] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Portfolio | null>(null)
+  const [modelTarget, setModelTarget] = useState<Portfolio | null>(null)
 
   // Single expanded row at a time
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -382,6 +386,16 @@ export default function AdminPortfolios() {
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7"
+                              title="Ubah Model Distribusi"
+                              onClick={e => { e.stopPropagation(); setModelTarget(p) }}
+                            >
+                              <Settings2 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              title="Edit Portofolio"
                               onClick={e => { e.stopPropagation(); openEdit(p) }}
                             >
                               <Pencil className="h-3 w-3" />
@@ -390,6 +404,7 @@ export default function AdminPortfolios() {
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7 text-destructive hover:text-destructive"
+                              title="Hapus Portofolio"
                               onClick={e => { e.stopPropagation(); onDelete(p) }}
                             >
                               <Trash2 className="h-3 w-3" />
@@ -726,6 +741,16 @@ export default function AdminPortfolios() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {modelTarget && (
+        <ChangeReturnModelDialog
+          open={!!modelTarget}
+          onOpenChange={(v) => { if (!v) setModelTarget(null) }}
+          portfolioId={modelTarget.id}
+          currentUser={user ? { uid: user.uid, displayName: user.displayName } : null}
+          onSaved={fetchData}
+        />
+      )}
     </div>
   )
 }

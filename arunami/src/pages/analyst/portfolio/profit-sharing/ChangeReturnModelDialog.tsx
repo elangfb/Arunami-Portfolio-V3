@@ -10,8 +10,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { formatPeriod } from '@/lib/dateUtils'
-import { recordConfigChange } from '@/lib/firestore'
+import { formatPeriod, getNextReportingPeriod } from '@/lib/dateUtils'
+import { getPortfolioConfig, recordConfigChange } from '@/lib/firestore'
 import { ModelPicker } from '@/pages/admin/setup/StepInvestorModel'
 import {
   buildInvestorConfig,
@@ -100,16 +100,16 @@ interface Props {
   onOpenChange: (v: boolean) => void
   portfolioId: string
   currentUser: SectionUser | null
-  currentConfig: PortfolioConfig
-  nextPeriod: string
   onSaved: () => Promise<void> | void
 }
 
 export default function ChangeReturnModelDialog({
-  open, onOpenChange, portfolioId, currentUser, currentConfig, nextPeriod, onSaved,
+  open, onOpenChange, portfolioId, currentUser, onSaved,
 }: Props) {
   const [reasonText, setReasonText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [currentConfig, setCurrentConfig] = useState<PortfolioConfig | null>(null)
+  const [loadingConfig, setLoadingConfig] = useState(false)
 
   const form = useForm<DialogFormData>({
     resolver: zodResolver(dialogSchema) as never,
@@ -127,30 +127,41 @@ export default function ChangeReturnModelDialog({
   })
 
   useEffect(() => {
-    if (open) {
-      setReasonText('')
-      form.reset({
-        returnModel: 'net_profit_share',
-        investorSharePercent: 70,
-        arunamiFeePercent: 10,
-        principalReference: 'invested_amount',
-        scheduledPayments: [],
-        customVariables: [],
-        distributionFrequency: 'bulanan',
-        formula: '',
+    if (!open) return
+    setReasonText('')
+    form.reset({
+      returnModel: 'net_profit_share',
+      investorSharePercent: 70,
+      arunamiFeePercent: 10,
+      principalReference: 'invested_amount',
+      scheduledPayments: [],
+      customVariables: [],
+      distributionFrequency: 'bulanan',
+      formula: '',
+    })
+    setLoadingConfig(true)
+    getPortfolioConfig(portfolioId)
+      .then(cfg => setCurrentConfig(cfg))
+      .catch(err => {
+        console.error(err)
+        toast.error('Gagal memuat konfigurasi portofolio')
+        setCurrentConfig(null)
       })
-    }
-  }, [open, form])
+      .finally(() => setLoadingConfig(false))
+  }, [open, portfolioId, form])
+
+  const nextPeriod = currentConfig ? getNextReportingPeriod(currentConfig.reportingFrequency) : ''
 
   const selectedModel = form.watch('returnModel')
-  const normalizedCurrent: ReturnModelType =
-    currentConfig.returnModel === 'percentage_based' || currentConfig.returnModel === 'fixed_return'
+  const normalizedCurrent: ReturnModelType | null = currentConfig
+    ? (currentConfig.returnModel === 'percentage_based' || currentConfig.returnModel === 'fixed_return'
       ? 'net_profit_share'
-      : currentConfig.returnModel
-  const modelChanged = selectedModel !== normalizedCurrent
+      : currentConfig.returnModel)
+    : null
+  const modelChanged = normalizedCurrent !== null && selectedModel !== normalizedCurrent
 
   const handleSave = async () => {
-    if (!currentUser) return
+    if (!currentUser || !currentConfig) return
     const valid = await form.trigger()
     if (!valid) return
     if (!modelChanged) return
@@ -195,7 +206,7 @@ export default function ChangeReturnModelDialog({
   }
 
   const reasonValid = reasonText.trim().length > 0
-  const saveEnabled = modelChanged && reasonValid && !saving && !!currentUser
+  const saveEnabled = modelChanged && reasonValid && !saving && !!currentUser && !!currentConfig
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -205,40 +216,50 @@ export default function ChangeReturnModelDialog({
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
-          <div className="flex gap-3 rounded-lg border border-amber-500/50 bg-amber-100 p-3 text-xs">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-700" />
-            <div className="text-black space-y-1">
-              <p className="font-bold">
-                Konfigurasi saat ini akan diarsipkan ke riwayat dan model baru akan dimulai dari nol.
-              </p>
-              <p>
-                Konfigurasi saat ini: <span className="font-semibold">{MODEL_LABEL[currentConfig.returnModel]}</span>
-                {' — '}{summarizeCurrentConfig(currentConfig.investorConfig)}
-              </p>
+          {loadingConfig ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">Memuat konfigurasi...</div>
+          ) : !currentConfig ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Konfigurasi portofolio belum dibuat.
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex gap-3 rounded-lg border border-amber-500/50 bg-amber-100 p-3 text-xs">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-700" />
+                <div className="text-black space-y-1">
+                  <p className="font-bold">
+                    Konfigurasi saat ini akan diarsipkan ke riwayat dan model baru akan dimulai dari nol.
+                  </p>
+                  <p>
+                    Konfigurasi saat ini: <span className="font-semibold">{MODEL_LABEL[currentConfig.returnModel]}</span>
+                    {' — '}{summarizeCurrentConfig(currentConfig.investorConfig)}
+                  </p>
+                </div>
+              </div>
 
-          <ModelPicker form={form} />
+              <ModelPicker form={form} />
 
-          <div className="space-y-1">
-            <Label className="text-xs text-black">Alasan Perubahan *</Label>
-            <Textarea
-              rows={3}
-              placeholder="Contoh: Renegosiasi kontrak, perubahan strategi distribusi..."
-              value={reasonText}
-              onChange={e => setReasonText(e.target.value)}
-              className="text-black"
-            />
-          </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-black">Alasan Perubahan *</Label>
+                <Textarea
+                  rows={3}
+                  placeholder="Contoh: Renegosiasi kontrak, perubahan strategi distribusi..."
+                  value={reasonText}
+                  onChange={e => setReasonText(e.target.value)}
+                  className="text-black"
+                />
+              </div>
 
-          <div className="flex gap-3 rounded-lg border border-amber-500/50 bg-amber-100 p-3 text-xs">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-700" />
-            <div className="text-black font-bold">
-              Perubahan berlaku mulai periode{' '}
-              <span className="underline">{nextPeriod ? formatPeriod(nextPeriod) : '-'}</span>.
-              Laporan periode sebelumnya tidak akan berubah.
-            </div>
-          </div>
+              <div className="flex gap-3 rounded-lg border border-amber-500/50 bg-amber-100 p-3 text-xs">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-700" />
+                <div className="text-black font-bold">
+                  Perubahan berlaku mulai periode{' '}
+                  <span className="underline">{nextPeriod ? formatPeriod(nextPeriod) : '-'}</span>.
+                  Laporan periode sebelumnya tidak akan berubah.
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
