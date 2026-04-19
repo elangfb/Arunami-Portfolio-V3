@@ -19,7 +19,10 @@ import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check, Chevron
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { PnLReviewTable } from '@/components/PnLReviewTable'
 import { CustomCategoryBlock } from '@/components/CustomCategoryBlock'
-import { AddCustomCategoryDialog } from '@/components/AddCustomCategoryDialog'
+import {
+  AddCustomCategoryDialog,
+  type AddCategoryPayload,
+} from '@/components/AddCustomCategoryDialog'
 import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 import {
   unionCategories,
@@ -229,6 +232,21 @@ export default function PnLPage() {
     const { categories: nextCats } = addCategoryInList(inlineCategories, name, type)
     setInlineCategories(nextCats)
     setInlineData(prev => recalcPnl(prev, nextCats))
+  }
+
+  const handleInlineDialogSubmit = (payload: AddCategoryPayload) => {
+    if (payload.kind === 'main') {
+      handleInlineAddCategory(payload.name, payload.type)
+      return
+    }
+    const { categories: nextCats, subId } = addSubItemInList(
+      inlineCategories,
+      payload.parentId,
+      payload.name,
+    )
+    if (!subId) return
+    setInlineCategories(nextCats)
+    setInlineData(prev => recalcPnl({ ...prev, [`custom:${payload.parentId}:${subId}`]: 0 }, nextCats))
   }
 
   const handleInlineRemoveCategory = (catId: string) => {
@@ -986,8 +1004,8 @@ export default function PnLPage() {
       <AddCustomCategoryDialog
         open={addCategoryOpen}
         onOpenChange={setAddCategoryOpen}
-        onSubmit={handleInlineAddCategory}
-        existingNames={inlineCategories.map(c => c.name)}
+        onSubmit={handleInlineDialogSubmit}
+        existingMainCategories={inlineCategories}
       />
     </div>
   )

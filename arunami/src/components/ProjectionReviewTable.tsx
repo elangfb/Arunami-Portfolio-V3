@@ -28,7 +28,10 @@ import {
   type MoveDirection,
 } from '@/lib/rowOrder'
 import { CustomCategoryBlock } from '@/components/CustomCategoryBlock'
-import { AddCustomCategoryDialog } from '@/components/AddCustomCategoryDialog'
+import {
+  AddCustomCategoryDialog,
+  type AddCategoryPayload,
+} from '@/components/AddCustomCategoryDialog'
 
 interface Props {
   data: ProjectionUploadPending
@@ -159,6 +162,15 @@ export function ProjectionReviewTable({
 
   const handleAddCategory = (name: string, type: CustomCategoryType) => {
     const { months: nextMonths } = addCategoryAcrossMonths(months, name, type)
+    onDataChange({ ...data, monthlyData: nextMonths.map(recalculateNetProfit) })
+  }
+
+  const handleDialogSubmit = (payload: AddCategoryPayload) => {
+    if (payload.kind === 'main') {
+      handleAddCategory(payload.name, payload.type)
+      return
+    }
+    const { months: nextMonths } = addSubItemAcrossMonths(months, payload.parentId, payload.name)
     onDataChange({ ...data, monthlyData: nextMonths.map(recalculateNetProfit) })
   }
 
@@ -434,8 +446,8 @@ export function ProjectionReviewTable({
       <AddCustomCategoryDialog
         open={addCategoryOpen}
         onOpenChange={setAddCategoryOpen}
-        onSubmit={handleAddCategory}
-        existingNames={rawCategories.map(c => c.name)}
+        onSubmit={handleDialogSubmit}
+        existingMainCategories={rawCategories}
       />
     </div>
   )
