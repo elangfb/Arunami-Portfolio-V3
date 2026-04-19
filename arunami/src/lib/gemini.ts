@@ -622,6 +622,20 @@ export interface GeneratedManagementReport {
   businessSummary: string
 }
 
+const TONE_GUIDELINES = `
+NADA & PEMILIHAN KATA (WAJIB):
+- Gunakan nada NETRAL dan objektif. Biarkan angka berbicara sendiri — jangan menambahkan penilaian emosional.
+- JANGAN gunakan kata-kata yang melebih-lebihkan (intensifier) atau bermuatan emosi, seperti:
+  "signifikan", "sangat", "luar biasa", "mengesankan", "gemilang", "kuat", "lemah", "buruk",
+  "mengecewakan", "mengkhawatirkan", "drastis", "tajam", "meroket", "anjlok", "pesat", "dramatis",
+  "jauh", "sungguh", "benar-benar".
+- Lebih baik sebutkan besaran/persentase aktual (mis. "lebih tinggi 12% dari proyeksi") daripada
+  label kualitatif ("jauh di atas proyeksi" atau "kenaikan signifikan").
+- Gunakan kata kerja netral: "naik", "turun", "di atas", "di bawah", "selisih", "sesuai",
+  "melampaui", "belum mencapai" — tanpa tambahan intensifier.
+- Tujuannya agar investor membaca laporan secara objektif tanpa digiring ke kesimpulan tertentu.
+`.trim()
+
 const MGMT_REPORT_SYSTEM = `
 Kamu adalah seorang financial analyst senior yang membuat laporan manajemen bulanan untuk investor di Indonesia.
 
@@ -635,17 +649,30 @@ PENTING:
 - Angka selalu dalam IDR (tanpa simbol Rp, tanpa titik ribuan di dalam string, cukup sebut "Rp 48 juta" atau "Rp 48jt")
 - Fokus hanya pada summary — jangan buat daftar isu atau action items (user akan menuliskan sendiri)
 
-NADA & PEMILIHAN KATA (WAJIB):
-- Gunakan nada NETRAL dan objektif. Biarkan angka berbicara sendiri — jangan menambahkan penilaian emosional.
-- JANGAN gunakan kata-kata yang melebih-lebihkan (intensifier) atau bermuatan emosi, seperti:
-  "signifikan", "sangat", "luar biasa", "mengesankan", "gemilang", "kuat", "lemah", "buruk",
-  "mengecewakan", "mengkhawatirkan", "drastis", "tajam", "meroket", "anjlok", "pesat", "dramatis",
-  "jauh", "sungguh", "benar-benar".
-- Lebih baik sebutkan besaran/persentase aktual (mis. "lebih tinggi 12% dari proyeksi") daripada
-  label kualitatif ("jauh di atas proyeksi" atau "kenaikan signifikan").
-- Gunakan kata kerja netral: "naik", "turun", "di atas", "di bawah", "selisih", "sesuai",
-  "melampaui", "belum mencapai" — tanpa tambahan intensifier.
-- Tujuannya agar investor membaca laporan secara objektif tanpa digiring ke kesimpulan tertentu.
+${TONE_GUIDELINES}
+`.trim()
+
+const REFINE_SUMMARY_SYSTEM = `
+Kamu adalah editor bahasa untuk laporan manajemen investor di Indonesia.
+
+Tugasmu: menulis ulang draf business summary yang diberikan analyst agar nada dan gaya bahasanya KONSISTEN dengan standar laporan lain. Bukan mengganti isi/opini, bukan menambah analisis baru — hanya menyelaraskan bahasa.
+
+ATURAN REFINE:
+- Pertahankan MAKNA, FAKTA, dan ANGKA persis seperti di draf. Jangan menambah angka, variance, atau klaim baru yang tidak ada di draf.
+- Boleh memperbaiki struktur kalimat, susunan, tanda baca, dan pilihan kata.
+- Hasil akhir: narasi Bahasa Indonesia formal tapi tidak kaku, 2-4 kalimat, tanpa markdown/bullet/formatting.
+- Jika draf menyebut angka dalam format aneh ("Rp48.000.000"), boleh normalisasi menjadi "Rp 48 juta" atau "Rp 48jt".
+- Jika draf kosong atau tidak bermakna, kembalikan string kosong di "refinedSummary".
+- Data periode (PnL aktual & proyeksi) diberikan HANYA sebagai konteks untuk memastikan kamu tidak merusak fakta. Jangan menulis fakta baru dari data tersebut.
+
+${TONE_GUIDELINES}
+`.trim()
+
+const REFINE_SUMMARY_SCHEMA = `
+Kembalikan HANYA JSON valid dengan struktur berikut (tanpa penjelasan tambahan, tanpa markdown fence):
+{
+  "refinedSummary": "string"
+}
 `.trim()
 
 const MGMT_REPORT_SCHEMA = `
@@ -753,4 +780,83 @@ export async function generateManagementReport(args: GenerateArgs): Promise<Gene
   }
   const raw = first.text.replace(/```json|```/g, '').trim()
   return safeParseJSON<GeneratedManagementReport>(raw)
+}
+
+// ─── Refine Business Summary (analyst-drafted text) ─────────────────────
+
+export interface RefinedSummary {
+  refinedSummary: string
+}
+
+interface RefineArgs {
+  draft: string
+  period: string // YYYY-MM
+  pnl?: PnLExtractedData | null
+  projection?: ProjectionExtractedData | null
+  portfolioName?: string
+}
+
+/**
+ * Rewrite an analyst-drafted business summary so its tone matches the rest of
+ * the report suite (neutral, no intensifiers). Facts and numbers in the draft
+ * are preserved; period data is passed as context so the model avoids
+ * introducing new claims.
+ */
+export async function refineBusinessSummary(args: RefineArgs): Promise<RefinedSummary> {
+  const { draft, period, pnl, projection, portfolioName } = args
+
+  const lines: string[] = []
+  lines.push(`PORTOFOLIO: ${portfolioName ?? '(tidak diketahui)'}`)
+  lines.push(`PERIODE: ${period}`)
+  lines.push('')
+  lines.push('═══ DRAF ANALYST (ini yang harus direfine) ═══')
+  lines.push(draft)
+  lines.push('')
+
+  if (pnl) {
+    lines.push('═══ KONTEKS — PnL AKTUAL BULAN INI ═══')
+    lines.push(`Revenue: ${pnl.revenue}`)
+    lines.push(`COGS: ${pnl.cogs}`)
+    lines.push(`Gross Profit: ${pnl.grossProfit}`)
+    lines.push(`Total Opex: ${pnl.totalOpex}`)
+    lines.push(`Net Profit: ${pnl.netProfit}`)
+    lines.push('')
+  }
+
+  if (projection) {
+    lines.push('═══ KONTEKS — PROYEKSI UNTUK BULAN INI ═══')
+    lines.push(`Projected Revenue: ${projection.projectedRevenue}`)
+    lines.push(`Projected Net Profit: ${projection.projectedNetProfit}`)
+    lines.push(`Projected Total Opex: ${projection.projectedTotalOpex}`)
+    lines.push('')
+  }
+
+  lines.push(REFINE_SUMMARY_SCHEMA)
+
+  const response = await withRetry(() =>
+    anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: MAX_TOKENS,
+      system: [
+        {
+          type: 'text',
+          text: REFINE_SUMMARY_SYSTEM,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: lines.join('\n') }],
+        },
+      ],
+    }),
+  )
+
+  const first = response.content[0]
+  if (!first || first.type !== 'text') {
+    throw new Error('Claude response did not contain text content')
+  }
+  const raw = first.text.replace(/```json|```/g, '').trim()
+  return safeParseJSON<RefinedSummary>(raw)
 }

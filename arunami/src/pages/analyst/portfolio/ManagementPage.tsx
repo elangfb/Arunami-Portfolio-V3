@@ -6,7 +6,7 @@ import {
   getManagementReports, saveManagementReport, updateManagementReport, deleteManagementReport,
   getReports, getNotes,
 } from '@/lib/firestore'
-import { generateManagementReport } from '@/lib/gemini'
+import { generateManagementReport, refineBusinessSummary } from '@/lib/gemini'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle, Trash2, Sparkles, Pencil } from 'lucide-react'
+import { PlusCircle, Trash2, Sparkles, Pencil, Copy, Wand2 } from 'lucide-react'
 import type {
   ManagementReport, IssueSeverity, ActionStatus, ActionCategory, Portfolio,
   PnLExtractedData, ProjectionExtractedData,
@@ -52,6 +52,12 @@ export default function ManagementPage() {
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  // Refine Summary state
+  const [refinePeriod, setRefinePeriod] = useState('')
+  const [refineDraft, setRefineDraft] = useState('')
+  const [refineResult, setRefineResult] = useState('')
+  const [refining, setRefining] = useState(false)
 
   const defaultFormValues: FormData = {
     period: '', businessSummary: '',
@@ -203,6 +209,57 @@ export default function ManagementPage() {
     }
   }
 
+  /**
+   * Refine a user-drafted business summary so its tone matches the rest of
+   * the report suite. Loads PnL + projection for the selected period (if
+   * available) so the AI can preserve facts without inventing new ones.
+   */
+  const handleRefineSummary = async () => {
+    if (!portfolioId || !portfolio) return
+    if (!refineDraft.trim()) {
+      toast.error('Masukkan draf summary terlebih dahulu')
+      return
+    }
+    if (!refinePeriod) {
+      toast.error('Pilih periode terlebih dahulu')
+      return
+    }
+    setRefining(true)
+    try {
+      const [pnls, projs] = await Promise.all([
+        getReports(portfolioId, 'pnl'),
+        getReports(portfolioId, 'projection'),
+      ])
+      const matchingPnl = pnls.find(p => p.period === refinePeriod)
+      const matchingProj = projs.find(p => p.period === refinePeriod)
+
+      const result = await refineBusinessSummary({
+        draft: refineDraft,
+        period: refinePeriod,
+        pnl: matchingPnl ? (matchingPnl.extractedData as PnLExtractedData) : null,
+        projection: matchingProj ? (matchingProj.extractedData as ProjectionExtractedData) : null,
+        portfolioName: portfolio.name,
+      })
+      setRefineResult(result.refinedSummary)
+      toast.success('Summary berhasil di-refine')
+    } catch (err) {
+      console.error(err)
+      toast.error('Gagal me-refine summary')
+    } finally {
+      setRefining(false)
+    }
+  }
+
+  const handleCopyRefined = async () => {
+    if (!refineResult) return
+    try {
+      await navigator.clipboard.writeText(refineResult)
+      toast.success('Disalin ke clipboard')
+    } catch {
+      toast.error('Gagal menyalin')
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -310,6 +367,53 @@ export default function ManagementPage() {
           </Dialog>
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-muted-foreground" />
+            Refine Summary
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Tulis draf summary, pilih periode, dan AI akan menyelaraskan nada bahasanya dengan laporan lain. Fakta & angka dari draf tetap dipertahankan.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Periode</Label>
+              <MonthYearPicker value={refinePeriod} onChange={setRefinePeriod} />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Draf Summary</Label>
+            <Textarea
+              rows={4}
+              placeholder="Tulis atau tempel draf business summary di sini..."
+              value={refineDraft}
+              onChange={e => setRefineDraft(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleRefineSummary} disabled={refining}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {refining ? 'Merefine...' : 'Refine dengan AI'}
+            </Button>
+          </div>
+          {refineResult && (
+            <div className="space-y-1 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Hasil Refine</Label>
+                <Button size="sm" variant="ghost" onClick={handleCopyRefined}>
+                  <Copy className="mr-2 h-3 w-3" />
+                  Copy
+                </Button>
+              </div>
+              <Textarea rows={4} value={refineResult} readOnly className="bg-muted/30" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {reports.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-muted-foreground">Belum ada management report</CardContent></Card>
