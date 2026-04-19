@@ -1,9 +1,34 @@
+import { useState } from 'react'
 import { formatPeriod } from '@/lib/dateUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Loader2, CheckCircle2, Plus, X } from 'lucide-react'
-import type { PnLUploadPending, MonthlyPnLRow, RevenueCategory } from '@/types'
+import { Loader2, CheckCircle2, ChevronDown, ChevronUp, Plus, X } from 'lucide-react'
+import type {
+  PnLUploadPending,
+  MonthlyPnLRow,
+  RevenueCategory,
+  CustomCategoryType,
+  RowOrder,
+} from '@/types'
+import {
+  customNetAdjustment,
+  addCategoryAcrossMonths,
+  removeCategoryAcrossMonths,
+  addSubItemAcrossMonths,
+  removeSubItemAcrossMonths,
+  setSubItemAmountInMonth,
+  unionCategories,
+} from '@/lib/customCategories'
+import {
+  applyOrderToCategories,
+  applyOrderToNames,
+  moveInOrder,
+  setSubItemOrder,
+  type MoveDirection,
+} from '@/lib/rowOrder'
+import { CustomCategoryRows } from '@/components/CustomCategoryRows'
+import { AddCustomCategoryDialog } from '@/components/AddCustomCategoryDialog'
 
 interface Props {
   data: PnLUploadPending
@@ -13,6 +38,8 @@ interface Props {
   isConfirming: boolean
   units: RevenueCategory[]
   onUnitsChange: (next: RevenueCategory[]) => void
+  rowOrder?: RowOrder
+  onRowOrderChange?: (next: RowOrder) => void
 }
 
 const PALETTE = ['#1e5f3f', '#38a169', '#48bb78', '#68d391', '#9ae6b4', '#3182ce', '#d69e2e', '#dd6b20']
@@ -56,19 +83,22 @@ function recalculate(month: MonthlyPnLRow): MonthlyPnLRow {
 
   const grossProfit = revenue - cogs
   const operatingProfit = grossProfit - totalOpex
-  const netProfit = operatingProfit - interest - taxes
+  const netProfit = operatingProfit - interest - taxes + customNetAdjustment(month.customCategories)
 
   return { ...month, grossProfit, totalOpex, operatingProfit, netProfit }
 }
 
 export function PnLReviewTable({
   data, onDataChange, onConfirm, onCancel, isConfirming, units, onUnitsChange,
+  rowOrder, onRowOrderChange,
 }: Props) {
   const months = data.monthlyData
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false)
 
-  const opexNames = [...new Set(months.flatMap(m => (m.opex ?? []).map(o => o.name)))]
+  const rawOpexNames = [...new Set(months.flatMap(m => (m.opex ?? []).map(o => o.name)))]
+  const opexNames = applyOrderToNames(rawOpexNames, rowOrder?.opex)
 
-  const rows: RowDef[] = [
+  const rowsBeforeCustom: RowDef[] = [
     { label: 'Revenue', key: 'revenue', isBold: true },
     { label: 'COGS', key: 'cogs', className: 'text-red-600' },
     { label: 'Gross Profit', key: 'grossProfit', isBold: true, className: 'text-green-700', readOnly: true },
@@ -81,8 +111,17 @@ export function PnLReviewTable({
     { label: 'Operating Profit', key: 'operatingProfit', isBold: true, readOnly: true },
     { label: 'Interest', key: 'interest', className: 'text-red-600' },
     { label: 'Taxes', key: 'taxes', className: 'text-red-600' },
-    { label: 'Net Profit', key: 'netProfit', isBold: true, readOnly: true },
   ]
+  const netProfitRow: RowDef = {
+    label: 'Net Profit', key: 'netProfit', isBold: true, readOnly: true,
+  }
+
+  const rawCustomCategories = unionCategories(months.map(m => m.customCategories))
+  const customCategories = applyOrderToCategories(
+    rawCustomCategories,
+    rowOrder?.customCategories,
+    rowOrder?.customSubItems,
+  )
 
   const getTotal = (key: string): number =>
     months.reduce((sum, m) => sum + getCellValue(m, key), 0)
@@ -110,6 +149,65 @@ export function PnLReviewTable({
     // Remove from ALL months
     const nextMonths = months.map(m =>
       recalculate({ ...m, opex: (m.opex ?? []).filter(o => o.name !== opexName) })
+    )
+    onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
+  const handleMoveOpex = (opexName: string, direction: MoveDirection) => {
+    if (!onRowOrderChange) return
+    const next = moveInOrder(rowOrder?.opex, rawOpexNames, opexName, direction)
+    onRowOrderChange({ ...(rowOrder ?? {}), opex: next })
+  }
+
+  const handleMoveCategory = (catId: string, direction: MoveDirection) => {
+    if (!onRowOrderChange) return
+    const availableIds = rawCustomCategories.map(c => c.id)
+    const next = moveInOrder(rowOrder?.customCategories, availableIds, catId, direction)
+    onRowOrderChange({ ...(rowOrder ?? {}), customCategories: next })
+  }
+
+  const handleMoveSubItem = (catId: string, subId: string, direction: MoveDirection) => {
+    if (!onRowOrderChange) return
+    const cat = rawCustomCategories.find(c => c.id === catId)
+    if (!cat) return
+    const availableIds = cat.subItems.map(s => s.id)
+    const next = moveInOrder(rowOrder?.customSubItems?.[catId], availableIds, subId, direction)
+    onRowOrderChange(setSubItemOrder(rowOrder, catId, next))
+  }
+
+  const handleAddCategory = (name: string, type: CustomCategoryType) => {
+    const { months: nextMonths } = addCategoryAcrossMonths(months, name, type)
+    onDataChange({ ...data, monthlyData: nextMonths.map(recalculate) })
+  }
+
+  const handleRemoveCategory = (catId: string) => {
+    const nextMonths = removeCategoryAcrossMonths(months, catId).map(recalculate)
+    onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
+  const handleAddSubItem = (catId: string) => {
+    const catName = customCategories.find(c => c.id === catId)?.name ?? 'Kategori'
+    const name = window.prompt(`Nama sub-kategori baru untuk "${catName}":`)
+    if (!name?.trim()) return
+    const { months: nextMonths } = addSubItemAcrossMonths(months, catId, name)
+    onDataChange({ ...data, monthlyData: nextMonths.map(recalculate) })
+  }
+
+  const handleRemoveSubItem = (catId: string, subId: string) => {
+    const nextMonths = removeSubItemAcrossMonths(months, catId, subId).map(recalculate)
+    onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
+  const handleCustomAmountChange = (
+    monthKey: string,
+    catId: string,
+    subId: string,
+    value: number,
+  ) => {
+    const monthIdx = months.findIndex(m => m.month === monthKey)
+    if (monthIdx < 0) return
+    const nextMonths = setSubItemAmountInMonth(months, monthIdx, catId, subId, value).map(
+      (m, i) => (i === monthIdx ? recalculate(m) : m),
     )
     onDataChange({ ...data, monthlyData: nextMonths })
   }
@@ -180,14 +278,39 @@ export function PnLReviewTable({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rows.map(row => {
-                const isNetProfit = row.key === 'netProfit'
+              {rowsBeforeCustom.map(row => {
                 const total = getTotal(row.key)
                 const isOpexRow = row.key.startsWith('opex:')
+                const opexName = isOpexRow ? row.key.slice(5) : ''
+                const opexIdx = isOpexRow ? opexNames.indexOf(opexName) : -1
+                const isFirstOpex = opexIdx === 0
+                const isLastOpex = opexIdx === opexNames.length - 1
                 return (
                   <tr key={row.key} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
                     <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.isBold ? 'font-semibold bg-muted/20' : ''} ${row.className?.includes('text-xs') ? 'pl-8' : ''}`}>
                       <div className="flex items-center gap-1">
+                        {isOpexRow && onRowOrderChange && (
+                          <div className="flex flex-col shrink-0">
+                            <button
+                              type="button"
+                              disabled={isFirstOpex}
+                              onClick={() => handleMoveOpex(opexName, 'up')}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                              title="Pindah ke atas"
+                            >
+                              <ChevronUp className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isLastOpex}
+                              onClick={() => handleMoveOpex(opexName, 'down')}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                              title="Pindah ke bawah"
+                            >
+                              <ChevronDown className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
                         <span className="flex-1">{row.label}</span>
                         {isOpexRow && (
                           <Button
@@ -195,7 +318,7 @@ export function PnLReviewTable({
                             size="icon"
                             variant="ghost"
                             className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                            onClick={() => handleRemoveOpex(row.key.slice(5))}
+                            onClick={() => handleRemoveOpex(opexName)}
                           >
                             <X className="h-3 w-3" />
                           </Button>
@@ -207,9 +330,7 @@ export function PnLReviewTable({
                       return (
                         <td key={m.month} className="px-2 py-1 text-right whitespace-nowrap">
                           {row.readOnly ? (
-                            <div className={`h-8 flex items-center justify-end px-3 text-sm tabular-nums ${
-                              isNetProfit ? (val >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold') : ''
-                            }`}>
+                            <div className="h-8 flex items-center justify-end px-3 text-sm tabular-nums">
                               {val.toLocaleString('id-ID')}
                             </div>
                           ) : (
@@ -217,7 +338,7 @@ export function PnLReviewTable({
                               type="number"
                               value={val}
                               onChange={e => handleCellChange(monthIdx, row.key, Number(e.target.value) || 0)}
-                              className={`h-8 text-right text-xs tabular-nums ${isNetProfit && val < 0 ? 'text-red-600' : ''}`}
+                              className="h-8 text-right text-xs tabular-nums"
                             />
                           )}
                         </td>
@@ -225,9 +346,7 @@ export function PnLReviewTable({
                     })}
                     {months.length > 1 && (
                       <td className={`px-4 py-2 text-right whitespace-nowrap tabular-nums border-l font-semibold ${
-                        isNetProfit
-                          ? total >= 0 ? 'text-green-600' : 'text-red-600'
-                          : row.className?.replace('text-xs', '') ?? ''
+                        row.className?.replace('text-xs', '') ?? ''
                       }`}>
                         {total.toLocaleString('id-ID')}
                       </td>
@@ -235,13 +354,69 @@ export function PnLReviewTable({
                   </tr>
                 )
               })}
+
+              <CustomCategoryRows
+                categories={customCategories}
+                columns={months.map(m => ({ key: m.month, editable: true }))}
+                showGrandTotal={months.length > 1}
+                getAmount={(monthKey, catId, subId) => {
+                  const m = months.find(mm => mm.month === monthKey)
+                  const cat = m?.customCategories?.find(c => c.id === catId)
+                  return cat?.subItems.find(s => s.id === subId)?.amount ?? 0
+                }}
+                onAmountChange={handleCustomAmountChange}
+                onRemoveCategory={handleRemoveCategory}
+                onAddSubItem={handleAddSubItem}
+                onRemoveSubItem={handleRemoveSubItem}
+                onMoveCategory={onRowOrderChange ? handleMoveCategory : undefined}
+                onMoveSubItem={onRowOrderChange ? handleMoveSubItem : undefined}
+              />
+
+              {/* Net Profit row (rendered last so custom categories sit above it) */}
+              <tr className="bg-muted/20">
+                <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+                  {netProfitRow.label}
+                </td>
+                {months.map(m => {
+                  const val = getCellValue(m, netProfitRow.key)
+                  return (
+                    <td key={m.month} className="px-2 py-1 text-right whitespace-nowrap">
+                      <div className={`h-8 flex items-center justify-end px-3 text-sm tabular-nums ${
+                        val >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'
+                      }`}>
+                        {val.toLocaleString('id-ID')}
+                      </div>
+                    </td>
+                  )
+                })}
+                {months.length > 1 && (() => {
+                  const total = getTotal(netProfitRow.key)
+                  return (
+                    <td className={`px-4 py-2 text-right whitespace-nowrap tabular-nums border-l font-semibold ${
+                      total >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {total.toLocaleString('id-ID')}
+                    </td>
+                  )
+                })()}
+              </tr>
             </tbody>
             <tfoot>
               <tr>
                 <td colSpan={months.length + (months.length > 1 ? 2 : 1)} className="px-4 py-2">
-                  <Button type="button" variant="outline" size="sm" onClick={handleAddOpex}>
-                    <Plus className="h-3 w-3 mr-1" /> Tambah Opex
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleAddOpex}>
+                      <Plus className="h-3 w-3 mr-1" /> Tambah Opex
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAddCategoryOpen(true)}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Tambah Kategori
+                    </Button>
+                  </div>
                 </td>
               </tr>
             </tfoot>
@@ -318,6 +493,13 @@ export function PnLReviewTable({
           )}
         </Button>
       </div>
+
+      <AddCustomCategoryDialog
+        open={addCategoryOpen}
+        onOpenChange={setAddCategoryOpen}
+        onSubmit={handleAddCategory}
+        existingNames={customCategories.map(c => c.name)}
+      />
     </div>
   )
 }

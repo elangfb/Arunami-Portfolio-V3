@@ -15,14 +15,33 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check } from 'lucide-react'
+import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check, ChevronUp, ChevronDown } from 'lucide-react'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { PnLReviewTable } from '@/components/PnLReviewTable'
+import { CustomCategoryRows } from '@/components/CustomCategoryRows'
+import { AddCustomCategoryDialog } from '@/components/AddCustomCategoryDialog'
 import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
+import {
+  unionCategories,
+  addCategory as addCategoryInList,
+  removeCategory as removeCategoryInList,
+  addSubItem as addSubItemInList,
+  removeSubItem as removeSubItemInList,
+} from '@/lib/customCategories'
+import {
+  applyOrderToCategories,
+  applyOrderToNames,
+  moveInOrder,
+  setSubItemOrder,
+  type MoveDirection,
+} from '@/lib/rowOrder'
 import SchedulePaymentConfirm from './SchedulePaymentConfirm'
 import DividendDeclaration from './DividendDeclaration'
 import CustomVariableInput from './CustomVariableInput'
-import type { PnLExtractedData, PnLUploadPending, OpexItem, PortfolioReport, Portfolio, PortfolioConfig, RevenueCategory } from '@/types'
+import type {
+  PnLExtractedData, PnLUploadPending, OpexItem, PortfolioReport, Portfolio,
+  PortfolioConfig, RevenueCategory, CustomCategory, CustomCategoryType,
+} from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -47,7 +66,9 @@ export default function PnLPage() {
   // Inline editing state
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineData, setInlineData] = useState<Record<string, number>>({})
+  const [inlineCategories, setInlineCategories] = useState<CustomCategory[]>([])
   const [inlineSaving, setInlineSaving] = useState(false)
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false)
 
   const { register, handleSubmit, reset, setValue, watch } = useForm<PnLExtractedData>({
     defaultValues: {
@@ -97,6 +118,20 @@ export default function PnLPage() {
     setCategories(config.revenueCategories)
   }
 
+  const handleRowOrderChange = async (next: import('@/types').RowOrder) => {
+    if (!portfolioId || !portfolioConfig) return
+    const optimistic: PortfolioConfig = { ...portfolioConfig, pnlRowOrder: next }
+    setPortfolioConfig(optimistic)
+    try {
+      const { createdAt: _omit, ...rest } = optimistic
+      void _omit
+      await savePortfolioConfig(portfolioId, rest)
+    } catch {
+      toast.error('Gagal menyimpan urutan baris')
+      setPortfolioConfig(portfolioConfig)
+    }
+  }
+
   useEffect(() => { fetchReports(); fetchConfig() }, [portfolioId])
 
   // Open dialog for manual input
@@ -118,15 +153,29 @@ export default function PnLPage() {
   // openEdit kept for potential future use but no longer called from Pencil button
 
   // Inline editing helpers
-  const recalcPnl = (data: Record<string, number>): Record<string, number> => {
+  const recalcPnl = (
+    data: Record<string, number>,
+    cats: CustomCategory[],
+  ): Record<string, number> => {
     const next = { ...data }
     const opexTotal = Object.entries(next)
       .filter(([k]) => k.startsWith('opex:'))
       .reduce((sum, [, v]) => sum + (v || 0), 0)
+    let customIncome = 0
+    let customExpense = 0
+    for (const c of cats) {
+      const sum = c.subItems.reduce(
+        (s, sub) => s + (next[`custom:${c.id}:${sub.id}`] || 0),
+        0,
+      )
+      if (c.type === 'income') customIncome += sum
+      else customExpense += sum
+    }
     next.grossProfit = (next.revenue || 0) - (next.cogs || 0)
     next.totalOpex = opexTotal
     next.operatingProfit = next.grossProfit - next.totalOpex
-    next.netProfit = next.operatingProfit - (next.interest || 0) - (next.taxes || 0)
+    next.netProfit =
+      next.operatingProfit - (next.interest || 0) - (next.taxes || 0) + customIncome - customExpense
     return next
   }
 
@@ -153,12 +202,64 @@ export default function PnLPage() {
     for (const name of allOpexNames) {
       if (data[`opex:${name}`] === undefined) data[`opex:${name}`] = 0
     }
-    setInlineData(data)
+    // Seed custom category rows from union of all reports; use this report's
+    // amounts when present, otherwise 0.
+    const catsUnion = unionCategories(
+      reports.map(r => (r.extractedData as PnLExtractedData).customCategories),
+    )
+    const ownCats = d.customCategories ?? []
+    for (const cat of catsUnion) {
+      for (const sub of cat.subItems) {
+        const ownCat = ownCats.find(c => c.id === cat.id)
+        const ownSub = ownCat?.subItems.find(s => s.id === sub.id)
+        data[`custom:${cat.id}:${sub.id}`] = ownSub?.amount ?? 0
+      }
+    }
+    setInlineCategories(catsUnion)
+    setInlineData(recalcPnl(data, catsUnion))
     setInlineEditId(report.id)
   }
 
   const handleInlineChange = (key: string, value: number) => {
-    setInlineData(prev => recalcPnl({ ...prev, [key]: value }))
+    setInlineData(prev => recalcPnl({ ...prev, [key]: value }, inlineCategories))
+  }
+
+  const handleInlineAddCategory = (name: string, type: CustomCategoryType) => {
+    const { categories: nextCats } = addCategoryInList(inlineCategories, name, type)
+    setInlineCategories(nextCats)
+    setInlineData(prev => recalcPnl(prev, nextCats))
+  }
+
+  const handleInlineRemoveCategory = (catId: string) => {
+    const nextCats = removeCategoryInList(inlineCategories, catId)
+    setInlineCategories(nextCats)
+    setInlineData(prev => {
+      const stripped: Record<string, number> = {}
+      for (const [k, v] of Object.entries(prev)) {
+        if (!k.startsWith(`custom:${catId}:`)) stripped[k] = v
+      }
+      return recalcPnl(stripped, nextCats)
+    })
+  }
+
+  const handleInlineAddSubItem = (catId: string) => {
+    const cat = inlineCategories.find(c => c.id === catId)
+    const name = window.prompt(`Nama sub-kategori baru untuk "${cat?.name ?? 'Kategori'}":`)
+    if (!name?.trim()) return
+    const { categories: nextCats, subId } = addSubItemInList(inlineCategories, catId, name)
+    if (!subId) return
+    setInlineCategories(nextCats)
+    setInlineData(prev => recalcPnl({ ...prev, [`custom:${catId}:${subId}`]: 0 }, nextCats))
+  }
+
+  const handleInlineRemoveSubItem = (catId: string, subId: string) => {
+    const nextCats = removeSubItemInList(inlineCategories, catId, subId)
+    setInlineCategories(nextCats)
+    setInlineData(prev => {
+      const { [`custom:${catId}:${subId}`]: _removed, ...rest } = prev
+      void _removed
+      return recalcPnl(rest, nextCats)
+    })
   }
 
   const handleInlineSave = async (report: PortfolioReport) => {
@@ -169,6 +270,17 @@ export default function PnLPage() {
       const opex: OpexItem[] = Object.entries(inlineData)
         .filter(([k]) => k.startsWith('opex:'))
         .map(([k, amount]) => ({ name: k.slice(5), amount }))
+
+      const customCategories: CustomCategory[] = inlineCategories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        type: cat.type,
+        subItems: cat.subItems.map(sub => ({
+          id: sub.id,
+          name: sub.name,
+          amount: inlineData[`custom:${cat.id}:${sub.id}`] ?? 0,
+        })),
+      }))
 
       const extractedData: PnLExtractedData = {
         ...d,
@@ -181,12 +293,14 @@ export default function PnLPage() {
         interest: inlineData.interest ?? d.interest,
         taxes: inlineData.taxes ?? d.taxes,
         netProfit: inlineData.netProfit ?? d.netProfit,
+        customCategories,
       }
 
       await updateReport(portfolioId, report.id, { extractedData })
       await syncFinancialData(portfolioId)
       setInlineEditId(null)
       setInlineData({})
+      setInlineCategories([])
       fetchReports()
       toast.success('Laporan PnL berhasil diperbarui')
     } catch {
@@ -199,6 +313,7 @@ export default function PnLPage() {
   const cancelInlineEdit = () => {
     setInlineEditId(null)
     setInlineData({})
+    setInlineCategories([])
   }
 
   // File upload → extract → show inline review table
@@ -471,6 +586,8 @@ export default function PnLPage() {
               isConfirming={isConfirming}
               units={pendingUnits}
               onUnitsChange={setPendingUnits}
+              rowOrder={portfolioConfig?.pnlRowOrder}
+              onRowOrderChange={handleRowOrderChange}
             />
           </CardContent>
         </Card>
@@ -499,10 +616,12 @@ export default function PnLPage() {
           ) : (
             (() => {
               const sorted = [...reports].sort((a, b) => comparePeriods(a.period, b.period))
-              const opexNames = [...new Set(sorted.flatMap(r => {
+              const rawOpexNames = [...new Set(sorted.flatMap(r => {
                 const d = r.extractedData as PnLExtractedData
                 return (d.opex ?? []).map(o => o.name)
               }))]
+              const rowOrder = portfolioConfig?.pnlRowOrder
+              const opexNames = applyOrderToNames(rawOpexNames, rowOrder?.opex)
               const getCell = (r: PortfolioReport, key: string): number => {
                 const d = r.extractedData as PnLExtractedData
                 if (key.startsWith('opex:')) {
@@ -511,7 +630,7 @@ export default function PnLPage() {
                 }
                 return (d[key as keyof PnLExtractedData] as number) ?? 0
               }
-              const rows: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
+              const rowsBeforeCustom: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
                 { label: 'Revenue', key: 'revenue', bold: true, editable: true },
                 { label: 'COGS', key: 'cogs', className: 'text-red-600', editable: true },
                 { label: 'Gross Profit', key: 'grossProfit', bold: true, className: 'text-green-700' },
@@ -520,8 +639,48 @@ export default function PnLPage() {
                 { label: 'Operating Profit', key: 'operatingProfit', bold: true },
                 { label: 'Interest', key: 'interest', className: 'text-red-600', editable: true },
                 { label: 'Taxes', key: 'taxes', className: 'text-red-600', editable: true },
-                { label: 'Net Profit', key: 'netProfit', bold: true },
               ]
+              const netProfitRow = { label: 'Net Profit', key: 'netProfit', bold: true }
+              // Categories shown in the table:
+              //   - When NOT editing: union across all saved reports.
+              //   - When editing: inlineCategories (which starts as the union, but may have
+              //     in-flight additions/removals scoped to the current edit).
+              const rawDisplayCategories = inlineEditId
+                ? inlineCategories
+                : unionCategories(
+                    sorted.map(r => (r.extractedData as PnLExtractedData).customCategories),
+                  )
+              const displayCategories = applyOrderToCategories(
+                rawDisplayCategories,
+                rowOrder?.customCategories,
+                rowOrder?.customSubItems,
+              )
+              const getCustomAmount = (reportId: string, catId: string, subId: string): number => {
+                if (inlineEditId === reportId) {
+                  return inlineData[`custom:${catId}:${subId}`] ?? 0
+                }
+                const r = sorted.find(x => x.id === reportId)
+                if (!r) return 0
+                const d = r.extractedData as PnLExtractedData
+                const cat = d.customCategories?.find(c => c.id === catId)
+                return cat?.subItems.find(s => s.id === subId)?.amount ?? 0
+              }
+              const moveOpex = (opexName: string, direction: MoveDirection) => {
+                const next = moveInOrder(rowOrder?.opex, rawOpexNames, opexName, direction)
+                handleRowOrderChange({ ...(rowOrder ?? {}), opex: next })
+              }
+              const moveCategory = (catId: string, direction: MoveDirection) => {
+                const availableIds = rawDisplayCategories.map(c => c.id)
+                const next = moveInOrder(rowOrder?.customCategories, availableIds, catId, direction)
+                handleRowOrderChange({ ...(rowOrder ?? {}), customCategories: next })
+              }
+              const moveSubItem = (catId: string, subId: string, direction: MoveDirection) => {
+                const cat = rawDisplayCategories.find(c => c.id === catId)
+                if (!cat) return
+                const availableIds = cat.subItems.map(s => s.id)
+                const next = moveInOrder(rowOrder?.customSubItems?.[catId], availableIds, subId, direction)
+                handleRowOrderChange(setSubItemOrder(rowOrder, catId, next))
+              }
               return (
                 <div className="rounded-lg border overflow-hidden">
                   <div className="overflow-x-auto">
@@ -572,36 +731,119 @@ export default function PnLPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {rows.map(row => (
-                          <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
-                            <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''} ${row.className?.includes('text-xs') ? 'pl-8' : ''}`}>
-                              {row.label}
-                            </td>
-                            {sorted.map(r => {
-                              const isEditing = inlineEditId === r.id
-                              const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
-                              const isNet = row.key === 'netProfit'
-                              const colorClass = isNet
-                                ? val >= 0 ? 'text-green-600' : 'text-red-600'
-                                : row.className ?? ''
-                              return (
-                                <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
-                                  {isEditing && row.editable ? (
-                                    <Input
-                                      type="number"
-                                      value={inlineData[row.key] ?? 0}
-                                      onChange={e => handleInlineChange(row.key, Number(e.target.value) || 0)}
-                                      className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    />
-                                  ) : (
-                                    formatCurrencyExact(val)
-                                  )}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
+                        {rowsBeforeCustom.map(row => {
+                          const isOpexRow = row.key.startsWith('opex:')
+                          const opexName = isOpexRow ? row.key.slice(5) : ''
+                          const opexIdx = isOpexRow ? opexNames.indexOf(opexName) : -1
+                          const isFirstOpex = opexIdx === 0
+                          const isLastOpex = opexIdx === opexNames.length - 1
+                          return (
+                            <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
+                              <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''} ${row.className?.includes('text-xs') ? 'pl-8' : ''}`}>
+                                {isOpexRow ? (
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex flex-col shrink-0">
+                                      <button
+                                        type="button"
+                                        disabled={isFirstOpex}
+                                        onClick={() => moveOpex(opexName, 'up')}
+                                        className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                                        title="Pindah ke atas"
+                                      >
+                                        <ChevronUp className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isLastOpex}
+                                        onClick={() => moveOpex(opexName, 'down')}
+                                        className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                                        title="Pindah ke bawah"
+                                      >
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                    <span className="flex-1">{row.label}</span>
+                                  </div>
+                                ) : (
+                                  row.label
+                                )}
+                              </td>
+                              {sorted.map(r => {
+                                const isEditing = inlineEditId === r.id
+                                const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
+                                const colorClass = row.className ?? ''
+                                return (
+                                  <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${colorClass} ${row.bold ? 'font-semibold' : ''}`}>
+                                    {isEditing && row.editable ? (
+                                      <Input
+                                        type="number"
+                                        value={inlineData[row.key] ?? 0}
+                                        onChange={e => handleInlineChange(row.key, Number(e.target.value) || 0)}
+                                        className="h-7 w-full text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      />
+                                    ) : (
+                                      formatCurrencyExact(val)
+                                    )}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          )
+                        })}
+
+                        <CustomCategoryRows
+                          categories={displayCategories}
+                          columns={sorted.map(r => ({
+                            key: r.id,
+                            editable: inlineEditId === r.id,
+                          }))}
+                          showGrandTotal={false}
+                          getAmount={getCustomAmount}
+                          onAmountChange={(columnKey, catId, subId, value) => {
+                            if (inlineEditId !== columnKey) return
+                            handleInlineChange(`custom:${catId}:${subId}`, value)
+                          }}
+                          onRemoveCategory={handleInlineRemoveCategory}
+                          onAddSubItem={handleInlineAddSubItem}
+                          onRemoveSubItem={handleInlineRemoveSubItem}
+                          onMoveCategory={moveCategory}
+                          onMoveSubItem={moveSubItem}
+                        />
+
+                        {/* Net Profit row */}
+                        <tr className="bg-muted/20">
+                          <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+                            {netProfitRow.label}
+                          </td>
+                          {sorted.map(r => {
+                            const isEditing = inlineEditId === r.id
+                            const val = isEditing ? (inlineData.netProfit ?? 0) : getCell(r, 'netProfit')
+                            return (
+                              <td key={r.id} className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums font-semibold ${
+                                val >= 0 ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {formatCurrencyExact(val)}
+                              </td>
+                            )
+                          })}
+                        </tr>
                       </tbody>
+                      {inlineEditId && (
+                        <tfoot>
+                          <tr>
+                            <td colSpan={sorted.length + 1} className="px-4 py-2 border-t">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAddCategoryOpen(true)}
+                              >
+                                <Plus className="h-3 w-3 mr-1" /> Tambah Kategori
+                              </Button>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 </div>
@@ -706,6 +948,13 @@ export default function PnLPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AddCustomCategoryDialog
+        open={addCategoryOpen}
+        onOpenChange={setAddCategoryOpen}
+        onSubmit={handleInlineAddCategory}
+        existingNames={inlineCategories.map(c => c.name)}
+      />
     </div>
   )
 }

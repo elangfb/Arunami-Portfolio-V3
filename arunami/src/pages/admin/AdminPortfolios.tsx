@@ -208,6 +208,10 @@ export default function AdminPortfolios() {
       toast.error('Pilih Investor dan isi Jumlah Investasi & Persentase dengan benar.')
       return
     }
+    if (allocations.some(a => a.investorUid === investor.uid)) {
+      toast.error(`${investor.displayName} sudah memiliki alokasi di portofolio ini.`)
+      return
+    }
 
     try {
       await createAllocation(

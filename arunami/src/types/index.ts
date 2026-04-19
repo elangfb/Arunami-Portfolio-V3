@@ -133,6 +133,12 @@ export type InvestorConfigUnion =
   | AnnualDividendConfig
   | CustomConfig
 
+export interface RowOrder {
+  opex?: string[]
+  customCategories?: string[]
+  customSubItems?: Record<string, string[]>
+}
+
 export interface PortfolioConfig {
   industryType: IndustryType
   revenueCategories: RevenueCategory[]
@@ -140,6 +146,8 @@ export interface PortfolioConfig {
   // default — the analyst seeds them on the first upload via the "+" button,
   // and they persist for subsequent uploads so the analyst only edits numbers.
   pnlUnitCategories?: RevenueCategory[]
+  pnlRowOrder?: RowOrder
+  projectionRowOrder?: RowOrder
   returnModel: ReturnModelType
   investorConfig: InvestorConfigUnion
   reportingFrequency: ReportingFrequency
@@ -249,6 +257,21 @@ export interface OpexItem {
   percentage?: number
 }
 
+export type CustomCategoryType = 'income' | 'expense'
+
+export interface CustomSubItem {
+  id: string
+  name: string
+  amount: number
+}
+
+export interface CustomCategory {
+  id: string
+  name: string
+  type: CustomCategoryType
+  subItems: CustomSubItem[]
+}
+
 export interface PnLExtractedData {
   period: string
   revenue: number
@@ -262,6 +285,7 @@ export interface PnLExtractedData {
   netProfit: number
   unitBreakdown: Record<string, number>
   notes: string
+  customCategories?: CustomCategory[]
 }
 
 export interface MonthlyPnLRow {
@@ -275,6 +299,7 @@ export interface MonthlyPnLRow {
   interest: number
   taxes: number
   netProfit: number
+  customCategories?: CustomCategory[]
 }
 
 export interface PnLUploadPending {
@@ -295,6 +320,7 @@ export interface ProjectionExtractedData {
   projectedTotalOpex: number
   projectedNetProfit: number
   assumptions: string
+  customCategories?: CustomCategory[]
 }
 
 export type ReportType = 'pnl' | 'projection' | 'management_report' | 'arunami_note'
@@ -340,6 +366,7 @@ export interface MonthlyProjectionRow {
   opexBreakdown: OpexItem[]
   totalOpex: number
   projectedNetProfit: number
+  customCategories?: CustomCategory[]
 }
 
 export interface ProjectionUploadPending {
