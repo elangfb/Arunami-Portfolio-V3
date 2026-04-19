@@ -295,6 +295,7 @@ export interface PnLExtractedData {
   unitBreakdown: Record<string, number>
   notes: string
   customCategories?: CustomCategory[]
+  cogsSubItems?: CustomSubItem[]
 }
 
 export interface MonthlyPnLRow {
@@ -309,6 +310,7 @@ export interface MonthlyPnLRow {
   taxes: number
   netProfit: number
   customCategories?: CustomCategory[]
+  cogsSubItems?: CustomSubItem[]
 }
 
 export interface PnLUploadPending {

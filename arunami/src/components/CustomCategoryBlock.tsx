@@ -26,6 +26,18 @@ interface Props {
   isLastInBody?: boolean
   /** When provided, renders up/down on each sub-item row. */
   onMoveSubItem?: (catId: string, subId: string, direction: MoveDirection) => void
+  /** When true, hides the category-delete X and move-up/down arrows. Used for pinned
+   *  categories like COGS that must stay in a fixed row position. */
+  pinned?: boolean
+  /** When true, hides the Income/Expense badge on the header row. */
+  hideTypeBadge?: boolean
+  /** When provided, takes precedence over the computed subItem sum for the header cell.
+   *  Used for legacy COGS columns (no breakdown) where the stored flat `cogs` should be shown. */
+  columnSubtotalOverride?: (columnKey: string) => number | undefined
+  /** When true, hides the bottom "Add sub-item" button. */
+  hideAddSubButton?: boolean
+  /** When false, hides the X remove button on each sub-item row. */
+  allowRemoveSubItem?: boolean
 }
 
 export function CustomCategoryBlock({
@@ -41,6 +53,11 @@ export function CustomCategoryBlock({
   isFirstInBody,
   isLastInBody,
   onMoveSubItem,
+  pinned = false,
+  hideTypeBadge = false,
+  columnSubtotalOverride,
+  hideAddSubButton = false,
+  allowRemoveSubItem = true,
 }: Props) {
   const colCount = columns.length + (showGrandTotal ? 2 : 1)
   const isIncome = cat.type === 'income'
@@ -53,7 +70,10 @@ export function CustomCategoryBlock({
     cat.subItems.reduce((s, sub) => s + (getAmount(columnKey, cat.id, sub.id) || 0), 0)
 
   const grandTotal = (): number =>
-    columns.reduce((s, col) => s + columnSubtotal(col.key), 0)
+    columns.reduce((s, col) => {
+      const override = columnSubtotalOverride?.(col.key)
+      return s + (override !== undefined ? override : columnSubtotal(col.key))
+    }, 0)
 
   const grandTotalForSub = (subId: string): number =>
     columns.reduce((s, col) => s + (getAmount(col.key, cat.id, subId) || 0), 0)
@@ -64,7 +84,7 @@ export function CustomCategoryBlock({
       <tr className="bg-muted/20">
         <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
           <div className="flex items-center gap-1">
-            {onMoveCategory && (
+            {!pinned && onMoveCategory && (
               <div className="flex flex-col shrink-0">
                 <button
                   type="button"
@@ -87,23 +107,28 @@ export function CustomCategoryBlock({
               </div>
             )}
             <span className="flex-1 truncate">{cat.name}</span>
-            <Badge className={`text-[10px] px-1.5 py-0 ${badgeClass}`}>
-              {isIncome ? 'Income' : 'Expense'}
-            </Badge>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-              onClick={() => onRemoveCategory(cat.id)}
-              title="Hapus kategori"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+            {!hideTypeBadge && (
+              <Badge className={`text-[10px] px-1.5 py-0 ${badgeClass}`}>
+                {isIncome ? 'Income' : 'Expense'}
+              </Badge>
+            )}
+            {!pinned && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                onClick={() => onRemoveCategory(cat.id)}
+                title="Hapus kategori"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </td>
         {columns.map(col => {
-          const val = columnSubtotal(col.key)
+          const override = columnSubtotalOverride?.(col.key)
+          const val = override !== undefined ? override : columnSubtotal(col.key)
           return (
             <td
               key={col.key}
@@ -153,16 +178,18 @@ export function CustomCategoryBlock({
                   </div>
                 )}
                 <span className="flex-1 truncate">{sub.name}</span>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                  onClick={() => onRemoveSubItem(cat.id, sub.id)}
-                  title="Hapus sub-item"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+                {allowRemoveSubItem && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => onRemoveSubItem(cat.id, sub.id)}
+                    title="Hapus sub-item"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </td>
             {columns.map(col => {
@@ -196,19 +223,21 @@ export function CustomCategoryBlock({
       })}
 
       {/* Add sub-item row */}
-      <tr>
-        <td colSpan={colCount} className="px-4 py-1.5 pl-8 border-b">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-muted-foreground"
-            onClick={() => onAddSubItem(cat.id)}
-          >
-            <Plus className="h-3 w-3 mr-1" /> Tambah Sub-Kategori
-          </Button>
-        </td>
-      </tr>
+      {!hideAddSubButton && (
+        <tr>
+          <td colSpan={colCount} className="px-4 py-1.5 pl-8 border-b">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => onAddSubItem(cat.id)}
+            >
+              <Plus className="h-3 w-3 mr-1" /> Tambah Sub-Kategori
+            </Button>
+          </td>
+        </tr>
+      )}
     </Fragment>
   )
 }

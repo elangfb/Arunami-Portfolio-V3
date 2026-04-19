@@ -178,6 +178,75 @@ export function setSubItemAmountInMonth<T extends { customCategories?: CustomCat
   )
 }
 
+// ─── COGS breakdown helpers ────────────────────────────────────────────────
+// COGS is a pinned main-category (always sits between Revenue and Gross Profit).
+// These helpers mirror the `*AcrossMonths` pattern used for customCategories
+// but operate on a flat CustomSubItem[] field (`cogsSubItems`) on each month.
+
+export function sumCogsSubItems(items: CustomSubItem[] | undefined): number {
+  if (!items) return 0
+  return items.reduce((s, x) => s + (Number(x.amount) || 0), 0)
+}
+
+export function unionCogsSubItems(
+  sources: Array<CustomSubItem[] | undefined>,
+): CustomSubItem[] {
+  const byId = new Map<string, CustomSubItem>()
+  for (const list of sources) {
+    if (!list) continue
+    for (const sub of list) {
+      if (!byId.has(sub.id)) {
+        byId.set(sub.id, { id: sub.id, name: sub.name, amount: 0 })
+      }
+    }
+  }
+  return Array.from(byId.values())
+}
+
+export function addCogsSubItemAcrossMonths<T extends { cogsSubItems?: CustomSubItem[] }>(
+  months: T[],
+  name: string,
+): { months: T[]; subId: string | null } {
+  const existingIds = new Set(months.flatMap(m => (m.cogsSubItems ?? []).map(s => s.id)))
+  const subId = uniqueId([...existingIds], slugifyCategory(name), `cogs-${Date.now()}`)
+  const next = months.map(m => ({
+    ...m,
+    cogsSubItems: [
+      ...(m.cogsSubItems ?? []),
+      { id: subId, name: name.trim(), amount: 0 } satisfies CustomSubItem,
+    ],
+  }))
+  return { months: next, subId }
+}
+
+export function removeCogsSubItemAcrossMonths<T extends { cogsSubItems?: CustomSubItem[] }>(
+  months: T[],
+  subId: string,
+): T[] {
+  return months.map(m => ({
+    ...m,
+    cogsSubItems: (m.cogsSubItems ?? []).filter(s => s.id !== subId),
+  }))
+}
+
+export function setCogsSubItemAmountInMonth<T extends { cogsSubItems?: CustomSubItem[] }>(
+  months: T[],
+  monthIdx: number,
+  subId: string,
+  amount: number,
+): T[] {
+  return months.map((m, i) =>
+    i === monthIdx
+      ? {
+          ...m,
+          cogsSubItems: (m.cogsSubItems ?? []).map(s =>
+            s.id === subId ? { ...s, amount } : s,
+          ),
+        }
+      : m,
+  )
+}
+
 /**
  * Compute the union of categories across a list of month rows / reports. Matches
  * categories by id; the first occurrence's name/type wins. Each returned category's

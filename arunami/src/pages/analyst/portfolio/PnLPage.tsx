@@ -30,6 +30,8 @@ import {
   removeCategory as removeCategoryInList,
   addSubItem as addSubItemInList,
   removeSubItem as removeSubItemInList,
+  unionCogsSubItems,
+  slugifyCategory,
 } from '@/lib/customCategories'
 import {
   resolveBodyOrder,
@@ -44,7 +46,7 @@ import DividendDeclaration from './DividendDeclaration'
 import CustomVariableInput from './CustomVariableInput'
 import type {
   PnLExtractedData, PnLUploadPending, OpexItem, PortfolioReport, Portfolio,
-  PortfolioConfig, RevenueCategory, CustomCategory, CustomCategoryType,
+  PortfolioConfig, RevenueCategory, CustomCategory, CustomCategoryType, CustomSubItem,
 } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -71,6 +73,7 @@ export default function PnLPage() {
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineData, setInlineData] = useState<Record<string, number>>({})
   const [inlineCategories, setInlineCategories] = useState<CustomCategory[]>([])
+  const [inlineCogsSubItems, setInlineCogsSubItems] = useState<CustomSubItem[]>([])
   const [inlineSaving, setInlineSaving] = useState(false)
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
 
@@ -175,6 +178,11 @@ export default function PnLPage() {
       if (c.type === 'income') customIncome += sum
       else customExpense += sum
     }
+    // When cogs breakdown exists, derive cogs from the sum of cogsSub:* keys.
+    const cogsKeys = Object.keys(next).filter(k => k.startsWith('cogsSub:'))
+    if (cogsKeys.length > 0) {
+      next.cogs = cogsKeys.reduce((s, k) => s + (next[k] || 0), 0)
+    }
     next.grossProfit = (next.revenue || 0) - (next.cogs || 0)
     next.totalOpex = opexTotal
     next.operatingProfit = next.grossProfit - next.totalOpex
@@ -219,7 +227,16 @@ export default function PnLPage() {
         data[`custom:${cat.id}:${sub.id}`] = ownSub?.amount ?? 0
       }
     }
+    // Seed cogs sub-items the same way.
+    const cogsUnion = unionCogsSubItems(
+      reports.map(r => (r.extractedData as PnLExtractedData).cogsSubItems),
+    )
+    const ownCogs = d.cogsSubItems ?? []
+    for (const sub of cogsUnion) {
+      data[`cogsSub:${sub.id}`] = ownCogs.find(s => s.id === sub.id)?.amount ?? 0
+    }
     setInlineCategories(catsUnion)
+    setInlineCogsSubItems(cogsUnion)
     setInlineData(recalcPnl(data, catsUnion))
     setInlineEditId(report.id)
   }
@@ -237,6 +254,10 @@ export default function PnLPage() {
   const handleInlineDialogSubmit = (payload: AddCategoryPayload) => {
     if (payload.kind === 'main') {
       handleInlineAddCategory(payload.name, payload.type)
+      return
+    }
+    if (payload.parentId === '__cogs__') {
+      handleInlineAddCogsSub(payload.name)
       return
     }
     const { categories: nextCats, subId } = addSubItemInList(
@@ -281,6 +302,39 @@ export default function PnLPage() {
     })
   }
 
+  // ── COGS breakdown handlers (inline edit) ──────────────────────────────
+  const handleInlineAddCogsSub = (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    if (inlineCogsSubItems.some(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('Komponen COGS dengan nama ini sudah ada')
+      return
+    }
+    const existingIds = new Set(inlineCogsSubItems.map(s => s.id))
+    const base = slugifyCategory(trimmed) || `cogs-${Date.now()}`
+    let subId = base
+    let i = 2
+    while (existingIds.has(subId)) subId = `${base}-${i++}`
+    const next = [...inlineCogsSubItems, { id: subId, name: trimmed, amount: 0 }]
+    setInlineCogsSubItems(next)
+    setInlineData(prev => recalcPnl({ ...prev, [`cogsSub:${subId}`]: 0 }, inlineCategories))
+  }
+
+  const handleInlineCogsAddPrompt = () => {
+    const name = window.prompt('Nama komponen COGS baru (misal: Bahan Baku):')
+    if (!name?.trim()) return
+    handleInlineAddCogsSub(name)
+  }
+
+  const handleInlineCogsRemoveSub = (_catId: string, subId: string) => {
+    setInlineCogsSubItems(prev => prev.filter(s => s.id !== subId))
+    setInlineData(prev => {
+      const { [`cogsSub:${subId}`]: _removed, ...rest } = prev
+      void _removed
+      return recalcPnl(rest, inlineCategories)
+    })
+  }
+
   const handleInlineSave = async (report: PortfolioReport) => {
     if (!portfolioId || !user) return
     setInlineSaving(true)
@@ -301,6 +355,12 @@ export default function PnLPage() {
         })),
       }))
 
+      const cogsSubItems: CustomSubItem[] = inlineCogsSubItems.map(sub => ({
+        id: sub.id,
+        name: sub.name,
+        amount: inlineData[`cogsSub:${sub.id}`] ?? 0,
+      }))
+
       const extractedData: PnLExtractedData = {
         ...d,
         revenue: inlineData.revenue ?? d.revenue,
@@ -313,6 +373,7 @@ export default function PnLPage() {
         taxes: inlineData.taxes ?? d.taxes,
         netProfit: inlineData.netProfit ?? d.netProfit,
         customCategories,
+        cogsSubItems,
       }
 
       await updateReport(portfolioId, report.id, { extractedData })
@@ -320,6 +381,7 @@ export default function PnLPage() {
       setInlineEditId(null)
       setInlineData({})
       setInlineCategories([])
+      setInlineCogsSubItems([])
       fetchReports()
       toast.success('Laporan PnL berhasil diperbarui')
     } catch {
@@ -333,6 +395,7 @@ export default function PnLPage() {
     setInlineEditId(null)
     setInlineData({})
     setInlineCategories([])
+    setInlineCogsSubItems([])
   }
 
   // File upload → extract → show inline review table
@@ -420,6 +483,8 @@ export default function PnLPage() {
           netProfit: month.netProfit,
           unitBreakdown: pendingPnl.unitBreakdown ?? {},
           notes: pendingPnl.notes ?? '',
+          customCategories: month.customCategories ?? [],
+          cogsSubItems: month.cogsSubItems ?? [],
         }
         await saveReport(portfolioId, {
           type: 'pnl',
@@ -648,9 +713,27 @@ export default function PnLPage() {
                 }
                 return (d[key as keyof PnLExtractedData] as number) ?? 0
               }
-              const rowsBeforeBody: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
+              // COGS can be either flat (one number) or broken down into sub-items.
+              // When editing, use inlineCogsSubItems; else union across saved reports.
+              const rawCogsSubItems = inlineEditId
+                ? inlineCogsSubItems
+                : unionCogsSubItems(
+                    sorted.map(r => (r.extractedData as PnLExtractedData).cogsSubItems),
+                  )
+              const hasCogsBreakdown = rawCogsSubItems.length > 0
+              const cogsCategory: CustomCategory = {
+                id: '__cogs__',
+                name: 'COGS',
+                type: 'expense',
+                subItems: rawCogsSubItems,
+              }
+              const rowsBeforeCogs: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
                 { label: 'Revenue', key: 'revenue', bold: true, editable: true },
-                { label: 'COGS', key: 'cogs', className: 'text-red-600', editable: true },
+              ]
+              const flatCogsRow = hasCogsBreakdown
+                ? null
+                : { label: 'COGS', key: 'cogs', className: 'text-red-600', editable: true }
+              const rowsAfterCogs: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
                 { label: 'Gross Profit', key: 'grossProfit', bold: true, className: 'text-green-700' },
               ]
               const rowsAfterBody: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
@@ -773,7 +856,53 @@ export default function PnLPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {rowsBeforeBody.map(renderStandardRow)}
+                        {rowsBeforeCogs.map(renderStandardRow)}
+
+                        {/* COGS — pinned block when breakdown exists, else flat row */}
+                        {hasCogsBreakdown ? (
+                          <CustomCategoryBlock
+                            key="body-cogs-pinned"
+                            category={cogsCategory}
+                            columns={sorted.map(r => ({
+                              key: r.id,
+                              editable: inlineEditId === r.id,
+                            }))}
+                            showGrandTotal={false}
+                            getAmount={(columnKey, _catId, subId) => {
+                              if (inlineEditId === columnKey) {
+                                return inlineData[`cogsSub:${subId}`] ?? 0
+                              }
+                              const r = sorted.find(x => x.id === columnKey)
+                              if (!r) return 0
+                              const d = r.extractedData as PnLExtractedData
+                              return d.cogsSubItems?.find(s => s.id === subId)?.amount ?? 0
+                            }}
+                            onAmountChange={(columnKey, _catId, subId, value) => {
+                              if (inlineEditId !== columnKey) return
+                              handleInlineChange(`cogsSub:${subId}`, value)
+                            }}
+                            onRemoveCategory={() => {}}
+                            onAddSubItem={handleInlineCogsAddPrompt}
+                            onRemoveSubItem={handleInlineCogsRemoveSub}
+                            pinned
+                            hideTypeBadge
+                            hideAddSubButton={!inlineEditId}
+                            allowRemoveSubItem={!!inlineEditId}
+                            columnSubtotalOverride={columnKey => {
+                              // Legacy/mixed columns without their own breakdown: show the
+                              // stored flat cogs instead of a misleading 0.
+                              if (inlineEditId === columnKey) return undefined
+                              const r = sorted.find(x => x.id === columnKey)
+                              if (!r) return undefined
+                              const d = r.extractedData as PnLExtractedData
+                              return (d.cogsSubItems?.length ?? 0) > 0 ? undefined : (Number(d.cogs) || 0)
+                            }}
+                          />
+                        ) : (
+                          flatCogsRow && renderStandardRow(flatCogsRow)
+                        )}
+
+                        {rowsAfterCogs.map(renderStandardRow)}
 
                         {/* Interleaved body: opex rows + custom category blocks */}
                         {bodyOrder.map((entry, bodyIdx) => {
@@ -917,26 +1046,40 @@ export default function PnLPage() {
                 <Label className="text-xs">Periode</Label>
                 <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} />
               </div>
-              {([
-                ['revenue', 'Revenue (IDR)', false],
-                ['cogs', 'COGS (IDR)', false],
-                ['grossProfit', 'Gross Profit (IDR)', true],
-                ['totalOpex', 'Total Opex (IDR)', true],
-                ['operatingProfit', 'Operating Profit (IDR)', true],
-                ['interest', 'Interest (IDR)', false],
-                ['taxes', 'Taxes (IDR)', false],
-                ['netProfit', 'Net Profit (IDR)', true],
-              ] as [keyof PnLExtractedData, string, boolean][]).map(([field, label, readOnly]) => (
-                <div key={field} className="space-y-1">
-                  <Label className="text-xs">{label}</Label>
-                  <Input
-                    {...register(field, { valueAsNumber: true })}
-                    type="number"
-                    readOnly={readOnly}
-                    className={`text-sm ${readOnly ? 'bg-muted cursor-not-allowed' : ''}`}
-                  />
-                </div>
-              ))}
+              {(() => {
+                // If this report already has a COGS breakdown, the flat input would
+                // silently nuke it — lock it down and direct the user to the inline
+                // edit flow.
+                const cogsLocked = (editingReport?.extractedData as PnLExtractedData | undefined)
+                  ?.cogsSubItems?.length
+                  ? true
+                  : false
+                return ([
+                  ['revenue', 'Revenue (IDR)', false],
+                  ['cogs', 'COGS (IDR)', cogsLocked],
+                  ['grossProfit', 'Gross Profit (IDR)', true],
+                  ['totalOpex', 'Total Opex (IDR)', true],
+                  ['operatingProfit', 'Operating Profit (IDR)', true],
+                  ['interest', 'Interest (IDR)', false],
+                  ['taxes', 'Taxes (IDR)', false],
+                  ['netProfit', 'Net Profit (IDR)', true],
+                ] as [keyof PnLExtractedData, string, boolean][]).map(([field, label, readOnly]) => (
+                  <div key={field} className="space-y-1">
+                    <Label className="text-xs">{label}</Label>
+                    <Input
+                      {...register(field, { valueAsNumber: true })}
+                      type="number"
+                      readOnly={readOnly}
+                      className={`text-sm ${readOnly ? 'bg-muted cursor-not-allowed' : ''}`}
+                    />
+                    {field === 'cogs' && cogsLocked && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Edit breakdown COGS lewat tabel riwayat (inline edit).
+                      </p>
+                    )}
+                  </div>
+                ))
+              })()}
             </div>
 
             {/* Unit Breakdown */}
@@ -1005,7 +1148,10 @@ export default function PnLPage() {
         open={addCategoryOpen}
         onOpenChange={setAddCategoryOpen}
         onSubmit={handleInlineDialogSubmit}
-        existingMainCategories={inlineCategories}
+        existingMainCategories={[
+          { id: '__cogs__', name: 'COGS', type: 'expense', subItems: inlineCogsSubItems },
+          ...inlineCategories,
+        ]}
       />
     </div>
   )

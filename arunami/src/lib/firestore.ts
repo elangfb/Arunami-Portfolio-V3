@@ -458,16 +458,32 @@ export async function syncFinancialData(portfolioId: string) {
     }
   })
 
-  // Build costStructure from the latest PnL
+  // Build costStructure from the latest PnL. Includes COGS sub-items (when the
+  // report has a breakdown) prefixed with "COGS: " so downstream consumers can
+  // tell them apart from opex items. Percentage is computed against the combined
+  // total of cogs + opex so items are comparable on the same scale.
   const latestPnl = sortedPnl.at(-1)?.extractedData as PnLExtractedData | undefined
   let costStructure: CostItem[] = []
-  if (latestPnl?.opex && latestPnl.opex.length > 0) {
-    const totalOpex = latestPnl.totalOpex || latestPnl.opex.reduce((s, o) => s + o.amount, 0)
-    costStructure = latestPnl.opex.map(o => ({
+  if (latestPnl) {
+    const opexItems = latestPnl.opex ?? []
+    const cogsSubs = latestPnl.cogsSubItems ?? []
+    const totalOpex = latestPnl.totalOpex || opexItems.reduce((s, o) => s + o.amount, 0)
+    const totalCogs = cogsSubs.length > 0
+      ? cogsSubs.reduce((s, x) => s + (Number(x.amount) || 0), 0)
+      : (Number(latestPnl.cogs) || 0)
+    const grandTotal = totalCogs + totalOpex
+
+    const cogsEntries: CostItem[] = cogsSubs.map(s => ({
+      name: `COGS: ${s.name}`,
+      amount: Number(s.amount) || 0,
+      percentage: grandTotal > 0 ? ((Number(s.amount) || 0) / grandTotal) * 100 : 0,
+    }))
+    const opexEntries: CostItem[] = opexItems.map(o => ({
       name: o.name,
       amount: o.amount,
-      percentage: totalOpex > 0 ? (o.amount / totalOpex) * 100 : 0,
+      percentage: grandTotal > 0 ? (o.amount / grandTotal) * 100 : 0,
     }))
+    costStructure = [...cogsEntries, ...opexEntries]
   }
 
   // Fetch portfolio config for dynamic categories

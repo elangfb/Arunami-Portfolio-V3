@@ -247,11 +247,17 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
     }
   }
 
+  const cogsRows = latestPnl && (latestPnl.cogsSubItems?.length ?? 0) > 0
+    ? `${row('COGS', latestPnl.cogs)}${latestPnl.cogsSubItems!.map(s =>
+        `<tr><td style="padding-left:20px;color:#666;font-size:12px">${s.name}</td><td style="text-align:right;color:#666;font-size:12px">${formatCurrencyExact(s.amount)}</td></tr>`,
+      ).join('')}`
+    : (latestPnl ? row('COGS', latestPnl.cogs) : '')
+
   const pnlSection = latestPnl ? `
     <h2>Laporan Keuangan — ${formatPeriod(latestPnl.period)}</h2>
     <table class="data">
       ${row('Revenue', latestPnl.revenue)}
-      ${row('COGS', latestPnl.cogs)}
+      ${cogsRows}
       ${row('Gross Profit', latestPnl.grossProfit)}
       ${row('Total Opex', latestPnl.totalOpex)}
       ${row('Operating Profit', derivedOperatingProfit)}
@@ -270,11 +276,20 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
     </table>
   ` : ''
 
-  const costSection = latestPnl && latestPnl.opex?.length ? `
+  const hasCogsBreakdown = (latestPnl?.cogsSubItems?.length ?? 0) > 0
+  const hasOpex = (latestPnl?.opex?.length ?? 0) > 0
+  const costSection = latestPnl && (hasOpex || hasCogsBreakdown) ? `
     <h2>Struktur Biaya</h2>
     <table class="data">
       <tr><th>Item</th><th style="text-align:right">Jumlah</th></tr>
-      ${latestPnl.opex.map(o => `<tr><td>${o.name}</td><td style="text-align:right">${formatCurrencyExact(o.amount)}</td></tr>`).join('')}
+      ${hasCogsBreakdown ? `
+        <tr><td colspan="2" style="font-weight:600;background:#f5f5f5">COGS</td></tr>
+        ${latestPnl.cogsSubItems!.map(s => `<tr><td style="padding-left:20px">${s.name}</td><td style="text-align:right">${formatCurrencyExact(s.amount)}</td></tr>`).join('')}
+      ` : ''}
+      ${hasOpex ? `
+        <tr><td colspan="2" style="font-weight:600;background:#f5f5f5">Operating Expenses</td></tr>
+        ${latestPnl.opex.map(o => `<tr><td style="padding-left:20px">${o.name}</td><td style="text-align:right">${formatCurrencyExact(o.amount)}</td></tr>`).join('')}
+      ` : ''}
     </table>
   ` : ''
 

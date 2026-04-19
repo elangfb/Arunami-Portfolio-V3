@@ -7,9 +7,10 @@ import * as XLSX from 'xlsx'
 import type {
   PnLExtractedData, ProjectionExtractedData, PortfolioConfig,
   ClassifiedPnLData, ClassifiedProjectionData, PortfolioSetupExtraction,
-  IndustryType, ProjectionUploadPending, PnLUploadPending,
+  IndustryType, ProjectionUploadPending, PnLUploadPending, MonthlyPnLRow,
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
+import { slugifyCategory } from '@/lib/customCategories'
 
 const anthropic = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
@@ -114,6 +115,7 @@ Kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
       "month": "string format YYYY-MM (contoh: 2026-01 untuk Januari 2026)",
       "revenue": number,
       "cogs": number,
+      "cogsBreakdown": [{"name": "string", "amount": number}],
       "grossProfit": number,
       "opex": [{"name": "string", "amount": number}],
       "totalOpex": number,
@@ -128,6 +130,7 @@ ATURAN:
 - Sertakan data untuk SETIAP bulan yang ada di dokumen (jangan diringkas/diaggregat)
 - Semua nilai moneter dalam IDR (angka saja, tanpa simbol Rp atau titik ribuan)
 - Gunakan nama opex yang KONSISTEN di semua bulan
+- Jika dokumen memecah COGS menjadi komponen (Bahan Baku, Tenaga Kerja Langsung, Overhead Produksi, dll), isi "cogsBreakdown" dengan setiap komponen. Gunakan nama yang KONSISTEN di semua bulan. Sum cogsBreakdown harus sama dengan cogs. Jika tidak ada breakdown di dokumen, kembalikan array kosong.
 - grossProfit = revenue - cogs
 - operatingProfit = grossProfit - totalOpex
 - netProfit = operatingProfit - interest - taxes
@@ -136,32 +139,68 @@ ATURAN:
 `
 }
 
+type RawMonthlyPnLRow = MonthlyPnLRow & { cogsBreakdown?: Array<{ name: string; amount: number }> }
+type RawPnLUploadPending = Omit<PnLUploadPending, 'monthlyData'> & { monthlyData: RawMonthlyPnLRow[] }
+
 export async function extractPnLMonthly(file: File, config?: PortfolioConfig): Promise<PnLUploadPending> {
   const raw = await sendToClaude(file, buildPnLMonthlyPrompt(config))
-  const parsed = safeParseJSON<PnLUploadPending>(raw)
+  const parsed = safeParseJSON<RawPnLUploadPending>(raw)
 
   // Normalize opex names across months: collect all unique names, ensure every month has all
   const allOpexNames = [...new Set(parsed.monthlyData.flatMap(m => (m.opex ?? []).map(o => o.name)))]
-  const normalizedData = parsed.monthlyData.map(m => {
+
+  // Normalize COGS breakdown names across months the same way, then convert to CustomSubItems
+  // with slugified ids. If no month has any breakdown, cogsSubItems stays empty and cogs is
+  // kept flat (backward-compatible).
+  const allCogsNames = [...new Set(parsed.monthlyData.flatMap(m => (m.cogsBreakdown ?? []).map(o => o.name)))]
+  const cogsIdByName: Record<string, string> = {}
+  for (const name of allCogsNames) {
+    const base = slugifyCategory(name) || `cogs-${Object.keys(cogsIdByName).length + 1}`
+    let id = base
+    let i = 2
+    while (Object.values(cogsIdByName).includes(id)) id = `${base}-${i++}`
+    cogsIdByName[name] = id
+  }
+
+  const normalizedData: MonthlyPnLRow[] = parsed.monthlyData.map(m => {
     const existingNames = new Set((m.opex ?? []).map(o => o.name))
     const filledOpex = [
       ...(m.opex ?? []),
       ...allOpexNames.filter(n => !existingNames.has(n)).map(n => ({ name: n, amount: 0 })),
     ]
-    // Recalculate derived values
+
+    const existingCogsNames = new Set((m.cogsBreakdown ?? []).map(o => o.name))
+    const filledCogs = [
+      ...(m.cogsBreakdown ?? []),
+      ...allCogsNames.filter(n => !existingCogsNames.has(n)).map(n => ({ name: n, amount: 0 })),
+    ]
+    const cogsSubItems = filledCogs.map(item => ({
+      id: cogsIdByName[item.name],
+      name: item.name,
+      amount: Number(item.amount) || 0,
+    }))
+
+    // Recalculate derived values. If breakdown exists, cogs is forced to the sum so AI drift
+    // can't produce inconsistent grossProfit.
     const revenue = Number(m.revenue) || 0
-    const cogs = Number(m.cogs) || 0
+    const cogs = cogsSubItems.length > 0
+      ? cogsSubItems.reduce((s, x) => s + x.amount, 0)
+      : Number(m.cogs) || 0
     const totalOpex = filledOpex.reduce((s, o) => s + (Number(o.amount) || 0), 0)
     const interest = Number(m.interest) || 0
     const taxes = Number(m.taxes) || 0
     const grossProfit = revenue - cogs
     const operatingProfit = grossProfit - totalOpex
     const netProfit = operatingProfit - interest - taxes
+
+    const { cogsBreakdown: _drop, ...rest } = m
+    void _drop
     return {
-      ...m,
+      ...rest,
       revenue, cogs, grossProfit,
       opex: filledOpex, totalOpex, operatingProfit,
       interest, taxes, netProfit,
+      ...(cogsSubItems.length > 0 ? { cogsSubItems } : {}),
     }
   })
 

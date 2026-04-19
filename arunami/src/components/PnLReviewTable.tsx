@@ -10,6 +10,7 @@ import type {
   RevenueCategory,
   CustomCategoryType,
   RowOrder,
+  CustomCategory,
 } from '@/types'
 import {
   customNetAdjustment,
@@ -19,6 +20,10 @@ import {
   removeSubItemAcrossMonths,
   setSubItemAmountInMonth,
   unionCategories,
+  unionCogsSubItems,
+  addCogsSubItemAcrossMonths,
+  removeCogsSubItemAcrossMonths,
+  setCogsSubItemAmountInMonth,
 } from '@/lib/customCategories'
 import {
   resolveBodyOrder,
@@ -80,7 +85,11 @@ function setCellValue(month: MonthlyPnLRow, key: string, value: number): Monthly
 
 function recalculate(month: MonthlyPnLRow): MonthlyPnLRow {
   const revenue = Number(month.revenue) || 0
-  const cogs = Number(month.cogs) || 0
+  // If COGS has a breakdown, derive the cogs total from the sub-items. Otherwise
+  // keep the flat stored value (backward compat for legacy rows / manual entry).
+  const cogs = (month.cogsSubItems?.length ?? 0) > 0
+    ? month.cogsSubItems!.reduce((s, x) => s + (Number(x.amount) || 0), 0)
+    : Number(month.cogs) || 0
   const totalOpex = (month.opex ?? []).reduce((s, o) => s + (Number(o.amount) || 0), 0)
   const interest = Number(month.interest) || 0
   const taxes = Number(month.taxes) || 0
@@ -89,7 +98,7 @@ function recalculate(month: MonthlyPnLRow): MonthlyPnLRow {
   const operatingProfit = grossProfit - totalOpex
   const netProfit = operatingProfit - interest - taxes + customNetAdjustment(month.customCategories)
 
-  return { ...month, grossProfit, totalOpex, operatingProfit, netProfit }
+  return { ...month, cogs, grossProfit, totalOpex, operatingProfit, netProfit }
 }
 
 export function PnLReviewTable({
@@ -105,9 +114,24 @@ export function PnLReviewTable({
   const bodyOrder = resolveBodyOrder(rawOpexNames, categoryIds, rowOrder)
   const catById = new Map(rawCategories.map(c => [c.id, c]))
 
-  const rowsBeforeBody: RowDef[] = [
+  // COGS can be either flat (one number per month) or broken down into sub-items.
+  // We render as a pinned main-category block once any month has a breakdown.
+  const cogsUnionSubItems = unionCogsSubItems(months.map(m => m.cogsSubItems))
+  const hasCogsBreakdown = cogsUnionSubItems.length > 0
+  const cogsCategory: CustomCategory = {
+    id: '__cogs__',
+    name: 'COGS',
+    type: 'expense',
+    subItems: cogsUnionSubItems,
+  }
+
+  const rowsBeforeCogs: RowDef[] = [
     { label: 'Revenue', key: 'revenue', isBold: true },
-    { label: 'COGS', key: 'cogs', className: 'text-red-600' },
+  ]
+  const flatCogsRow: RowDef | null = hasCogsBreakdown
+    ? null
+    : { label: 'COGS', key: 'cogs', className: 'text-red-600' }
+  const rowsAfterCogs: RowDef[] = [
     { label: 'Gross Profit', key: 'grossProfit', isBold: true, className: 'text-green-700', readOnly: true },
   ]
   const rowsAfterBody: RowDef[] = [
@@ -179,6 +203,11 @@ export function PnLReviewTable({
       handleAddCategory(payload.name, payload.type)
       return
     }
+    if (payload.parentId === '__cogs__') {
+      const { months: nextMonths } = addCogsSubItemAcrossMonths(months, payload.name)
+      onDataChange({ ...data, monthlyData: nextMonths.map(recalculate) })
+      return
+    }
     const { months: nextMonths } = addSubItemAcrossMonths(months, payload.parentId, payload.name)
     onDataChange({ ...data, monthlyData: nextMonths.map(recalculate) })
   }
@@ -210,6 +239,39 @@ export function PnLReviewTable({
     const monthIdx = months.findIndex(m => m.month === monthKey)
     if (monthIdx < 0) return
     const nextMonths = setSubItemAmountInMonth(months, monthIdx, catId, subId, value).map(
+      (m, i) => (i === monthIdx ? recalculate(m) : m),
+    )
+    onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
+  // ── COGS breakdown handlers ────────────────────────────────────────────
+  const handleCogsAddSub = () => {
+    const name = window.prompt('Nama komponen COGS baru (misal: Bahan Baku):')
+    if (!name?.trim()) return
+    // Prevent duplicate name across existing sub-items
+    const lower = name.trim().toLowerCase()
+    if (cogsUnionSubItems.some(s => s.name.toLowerCase() === lower)) {
+      alert('Komponen COGS dengan nama ini sudah ada.')
+      return
+    }
+    const { months: nextMonths } = addCogsSubItemAcrossMonths(months, name)
+    onDataChange({ ...data, monthlyData: nextMonths.map(recalculate) })
+  }
+
+  const handleCogsRemoveSub = (_catId: string, subId: string) => {
+    const nextMonths = removeCogsSubItemAcrossMonths(months, subId).map(recalculate)
+    onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
+  const handleCogsAmountChange = (
+    monthKey: string,
+    _catId: string,
+    subId: string,
+    value: number,
+  ) => {
+    const monthIdx = months.findIndex(m => m.month === monthKey)
+    if (monthIdx < 0) return
+    const nextMonths = setCogsSubItemAmountInMonth(months, monthIdx, subId, value).map(
       (m, i) => (i === monthIdx ? recalculate(m) : m),
     )
     onDataChange({ ...data, monthlyData: nextMonths })
@@ -318,7 +380,38 @@ export function PnLReviewTable({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rowsBeforeBody.map(renderStandardRow)}
+              {rowsBeforeCogs.map(renderStandardRow)}
+
+              {/* COGS — pinned block when breakdown exists, else flat editable row */}
+              {hasCogsBreakdown ? (
+                <CustomCategoryBlock
+                  key="body-cogs-pinned"
+                  category={cogsCategory}
+                  columns={months.map(m => ({ key: m.month, editable: true }))}
+                  showGrandTotal={months.length > 1}
+                  getAmount={(monthKey, _catId, subId) => {
+                    const m = months.find(mm => mm.month === monthKey)
+                    return m?.cogsSubItems?.find(s => s.id === subId)?.amount ?? 0
+                  }}
+                  onAmountChange={handleCogsAmountChange}
+                  onRemoveCategory={() => {}}
+                  onAddSubItem={handleCogsAddSub}
+                  onRemoveSubItem={handleCogsRemoveSub}
+                  pinned
+                  hideTypeBadge
+                  columnSubtotalOverride={monthKey => {
+                    const m = months.find(mm => mm.month === monthKey)
+                    if (!m) return undefined
+                    // When the column has no breakdown of its own, show the stored
+                    // flat cogs so legacy/mixed columns aren't rendered as 0.
+                    return (m.cogsSubItems?.length ?? 0) > 0 ? undefined : (Number(m.cogs) || 0)
+                  }}
+                />
+              ) : (
+                flatCogsRow && renderStandardRow(flatCogsRow)
+              )}
+
+              {rowsAfterCogs.map(renderStandardRow)}
 
               {/* Interleaved body zone: opex items + custom category blocks */}
               {bodyOrder.map((entry, bodyIdx) => {
@@ -543,7 +636,7 @@ export function PnLReviewTable({
         open={addCategoryOpen}
         onOpenChange={setAddCategoryOpen}
         onSubmit={handleDialogSubmit}
-        existingMainCategories={rawCategories}
+        existingMainCategories={[cogsCategory, ...rawCategories]}
       />
     </div>
   )
