@@ -74,6 +74,10 @@ export default function PnLPage() {
   const [inlineData, setInlineData] = useState<Record<string, number>>({})
   const [inlineCategories, setInlineCategories] = useState<CustomCategory[]>([])
   const [inlineCogsSubItems, setInlineCogsSubItems] = useState<CustomSubItem[]>([])
+  // Opex items added during the current inline edit that don't exist in any saved
+  // report yet. Merged into the displayed opex name set so the new row shows up
+  // immediately while the user is editing.
+  const [inlineAddedOpexNames, setInlineAddedOpexNames] = useState<string[]>([])
   const [inlineSaving, setInlineSaving] = useState(false)
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
 
@@ -260,6 +264,10 @@ export default function PnLPage() {
       handleInlineAddCogsSub(payload.name)
       return
     }
+    if (payload.parentId === '__opex__') {
+      handleInlineAddOpexByName(payload.name)
+      return
+    }
     const { categories: nextCats, subId } = addSubItemInList(
       inlineCategories,
       payload.parentId,
@@ -335,6 +343,23 @@ export default function PnLPage() {
     })
   }
 
+  // ── OPEX-add during inline edit (via AddCustomCategoryDialog) ─────────
+  const handleInlineAddOpexByName = (rawName: string) => {
+    const name = rawName.trim()
+    if (!name) return
+    // Collide against both saved reports and newly-added-in-this-edit names.
+    const allOpex = [...new Set(reports.flatMap(r => {
+      const rd = r.extractedData as PnLExtractedData
+      return (rd.opex ?? []).map(o => o.name)
+    }))]
+    if ([...allOpex, ...inlineAddedOpexNames].some(n => n.toLowerCase() === name.toLowerCase())) {
+      toast.error('Item opex dengan nama ini sudah ada')
+      return
+    }
+    setInlineAddedOpexNames(prev => [...prev, name])
+    setInlineData(prev => recalcPnl({ ...prev, [`opex:${name}`]: 0 }, inlineCategories))
+  }
+
   const handleInlineSave = async (report: PortfolioReport) => {
     if (!portfolioId || !user) return
     setInlineSaving(true)
@@ -382,6 +407,7 @@ export default function PnLPage() {
       setInlineData({})
       setInlineCategories([])
       setInlineCogsSubItems([])
+      setInlineAddedOpexNames([])
       fetchReports()
       toast.success('Laporan PnL berhasil diperbarui')
     } catch {
@@ -396,6 +422,7 @@ export default function PnLPage() {
     setInlineData({})
     setInlineCategories([])
     setInlineCogsSubItems([])
+    setInlineAddedOpexNames([])
   }
 
   // File upload → extract → show inline review table
@@ -700,10 +727,15 @@ export default function PnLPage() {
           ) : (
             (() => {
               const sorted = [...reports].sort((a, b) => comparePeriods(a.period, b.period))
-              const rawOpexNames = [...new Set(sorted.flatMap(r => {
+              const savedOpexNames = [...new Set(sorted.flatMap(r => {
                 const d = r.extractedData as PnLExtractedData
                 return (d.opex ?? []).map(o => o.name)
               }))]
+              // Merge in any opex items added during the current inline edit so
+              // the new row renders immediately (before save).
+              const rawOpexNames = inlineEditId
+                ? [...savedOpexNames, ...inlineAddedOpexNames.filter(n => !savedOpexNames.includes(n))]
+                : savedOpexNames
               const rowOrder = portfolioConfig?.pnlRowOrder
               const getCell = (r: PortfolioReport, key: string): number => {
                 const d = r.extractedData as PnLExtractedData
@@ -1150,6 +1182,20 @@ export default function PnLPage() {
         onSubmit={handleInlineDialogSubmit}
         existingMainCategories={[
           { id: '__cogs__', name: 'COGS', type: 'expense', subItems: inlineCogsSubItems },
+          {
+            id: '__opex__',
+            name: 'OPEX',
+            type: 'expense',
+            subItems: [
+              ...new Set([
+                ...reports.flatMap(r => {
+                  const d = r.extractedData as PnLExtractedData
+                  return (d.opex ?? []).map(o => o.name)
+                }),
+                ...inlineAddedOpexNames,
+              ]),
+            ].map(n => ({ id: n, name: n, amount: 0 })),
+          },
           ...inlineCategories,
         ]}
       />

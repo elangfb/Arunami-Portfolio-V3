@@ -154,15 +154,21 @@ export function PnLReviewTable({
     onDataChange({ ...data, monthlyData: nextMonths })
   }
 
+  const addOpexByName = (rawName: string) => {
+    const name = rawName.trim()
+    if (!name) return
+    const nextMonths = months.map(m => {
+      const exists = (m.opex ?? []).some(o => o.name === name)
+      if (exists) return m
+      return { ...m, opex: [...(m.opex ?? []), { name, amount: 0 }] }
+    })
+    onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
   const handleAddOpex = () => {
     const name = window.prompt('Nama item opex baru:')
     if (!name?.trim()) return
-    const nextMonths = months.map(m => {
-      const exists = (m.opex ?? []).some(o => o.name === name.trim())
-      if (exists) return m
-      return { ...m, opex: [...(m.opex ?? []), { name: name.trim(), amount: 0 }] }
-    })
-    onDataChange({ ...data, monthlyData: nextMonths })
+    addOpexByName(name)
   }
 
   const handleRemoveOpex = (opexName: string) => {
@@ -206,6 +212,10 @@ export function PnLReviewTable({
     if (payload.parentId === '__cogs__') {
       const { months: nextMonths } = addCogsSubItemAcrossMonths(months, payload.name)
       onDataChange({ ...data, monthlyData: nextMonths.map(recalculate) })
+      return
+    }
+    if (payload.parentId === '__opex__') {
+      addOpexByName(payload.name)
       return
     }
     const { months: nextMonths } = addSubItemAcrossMonths(months, payload.parentId, payload.name)
@@ -636,7 +646,16 @@ export function PnLReviewTable({
         open={addCategoryOpen}
         onOpenChange={setAddCategoryOpen}
         onSubmit={handleDialogSubmit}
-        existingMainCategories={[cogsCategory, ...rawCategories]}
+        existingMainCategories={[
+          cogsCategory,
+          {
+            id: '__opex__',
+            name: 'OPEX',
+            type: 'expense',
+            subItems: rawOpexNames.map(n => ({ id: n, name: n, amount: 0 })),
+          },
+          ...rawCategories,
+        ]}
       />
     </div>
   )
