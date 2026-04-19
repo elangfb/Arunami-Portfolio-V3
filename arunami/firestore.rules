@@ -77,8 +77,8 @@ service cloud.firestore {
     // Admin manages all users; signed-in users can read their own profile so
     // role lookup works on the client without leaking other users' data.
     match /users/{uid} {
-      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
-      allow list: if isAdmin();
+      allow read: if isStaff() || (isSignedIn() && request.auth.uid == uid);
+      allow list: if isStaff();
       allow create, update, delete: if isAdmin();
     }
 

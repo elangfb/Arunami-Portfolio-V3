@@ -634,6 +634,18 @@ PENTING:
 - Jangan gunakan markdown atau formatting lain di dalam string
 - Angka selalu dalam IDR (tanpa simbol Rp, tanpa titik ribuan di dalam string, cukup sebut "Rp 48 juta" atau "Rp 48jt")
 - Fokus hanya pada summary — jangan buat daftar isu atau action items (user akan menuliskan sendiri)
+
+NADA & PEMILIHAN KATA (WAJIB):
+- Gunakan nada NETRAL dan objektif. Biarkan angka berbicara sendiri — jangan menambahkan penilaian emosional.
+- JANGAN gunakan kata-kata yang melebih-lebihkan (intensifier) atau bermuatan emosi, seperti:
+  "signifikan", "sangat", "luar biasa", "mengesankan", "gemilang", "kuat", "lemah", "buruk",
+  "mengecewakan", "mengkhawatirkan", "drastis", "tajam", "meroket", "anjlok", "pesat", "dramatis",
+  "jauh", "sungguh", "benar-benar".
+- Lebih baik sebutkan besaran/persentase aktual (mis. "lebih tinggi 12% dari proyeksi") daripada
+  label kualitatif ("jauh di atas proyeksi" atau "kenaikan signifikan").
+- Gunakan kata kerja netral: "naik", "turun", "di atas", "di bawah", "selisih", "sesuai",
+  "melampaui", "belum mencapai" — tanpa tambahan intensifier.
+- Tujuannya agar investor membaca laporan secara objektif tanpa digiring ke kesimpulan tertentu.
 `.trim()
 
 const MGMT_REPORT_SCHEMA = `
