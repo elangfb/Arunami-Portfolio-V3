@@ -38,10 +38,64 @@ const VARIABLE_SOURCES: { value: CustomVariableSource; label: string }[] = [
   { value: 'from_investasi_awal', label: 'Total Investasi Awal' },
 ]
 
-export default function StepInvestorModel({ form }: Props) {
+export function ModelPicker({ form }: { form: UseFormReturn<any> }) {
   const { register, formState: { errors }, watch, setValue, getValues } = form
-  const investasiAwal = watch('investasiAwal')
   const returnModel = watch('returnModel') as ReturnModelType
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <Label className="text-base font-semibold">Model Distribusi</Label>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {DISTRIBUTION_MODEL_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setValue('returnModel', opt.value, { shouldValidate: true })}
+              className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+                returnModel === opt.value
+                  ? 'border-green-600 bg-green-50 ring-1 ring-green-600'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <div className={`mt-0.5 rounded-md p-1.5 ${
+                returnModel === opt.value ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {MODEL_ICONS[opt.value]}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{opt.label}</p>
+                <p className="text-xs text-muted-foreground">{opt.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {returnModel === 'net_profit_share' && (
+        <NetProfitShareFields form={form} errors={errors} register={register} />
+      )}
+      {returnModel === 'fixed_yield' && (
+        <FixedYieldFields form={form} errors={errors} register={register} setValue={setValue} watch={watch} />
+      )}
+      {returnModel === 'revenue_share' && (
+        <RevenueShareFields form={form} errors={errors} register={register} />
+      )}
+      {returnModel === 'fixed_schedule' && (
+        <FixedScheduleFields form={form} getValues={getValues} setValue={setValue} register={register} />
+      )}
+      {returnModel === 'annual_dividend' && (
+        <AnnualDividendFields register={register} />
+      )}
+      {returnModel === 'custom' && (
+        <CustomFields form={form} getValues={getValues} setValue={setValue} register={register} errors={errors} />
+      )}
+    </div>
+  )
+}
+
+export default function StepInvestorModel({ form }: Props) {
+  const investasiAwal = form.watch('investasiAwal')
 
   return (
     <Card>
@@ -52,7 +106,6 @@ export default function StepInvestorModel({ form }: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Total Investasi (read-only) */}
         <div className="space-y-2">
           <Label>Total Investasi</Label>
           <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm">
@@ -63,54 +116,7 @@ export default function StepInvestorModel({ form }: Props) {
           </p>
         </div>
 
-        {/* Model Selector */}
-        <div className="space-y-3">
-          <Label className="text-base font-semibold">Model Distribusi</Label>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {DISTRIBUTION_MODEL_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setValue('returnModel', opt.value as WizardFormData['returnModel'], { shouldValidate: true })}
-                className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
-                  returnModel === opt.value
-                    ? 'border-green-600 bg-green-50 ring-1 ring-green-600'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <div className={`mt-0.5 rounded-md p-1.5 ${
-                  returnModel === opt.value ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {MODEL_ICONS[opt.value]}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground">{opt.description}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Model-specific fields */}
-        {returnModel === 'net_profit_share' && (
-          <NetProfitShareFields form={form} errors={errors} register={register} />
-        )}
-        {returnModel === 'fixed_yield' && (
-          <FixedYieldFields form={form} errors={errors} register={register} setValue={setValue} watch={watch} />
-        )}
-        {returnModel === 'revenue_share' && (
-          <RevenueShareFields form={form} errors={errors} register={register} />
-        )}
-        {returnModel === 'fixed_schedule' && (
-          <FixedScheduleFields form={form} getValues={getValues} setValue={setValue} register={register} />
-        )}
-        {returnModel === 'annual_dividend' && (
-          <AnnualDividendFields register={register} />
-        )}
-        {returnModel === 'custom' && (
-          <CustomFields form={form} getValues={getValues} setValue={setValue} register={register} errors={errors} />
-        )}
+        <ModelPicker form={form} />
       </CardContent>
     </Card>
   )

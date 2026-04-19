@@ -7,7 +7,8 @@ import { useAuthStore } from '@/store/authStore'
 import { formatPeriod, getNextReportingPeriod } from '@/lib/dateUtils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle, Pencil } from 'lucide-react'
 import type {
   Portfolio, PortfolioConfig, EquityChangeEntry, ReturnModelType,
 } from '@/types'
@@ -18,6 +19,7 @@ import RevenueShareSection from './profit-sharing/RevenueShareSection'
 import FixedScheduleSection from './profit-sharing/FixedScheduleSection'
 import AnnualDividendSection from './profit-sharing/AnnualDividendSection'
 import CustomSection from './profit-sharing/CustomSection'
+import ChangeReturnModelDialog from './profit-sharing/ChangeReturnModelDialog'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -70,6 +72,7 @@ export default function ProfitSharingPage() {
   const [config, setConfig] = useState<PortfolioConfig | null>(null)
   const [history, setHistory] = useState<EquityChangeEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [changeModelOpen, setChangeModelOpen] = useState(false)
 
   const load = async () => {
     if (!portfolioId) return
@@ -108,10 +111,19 @@ export default function ProfitSharingPage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto text-black">
       <div>
-        <h2 className="text-xl font-bold text-black">Profit Sharing Management</h2>
-        <p className="text-sm text-black mt-1">
-          Kelola model distribusi untuk portfolio ini. Setiap perubahan dicatat untuk akuntabilitas.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-black">Profit Sharing Management</h2>
+            <p className="text-sm text-black mt-1">
+              Kelola model distribusi untuk portfolio ini. Setiap perubahan dicatat untuk akuntabilitas.
+            </p>
+          </div>
+          {user?.role === 'admin' && (
+            <Button size="sm" variant="outline" onClick={() => setChangeModelOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />Ubah Model
+            </Button>
+          )}
+        </div>
         <div className="mt-2">
           <Badge variant="outline">Model: {MODEL_LABEL[config.returnModel]}</Badge>
           <Badge variant="outline" className="ml-2">Frekuensi: {config.reportingFrequency}</Badge>
@@ -141,6 +153,18 @@ export default function ProfitSharingPage() {
       </div>
 
       <HistorySection history={history} />
+
+      {user?.role === 'admin' && portfolioId && (
+        <ChangeReturnModelDialog
+          open={changeModelOpen}
+          onOpenChange={setChangeModelOpen}
+          portfolioId={portfolioId}
+          currentUser={currentUser}
+          currentConfig={config}
+          nextPeriod={nextPeriod ?? ''}
+          onSaved={load}
+        />
+      )}
     </div>
   )
 }

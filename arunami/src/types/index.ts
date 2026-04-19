@@ -579,6 +579,7 @@ export type ConfigChangeKind =
   | 'scheduled_payment'
   | 'dividend_declared'
   | 'custom_formula'
+  | 'return_model'
 
 export interface EquityChangeEntry {
   id: string

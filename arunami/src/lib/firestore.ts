@@ -12,7 +12,7 @@ import type {
   MonthlyDataPoint, CostItem, TransactionDataPoint, RevenueMixItem,
   PortfolioConfig, InvestorCommunication,
   InvestorReportDoc, EquityChangeEntry,
-  InvestorConfigUnion, ConfigChangeKind,
+  InvestorConfigUnion, ConfigChangeKind, ReturnModelType,
 } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 
@@ -183,20 +183,22 @@ export async function recordConfigChange(params: {
   effectiveFromPeriod: string
   changedByUid: string
   changedByName: string
+  newReturnModel?: ReturnModelType
 }): Promise<void> {
   const {
     portfolioId, currentConfig, newInvestorConfig, changeKind,
     fromValue, toValue, reasonNote, effectiveFromPeriod,
-    changedByUid, changedByName,
+    changedByUid, changedByName, newReturnModel,
   } = params
 
   const batch = writeBatch(db)
   const configRef = doc(db, 'portfolios', portfolioId, 'config', 'current')
-  batch.set(
-    configRef,
-    { ...currentConfig, investorConfig: newInvestorConfig },
-    { merge: true },
-  )
+  const mergedConfig: PortfolioConfig = {
+    ...currentConfig,
+    investorConfig: newInvestorConfig,
+    ...(newReturnModel ? { returnModel: newReturnModel } : {}),
+  }
+  batch.set(configRef, mergedConfig, { merge: true })
 
   const historyRef = doc(collection(db, 'portfolios', portfolioId, 'equityHistory'))
   const entry: Omit<EquityChangeEntry, 'id' | 'changedAt'> & {

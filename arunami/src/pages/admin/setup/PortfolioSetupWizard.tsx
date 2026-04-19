@@ -105,7 +105,21 @@ const STEPS = [
   { label: 'Struktur Investasi' },
 ]
 
-function buildInvestorConfig(data: WizardFormData): InvestorConfigUnion {
+export type InvestmentFormData = Pick<
+  WizardFormData,
+  | 'returnModel'
+  | 'investorSharePercent'
+  | 'arunamiFeePercent'
+  | 'fixedYieldPercent'
+  | 'principalReference'
+  | 'revenueSharePercent'
+  | 'scheduledPayments'
+  | 'customVariables'
+  | 'formula'
+  | 'distributionFrequency'
+>
+
+export function buildInvestorConfig(data: InvestmentFormData): InvestorConfigUnion {
   const base = {
     investorSharePercent: data.investorSharePercent,
     arunamiFeePercent: data.arunamiFeePercent,

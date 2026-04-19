@@ -18,6 +18,7 @@ const KIND_LABEL: Record<ConfigChangeKind, string> = {
   scheduled_payment: 'Jadwal Pembayaran',
   dividend_declared: 'Dividen',
   custom_formula: 'Formula Custom',
+  return_model: 'Model Distribusi',
 }
 
 function renderChange(row: EquityChangeEntry): { label: string; from: string; to: string } {
