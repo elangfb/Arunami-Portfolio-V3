@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'
 import type {
   PnLExtractedData, ProjectionExtractedData, PortfolioConfig,
   ClassifiedPnLData, ClassifiedProjectionData, PortfolioSetupExtraction,
-  IndustryType, ProjectionUploadPending, PnLUploadPending, MonthlyPnLRow, MonthlyProjectionRow,
+  IndustryType, ProjectionUploadPending, PnLUploadPending, MonthlyPnLRow,
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 import { slugifyCategory } from '@/lib/customCategories'
