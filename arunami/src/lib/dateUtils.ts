@@ -70,6 +70,13 @@ export function normalizePeriod(period: string): string {
   return period // can't parse, return as-is
 }
 
+/** Add N months to a "YYYY-MM" period key */
+export function addMonthOffset(periodKey: string, offset: number): string {
+  const [y, m] = periodKey.split('-').map(Number)
+  const total = y * 12 + m - 1 + offset
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
+}
+
 /** Sort comparator for "YYYY-MM" period strings (chronological) */
 export function comparePeriods(a: string, b: string): number {
   return a.localeCompare(b) // YYYY-MM sorts correctly with string comparison

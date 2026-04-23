@@ -11,7 +11,7 @@ import type {
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 import { slugifyCategory } from '@/lib/customCategories'
-import { normalizePeriod } from '@/lib/dateUtils'
+import { normalizePeriod, addMonthOffset } from '@/lib/dateUtils'
 
 const anthropic = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
@@ -605,12 +605,6 @@ ATURAN:
 - "month" HARUS format YYYY-MM yang valid berdasarkan tanggal kalender (contoh: "2026-04"). JANGAN gunakan label seperti "Month-1", "Month 2", atau "Bulan ke-1". Jika dokumen menggunakan label numerik, konversi ke bulan kalender aktual berdasarkan periode proyeksi yang ada di dokumen.
 `
 
-function addMonthOffset(periodKey: string, offset: number): string {
-  const [y, m] = periodKey.split('-').map(Number)
-  const total = y * 12 + m - 1 + offset
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
-}
-
 function resolveMonthKeys(
   monthlyData: MonthlyProjectionRow[],
   period: string,
@@ -622,7 +616,7 @@ function resolveMonthKeys(
   return monthlyData.map((row) => {
     let key = normalizePeriod(row.month)
     if (!/^\d{4}-\d{2}$/.test(key)) {
-      const match = row.month.match(/(?:month|bulan)[-\s](\d{1,2})/i)
+      const match = row.month.match(/(?:month|bulan)(?:\s+ke)?[-\s](\d{1,2})/i)
       if (match && hasStartKey) {
         key = addMonthOffset(startKey, parseInt(match[1], 10) - 1)
       }

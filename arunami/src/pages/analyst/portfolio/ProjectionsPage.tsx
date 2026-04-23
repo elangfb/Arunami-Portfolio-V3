@@ -23,7 +23,7 @@ import {
   type AddCategoryPayload,
 } from '@/components/AddCustomCategoryDialog'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
-import { formatPeriod, normalizePeriod, comparePeriods } from '@/lib/dateUtils'
+import { formatPeriod, normalizePeriod, comparePeriods, addMonthOffset } from '@/lib/dateUtils'
 import {
   unionCategories,
   addCategory as addCategoryInList,
@@ -63,6 +63,9 @@ export default function ProjectionsPage() {
   const [pendingProjection, setPendingProjection] = useState<ProjectionUploadPending | null>(null)
   const [isConfirming, setIsConfirming] = useState(false)
   const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
+  const [monthStartDialogOpen, setMonthStartDialogOpen] = useState(false)
+  const [rawPendingProjection, setRawPendingProjection] = useState<ProjectionUploadPending | null>(null)
+  const [monthStartValue, setMonthStartValue] = useState('')
 
   // Inline editing state
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
@@ -320,6 +323,29 @@ export default function ProjectionsPage() {
     setInlineCategories([])
   }
 
+  const handleMonthStartConfirm = () => {
+    if (!rawPendingProjection || !monthStartValue) return
+    const resolved: ProjectionUploadPending = {
+      ...rawPendingProjection,
+      monthlyData: rawPendingProjection.monthlyData.map((row) => {
+        if (/^\d{4}-\d{2}$/.test(row.month)) return row
+        const match = row.month.match(/(?:month|bulan)(?:\s+ke)?[-\s](\d{1,2})/i)
+        if (match) return { ...row, month: addMonthOffset(monthStartValue, parseInt(match[1], 10) - 1) }
+        return row
+      }),
+    }
+    setPendingProjection(resolved)
+    setMonthStartDialogOpen(false)
+    setRawPendingProjection(null)
+    toast.success('Data proyeksi berhasil diekstrak — silakan review sebelum konfirmasi')
+  }
+
+  const handleMonthStartCancel = () => {
+    setMonthStartDialogOpen(false)
+    setRawPendingProjection(null)
+    setMonthStartValue('')
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -328,8 +354,15 @@ export default function ProjectionsPage() {
     setMode('extracting')
     try {
       const data = await extractProjectionMonthly(file)
-      setPendingProjection(data)
-      toast.success('Data proyeksi berhasil diekstrak — silakan review sebelum konfirmasi')
+      const hasUnresolved = data.monthlyData?.some(row => !/^\d{4}-\d{2}$/.test(row.month))
+      if (hasUnresolved) {
+        setRawPendingProjection(data)
+        setMonthStartValue('')
+        setMonthStartDialogOpen(true)
+      } else {
+        setPendingProjection(data)
+        toast.success('Data proyeksi berhasil diekstrak — silakan review sebelum konfirmasi')
+      }
 
       // One-shot enrichment on the very first upload — discovers custom revenue
       // categories and KPI metrics from this file and merges into PortfolioConfig.
@@ -957,6 +990,26 @@ export default function ProjectionsPage() {
         onSubmit={handleInlineDialogSubmit}
         existingMainCategories={inlineCategories}
       />
+
+      {/* Month start dialog — shown when extracted months use "Bulan 1" labels without calendar dates */}
+      <Dialog open={monthStartDialogOpen} onOpenChange={(open) => { if (!open) handleMonthStartCancel() }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Tentukan Bulan Awal Proyeksi</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Dokumen menggunakan label seperti "Bulan 1", "Month 1" tanpa tanggal kalender. Pilih bulan awal untuk "Bulan 1".
+          </p>
+          <div className="space-y-1 pt-2">
+            <Label className="text-xs">Bulan 1 dimulai pada</Label>
+            <MonthYearPicker value={monthStartValue} onChange={setMonthStartValue} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={handleMonthStartCancel}>Batal</Button>
+            <Button onClick={handleMonthStartConfirm} disabled={!monthStartValue}>Terapkan</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <DialogContent>
