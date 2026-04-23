@@ -356,8 +356,11 @@ export default function ProjectionsPage() {
       const data = await extractProjectionMonthly(file)
       const hasUnresolved = data.monthlyData?.some(row => !/^\d{4}-\d{2}$/.test(row.month))
       if (hasUnresolved) {
+        // Pre-fill the picker with the start month from the document's period field if parseable
+        const firstSegment = (data.period ?? '').split(/\s*[-–]\s*/)[0].trim()
+        const prefilledStart = normalizePeriod(firstSegment)
         setRawPendingProjection(data)
-        setMonthStartValue('')
+        setMonthStartValue(/^\d{4}-\d{2}$/.test(prefilledStart) ? prefilledStart : '')
         setMonthStartDialogOpen(true)
       } else {
         setPendingProjection(data)

@@ -11,7 +11,7 @@ import type {
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 import { slugifyCategory } from '@/lib/customCategories'
-import { normalizePeriod, addMonthOffset } from '@/lib/dateUtils'
+import { normalizePeriod } from '@/lib/dateUtils'
 
 const anthropic = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
@@ -605,32 +605,15 @@ ATURAN:
 - "month" HARUS format YYYY-MM yang valid berdasarkan tanggal kalender (contoh: "2026-04"). JANGAN gunakan label seperti "Month-1", "Month 2", atau "Bulan ke-1". Jika dokumen menggunakan label numerik, konversi ke bulan kalender aktual berdasarkan periode proyeksi yang ada di dokumen.
 `
 
-function resolveMonthKeys(
-  monthlyData: MonthlyProjectionRow[],
-  period: string,
-): MonthlyProjectionRow[] {
-  const firstSegment = period.split(/\s*[-–]\s*/)[0].trim()
-  const startKey = normalizePeriod(firstSegment)
-  const hasStartKey = /^\d{4}-\d{2}$/.test(startKey)
-
-  return monthlyData.map((row) => {
-    let key = normalizePeriod(row.month)
-    if (!/^\d{4}-\d{2}$/.test(key)) {
-      const match = row.month.match(/(?:month|bulan)(?:\s+ke)?[-\s](\d{1,2})/i)
-      if (match && hasStartKey) {
-        key = addMonthOffset(startKey, parseInt(match[1], 10) - 1)
-      }
-    }
-    return { ...row, month: key }
-  })
-}
-
 export async function extractProjectionMonthly(file: File): Promise<ProjectionUploadPending> {
   const raw = await sendToClaude(file, PROJECTION_MONTHLY_PROMPT)
   const parsed = safeParseJSON<ProjectionUploadPending>(raw)
-  const monthlyData = parsed.monthlyData?.length
-    ? resolveMonthKeys(parsed.monthlyData, parsed.period ?? '')
-    : (parsed.monthlyData ?? [])
+  // Normalize proper month names (e.g. "April 2026" → "2026-04").
+  // Month-N labels are left as-is so the caller can show a start-month dialog.
+  const monthlyData = (parsed.monthlyData ?? []).map((row) => ({
+    ...row,
+    month: normalizePeriod(row.month),
+  }))
   return { ...parsed, monthlyData, status: 'pending_review' }
 }
 
