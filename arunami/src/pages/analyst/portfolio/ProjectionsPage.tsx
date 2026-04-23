@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { extractProjectionMonthly } from '@/lib/gemini'
-import { getReports, saveReport, updateReport, deleteReport, syncFinancialData, getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
+import { getReports, saveReport, updateReport, deleteReport, deleteAllReports, syncFinancialData, getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
 import { enrichConfigFromFirstUpload } from '@/lib/portfolioEnrichment'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact } from '@/lib/utils'
@@ -58,6 +58,8 @@ export default function ProjectionsPage() {
   const [editingReport, setEditingReport] = useState<PortfolioReport | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const [pendingProjection, setPendingProjection] = useState<ProjectionUploadPending | null>(null)
   const [isConfirming, setIsConfirming] = useState(false)
   const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
@@ -443,6 +445,22 @@ export default function ProjectionsPage() {
     }
   }
 
+  const handleResetAll = async () => {
+    if (!portfolioId) return
+    setIsResetting(true)
+    try {
+      await deleteAllReports(portfolioId, 'projection')
+      await syncFinancialData(portfolioId)
+      setReports([])
+      setResetDialogOpen(false)
+      toast.success('Semua data Proyeksi berhasil dihapus')
+    } catch {
+      toast.error('Gagal menghapus data Proyeksi')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
   const addOpexItem = () => setOpexItems(prev => [...prev, { name: '', amount: 0, percentage: 0 }])
   const removeOpexItem = (i: number) => setOpexItems(prev => prev.filter((_, idx) => idx !== i))
   const updateOpexItem = (i: number, field: keyof OpexItem, val: string | number) => {
@@ -516,7 +534,14 @@ export default function ProjectionsPage() {
 
       {/* History — horizontal table */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Riwayat Proyeksi ({reports.length})</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Riwayat Proyeksi ({reports.length})</CardTitle>
+          {reports.length > 0 && (
+            <Button variant="destructive" size="sm" onClick={() => setResetDialogOpen(true)} disabled={isResetting}>
+              Reset Proyeksi
+            </Button>
+          )}
+        </CardHeader>
         <CardContent>
           {reports.length === 0 ? (
             portfolio?.isGracePeriod ? (
@@ -932,6 +957,26 @@ export default function ProjectionsPage() {
         onSubmit={handleInlineDialogSubmit}
         existingMainCategories={inlineCategories}
       />
+
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Semua Data Proyeksi?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Tindakan ini akan menghapus <strong>seluruh {reports.length} laporan Proyeksi</strong> secara permanen dan tidak dapat dibatalkan.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setResetDialogOpen(false)} disabled={isResetting}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleResetAll} disabled={isResetting}>
+              {isResetting && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Hapus Semua
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

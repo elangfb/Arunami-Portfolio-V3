@@ -265,6 +265,18 @@ export async function deleteReport(portfolioId: string, reportId: string) {
   await deleteDoc(doc(db, 'portfolios', portfolioId, 'reports', reportId))
 }
 
+export async function deleteAllReports(portfolioId: string, type: 'pnl' | 'projection') {
+  const q = query(
+    collection(db, 'portfolios', portfolioId, 'reports'),
+    where('type', '==', type),
+  )
+  const snap = await getDocs(q)
+  if (snap.empty) return
+  const batch = writeBatch(db)
+  snap.docs.forEach(d => batch.delete(d.ref))
+  await batch.commit()
+}
+
 // ─── Management Reports ───────────────────────────────────────────────────
 
 export async function getManagementReports(portfolioId: string): Promise<ManagementReport[]> {

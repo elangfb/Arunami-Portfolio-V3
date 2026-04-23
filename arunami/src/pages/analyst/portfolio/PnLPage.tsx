@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { extractPnLMonthly } from '@/lib/gemini'
-import { getReports, saveReport, updateReport, deleteReport, syncFinancialData, getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
+import { getReports, saveReport, updateReport, deleteReport, deleteAllReports, syncFinancialData, getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
 import { enrichConfigFromFirstUpload } from '@/lib/portfolioEnrichment'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact } from '@/lib/utils'
@@ -61,6 +61,8 @@ export default function PnLPage() {
   const [editingReport, setEditingReport] = useState<PortfolioReport | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
   const [categories, setCategories] = useState<RevenueCategory[]>([])
   const [pendingPnl, setPendingPnl] = useState<PnLUploadPending | null>(null)
@@ -655,6 +657,22 @@ export default function PnLPage() {
     }
   }
 
+  const handleResetAll = async () => {
+    if (!portfolioId) return
+    setIsResetting(true)
+    try {
+      await deleteAllReports(portfolioId, 'pnl')
+      await syncFinancialData(portfolioId)
+      setReports([])
+      setResetDialogOpen(false)
+      toast.success('Semua data PnL berhasil dihapus')
+    } catch {
+      toast.error('Gagal menghapus data PnL')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
   // Opex helpers
   const addOpexItem = () => setOpexItems(prev => [...prev, { name: '', amount: 0 }])
   const removeOpexItem = (i: number) => setOpexItems(prev => prev.filter((_, idx) => idx !== i))
@@ -723,7 +741,14 @@ export default function PnLPage() {
 
       {/* History */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Riwayat PnL ({reports.length})</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Riwayat PnL ({reports.length})</CardTitle>
+          {reports.length > 0 && (
+            <Button variant="destructive" size="sm" onClick={() => setResetDialogOpen(true)} disabled={isResetting}>
+              Reset PnL
+            </Button>
+          )}
+        </CardHeader>
         <CardContent>
           {reports.length === 0 ? (
             portfolio?.isGracePeriod ? (
@@ -1323,6 +1348,26 @@ export default function PnLPage() {
           ...inlineCategories,
         ]}
       />
+
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Semua Data PnL?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Tindakan ini akan menghapus <strong>seluruh {reports.length} laporan PnL</strong> secara permanen dan tidak dapat dibatalkan.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setResetDialogOpen(false)} disabled={isResetting}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleResetAll} disabled={isResetting}>
+              {isResetting && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Hapus Semua
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
