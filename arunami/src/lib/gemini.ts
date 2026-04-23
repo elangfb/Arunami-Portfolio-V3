@@ -7,10 +7,11 @@ import * as XLSX from 'xlsx'
 import type {
   PnLExtractedData, ProjectionExtractedData, PortfolioConfig,
   ClassifiedPnLData, ClassifiedProjectionData, PortfolioSetupExtraction,
-  IndustryType, ProjectionUploadPending, PnLUploadPending, MonthlyPnLRow,
+  IndustryType, ProjectionUploadPending, PnLUploadPending, MonthlyPnLRow, MonthlyProjectionRow,
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 import { slugifyCategory } from '@/lib/customCategories'
+import { normalizePeriod } from '@/lib/dateUtils'
 
 const anthropic = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
@@ -601,12 +602,42 @@ ATURAN:
 - Semua nilai moneter dalam IDR (angka saja, tanpa simbol Rp atau titik ribuan)
 - cogsPercent = rata-rata persentase COGS terhadap revenue dari seluruh bulan
 - Jika hanya ada data tahunan/total tanpa breakdown bulanan, buat satu entry saja
+- "month" HARUS format YYYY-MM yang valid berdasarkan tanggal kalender (contoh: "2026-04"). JANGAN gunakan label seperti "Month-1", "Month 2", atau "Bulan ke-1". Jika dokumen menggunakan label numerik, konversi ke bulan kalender aktual berdasarkan periode proyeksi yang ada di dokumen.
 `
+
+function addMonthOffset(periodKey: string, offset: number): string {
+  const [y, m] = periodKey.split('-').map(Number)
+  const total = y * 12 + m - 1 + offset
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
+}
+
+function resolveMonthKeys(
+  monthlyData: MonthlyProjectionRow[],
+  period: string,
+): MonthlyProjectionRow[] {
+  const firstSegment = period.split(/\s*[-–]\s*/)[0].trim()
+  const startKey = normalizePeriod(firstSegment)
+  const hasStartKey = /^\d{4}-\d{2}$/.test(startKey)
+
+  return monthlyData.map((row) => {
+    let key = normalizePeriod(row.month)
+    if (!/^\d{4}-\d{2}$/.test(key)) {
+      const match = row.month.match(/(?:month|bulan)[-\s](\d{1,2})/i)
+      if (match && hasStartKey) {
+        key = addMonthOffset(startKey, parseInt(match[1], 10) - 1)
+      }
+    }
+    return { ...row, month: key }
+  })
+}
 
 export async function extractProjectionMonthly(file: File): Promise<ProjectionUploadPending> {
   const raw = await sendToClaude(file, PROJECTION_MONTHLY_PROMPT)
   const parsed = safeParseJSON<ProjectionUploadPending>(raw)
-  return { ...parsed, status: 'pending_review' }
+  const monthlyData = parsed.monthlyData?.length
+    ? resolveMonthKeys(parsed.monthlyData, parsed.period ?? '')
+    : (parsed.monthlyData ?? [])
+  return { ...parsed, monthlyData, status: 'pending_review' }
 }
 
 // ─── Legacy extraction functions (used by analyst pages) ─────────────────
