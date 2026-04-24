@@ -602,6 +602,8 @@ Kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
       "projectedGrossProfit": number,
       "opexBreakdown": [{"name": "string", "amount": number}],
       "totalOpex": number,
+      "projectedDepreciationAmortization": number,
+      "projectedTax": number,
       "projectedNetProfit": number
     }
   ]
@@ -612,6 +614,9 @@ ATURAN:
 - cogsPercent = rata-rata persentase COGS terhadap revenue dari seluruh bulan
 - Jika hanya ada data tahunan/total tanpa breakdown bulanan, buat satu entry saja
 - "month" HARUS format YYYY-MM yang valid berdasarkan tanggal kalender (contoh: "2026-04"). JANGAN gunakan label seperti "Month-1", "Month 2", atau "Bulan ke-1". Jika dokumen menggunakan label numerik, konversi ke bulan kalender aktual berdasarkan periode proyeksi yang ada di dokumen.
+- "projectedDepreciationAmortization": nilai Depresiasi/Amortisasi (Depreciation & Amortization / D&A / Penyusutan). JANGAN masukkan item ini ke dalam "opexBreakdown". Jika tidak ada, isi 0.
+- "projectedTax": nilai Pajak/Tax. JANGAN masukkan item ini ke dalam "opexBreakdown". Jika tidak ada, isi 0.
+- projectedNetProfit = projectedGrossProfit - totalOpex - projectedDepreciationAmortization - projectedTax
 `
 
 export async function extractProjectionMonthly(file: File): Promise<ProjectionUploadPending> {
@@ -622,6 +627,8 @@ export async function extractProjectionMonthly(file: File): Promise<ProjectionUp
   const monthlyData = (parsed.monthlyData ?? []).map((row) => ({
     ...row,
     month: normalizePeriod(row.month),
+    projectedDepreciationAmortization: Number(row.projectedDepreciationAmortization) || 0,
+    projectedTax: Number(row.projectedTax) || 0,
   }))
   return { ...parsed, monthlyData, status: 'pending_review' }
 }

@@ -77,8 +77,10 @@ function recalculateMonth(month: MonthlyProjectionRow): MonthlyProjectionRow {
   const cogs = Number(month.projectedCogs) || 0
   const projectedGrossProfit = revenue - cogs
   const totalOpex = month.opexBreakdown.reduce((sum, o) => sum + (Number(o.amount) || 0), 0)
+  const depAmort = Number(month.projectedDepreciationAmortization) || 0
+  const tax = Number(month.projectedTax) || 0
   const projectedNetProfit =
-    projectedGrossProfit - totalOpex + customNetAdjustment(month.customCategories)
+    projectedGrossProfit - totalOpex - depAmort - tax + customNetAdjustment(month.customCategories)
   return { ...month, projectedGrossProfit, totalOpex, projectedNetProfit }
 }
 
@@ -102,6 +104,8 @@ export function ProjectionReviewTable({
   ]
   const rowsAfterBody: RowDef[] = [
     { label: 'Total Opex', key: 'totalOpex', className: 'text-red-600 font-medium', readOnly: true },
+    { label: 'Depreciation & Amortization', key: 'projectedDepreciationAmortization', className: 'text-red-600' },
+    { label: 'Tax', key: 'projectedTax', className: 'text-red-600' },
   ]
   const netProfitRow: RowDef = {
     label: 'Net Profit', key: 'projectedNetProfit', isBold: true, readOnly: true,

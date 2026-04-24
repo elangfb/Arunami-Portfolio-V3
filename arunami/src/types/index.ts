@@ -321,6 +321,8 @@ export interface ProjectionExtractedData {
   projectedGrossProfit: number
   projectedOpex: OpexItem[]
   projectedTotalOpex: number
+  projectedDepreciationAmortization?: number
+  projectedTax?: number
   projectedNetProfit: number
   assumptions: string
   customCategories?: CustomCategory[]
@@ -368,6 +370,8 @@ export interface MonthlyProjectionRow {
   projectedGrossProfit: number
   opexBreakdown: OpexItem[]
   totalOpex: number
+  projectedDepreciationAmortization?: number
+  projectedTax?: number
   projectedNetProfit: number
   customCategories?: CustomCategory[]
 }

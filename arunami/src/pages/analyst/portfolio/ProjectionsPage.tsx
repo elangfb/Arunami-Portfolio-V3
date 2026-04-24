@@ -79,6 +79,7 @@ export default function ProjectionsPage() {
     defaultValues: {
       period: '', projectedRevenue: 0, projectedCogsPercent: 0, projectedCogs: 0,
       projectedGrossProfit: 0, projectedOpex: [], projectedTotalOpex: 0,
+      projectedDepreciationAmortization: 0, projectedTax: 0,
       projectedNetProfit: 0, assumptions: '',
     },
   })
@@ -86,6 +87,8 @@ export default function ProjectionsPage() {
   const [opexItems, setOpexItems] = useState<OpexItem[]>([])
   const watchedRevenue = watch('projectedRevenue')
   const watchedCogsPercent = watch('projectedCogsPercent')
+  const watchedDepAmort = watch('projectedDepreciationAmortization')
+  const watchedTax = watch('projectedTax')
 
   // Auto-calculate derived fields whenever revenue, COGS%, or opex items change
   useEffect(() => {
@@ -94,13 +97,15 @@ export default function ProjectionsPage() {
     const cogs = Math.round(revenue * cogsPercent / 100)
     const grossProfit = revenue - cogs
     const totalOpex = opexItems.reduce((sum, item) => sum + (item.amount || 0), 0)
-    const netProfit = grossProfit - totalOpex
+    const depAmort = Number(watchedDepAmort) || 0
+    const tax = Number(watchedTax) || 0
+    const netProfit = grossProfit - totalOpex - depAmort - tax
 
     setValue('projectedCogs', cogs)
     setValue('projectedGrossProfit', grossProfit)
     setValue('projectedTotalOpex', totalOpex)
     setValue('projectedNetProfit', netProfit)
-  }, [watchedRevenue, watchedCogsPercent, opexItems, setValue])
+  }, [watchedRevenue, watchedCogsPercent, opexItems, watchedDepAmort, watchedTax, setValue])
 
   const fetchReports = async () => {
     if (!portfolioId) return
@@ -135,6 +140,7 @@ export default function ProjectionsPage() {
     reset({
       period: '', projectedRevenue: 0, projectedCogsPercent: 0, projectedCogs: 0,
       projectedGrossProfit: 0, projectedOpex: [], projectedTotalOpex: 0,
+      projectedDepreciationAmortization: 0, projectedTax: 0,
       projectedNetProfit: 0, assumptions: '',
     })
     setOpexItems([])
@@ -164,8 +170,10 @@ export default function ProjectionsPage() {
     }
     next.projectedGrossProfit = (next.projectedRevenue || 0) - (next.projectedCogs || 0)
     next.projectedTotalOpex = opexTotal
+    const depAmort = next.projectedDepreciationAmortization || 0
+    const tax = next.projectedTax || 0
     next.projectedNetProfit =
-      next.projectedGrossProfit - next.projectedTotalOpex + customIncome - customExpense
+      next.projectedGrossProfit - next.projectedTotalOpex - depAmort - tax + customIncome - customExpense
     return next
   }
 
@@ -176,6 +184,8 @@ export default function ProjectionsPage() {
       projectedCogs: d.projectedCogs,
       projectedGrossProfit: d.projectedGrossProfit,
       projectedTotalOpex: d.projectedTotalOpex,
+      projectedDepreciationAmortization: d.projectedDepreciationAmortization ?? 0,
+      projectedTax: d.projectedTax ?? 0,
       projectedNetProfit: d.projectedNetProfit,
     }
     for (const item of d.projectedOpex ?? []) {
@@ -303,6 +313,9 @@ export default function ProjectionsPage() {
         projectedGrossProfit: inlineData.projectedGrossProfit ?? d.projectedGrossProfit,
         projectedOpex,
         projectedTotalOpex: inlineData.projectedTotalOpex ?? d.projectedTotalOpex,
+        projectedDepreciationAmortization:
+          inlineData.projectedDepreciationAmortization ?? d.projectedDepreciationAmortization ?? 0,
+        projectedTax: inlineData.projectedTax ?? d.projectedTax ?? 0,
         projectedNetProfit: inlineData.projectedNetProfit ?? d.projectedNetProfit,
         customCategories,
       }
@@ -417,6 +430,8 @@ export default function ProjectionsPage() {
           projectedGrossProfit: month.projectedGrossProfit,
           projectedOpex: month.opexBreakdown,
           projectedTotalOpex: month.totalOpex,
+          projectedDepreciationAmortization: month.projectedDepreciationAmortization ?? 0,
+          projectedTax: month.projectedTax ?? 0,
           projectedNetProfit: month.projectedNetProfit,
           assumptions: pendingProjection.assumptions,
         }
@@ -627,6 +642,8 @@ export default function ProjectionsPage() {
               ]
               const rowsAfterBody: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }[] = [
                 { label: 'Total Opex', key: 'projectedTotalOpex', className: 'text-red-600' },
+                { label: 'Depreciation & Amortization', key: 'projectedDepreciationAmortization', className: 'text-red-600', editable: true },
+                { label: 'Tax', key: 'projectedTax', className: 'text-red-600', editable: true },
               ]
               const netProfitRow = { label: 'Net Profit', key: 'projectedNetProfit', bold: true }
               const rawDisplayCategories = inlineEditId
@@ -975,6 +992,24 @@ export default function ProjectionsPage() {
               <div className="flex items-center justify-between pt-2 border-t text-sm">
                 <span className="font-medium">Total Opex</span>
                 <span className="font-semibold">{formatCurrencyExact(watch('projectedTotalOpex'))}</span>
+              </div>
+            </div>
+
+            {/* Depreciation & Amortization / Tax */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs">Depreciation & Amortization (IDR)</Label>
+                <Input
+                  {...register('projectedDepreciationAmortization', { valueAsNumber: true })}
+                  type="number" className="text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tax (IDR)</Label>
+                <Input
+                  {...register('projectedTax', { valueAsNumber: true })}
+                  type="number" className="text-sm"
+                />
               </div>
             </div>
 

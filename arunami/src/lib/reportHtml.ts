@@ -260,6 +260,8 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
       ${row('Projected COGS', latestProj.projectedCogs)}
       ${row('Projected Gross Profit', latestProj.projectedGrossProfit)}
       ${row('Projected Total Opex', latestProj.projectedTotalOpex)}
+      ${row('Depreciation & Amortization', latestProj.projectedDepreciationAmortization ?? 0)}
+      ${row('Tax', latestProj.projectedTax ?? 0)}
       ${row('Projected Net Profit', latestProj.projectedNetProfit)}
     </table>
   ` : ''
