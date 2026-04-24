@@ -29,7 +29,7 @@ export function MonthYearPicker({ value, onChange, disabled }: Props) {
 
   return (
     <div className="flex gap-2">
-      <Select value={selectedMonth} onValueChange={handleMonth} disabled={disabled}>
+      <Select value={selectedMonth || undefined} onValueChange={handleMonth} disabled={disabled}>
         <SelectTrigger className="text-sm flex-1">
           <SelectValue placeholder="Bulan" />
         </SelectTrigger>
@@ -39,7 +39,7 @@ export function MonthYearPicker({ value, onChange, disabled }: Props) {
           ))}
         </SelectContent>
       </Select>
-      <Select value={selectedYear} onValueChange={handleYear} disabled={disabled}>
+      <Select value={selectedYear || undefined} onValueChange={handleYear} disabled={disabled}>
         <SelectTrigger className="text-sm w-[100px]">
           <SelectValue placeholder="Tahun" />
         </SelectTrigger>

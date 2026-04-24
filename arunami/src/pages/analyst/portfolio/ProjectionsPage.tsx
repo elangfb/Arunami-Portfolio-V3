@@ -360,7 +360,9 @@ export default function ProjectionsPage() {
         const firstSegment = (data.period ?? '').split(/\s*[-–]\s*/)[0].trim()
         const prefilledStart = normalizePeriod(firstSegment)
         setRawPendingProjection(data)
-        setMonthStartValue(/^\d{4}-\d{2}$/.test(prefilledStart) ? prefilledStart : '')
+        const today = new Date()
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+        setMonthStartValue(/^\d{4}-\d{2}$/.test(prefilledStart) ? prefilledStart : todayKey)
         setMonthStartDialogOpen(true)
       } else {
         setPendingProjection(data)
