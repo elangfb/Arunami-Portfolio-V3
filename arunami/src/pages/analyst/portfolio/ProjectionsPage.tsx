@@ -408,7 +408,8 @@ export default function ProjectionsPage() {
       }
     } catch (err) {
       console.error('Projection extraction failed:', err)
-      toast.error('Gagal mengekstrak data')
+      const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
+      toast.error(`Gagal mengekstrak data${detail}. Coba unggah ulang.`)
     } finally {
       setMode('idle')
       if (fileRef.current) fileRef.current.value = ''

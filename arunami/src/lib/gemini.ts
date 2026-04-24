@@ -153,6 +153,10 @@ export async function extractPnLMonthly(file: File, config?: PortfolioConfig): P
   const raw = await sendToClaude(file, buildPnLMonthlyPrompt(config))
   const parsed = safeParseJSON<RawPnLUploadPending>(raw)
 
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.monthlyData)) {
+    throw new Error('Struktur data tidak sesuai — dokumen mungkin tidak berisi laporan laba-rugi bulanan')
+  }
+
   // Normalize opex names across months: collect all unique names, ensure every month has all
   const allOpexNames = [...new Set(parsed.monthlyData.flatMap(m => (m.opex ?? []).map(o => o.name)))]
 
@@ -281,22 +285,79 @@ ATURAN KLASIFIKASI isStandard:
 - Semua nilai moneter dalam IDR (angka saja, tanpa simbol Rp atau titik ribuan)
 `
 
-/** Try JSON.parse with fallback repairs for common LLM output issues */
-function safeParseJSON<T>(raw: string): T {
-  try {
-    return JSON.parse(raw)
-  } catch {
-    // Fix trailing commas before } or ]
-    let fixed = raw.replace(/,\s*([}\]])/g, '$1')
-    // Fix unescaped newlines inside string values
-    fixed = fixed.replace(/(?<=:\s*"[^"]*)\n/g, '\\n')
-    try {
-      return JSON.parse(fixed)
-    } catch (e) {
-      console.error('Raw Gemini response that failed to parse:', raw.slice(0, 500))
-      throw e
+/**
+ * Scan `raw` for the first JSON value (object or array) and return its exact
+ * slice. Walks the string with a depth counter that respects string literals
+ * and backslash escapes so braces inside quoted strings don't throw it off.
+ * Returns null when no balanced JSON value is found.
+ */
+function extractBalancedJson(raw: string): string | null {
+  const firstObj = raw.indexOf('{')
+  const firstArr = raw.indexOf('[')
+  const start =
+    firstObj === -1 ? firstArr :
+    firstArr === -1 ? firstObj :
+    Math.min(firstObj, firstArr)
+  if (start === -1) return null
+
+  const open = raw[start]
+  const close = open === '{' ? '}' : ']'
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i]
+    if (escaped) { escaped = false; continue }
+    if (inString) {
+      if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') { inString = true; continue }
+    if (ch === open) depth++
+    else if (ch === close) {
+      depth--
+      if (depth === 0) return raw.slice(start, i + 1)
     }
   }
+  return null
+}
+
+/** Apply cheap repairs for common LLM-produced JSON defects. */
+function repairJson(s: string): string {
+  let fixed = s.replace(/,\s*([}\]])/g, '$1') // trailing commas
+  fixed = fixed.replace(/(?<=:\s*"[^"]*)\n/g, '\\n') // unescaped newlines inside strings
+  return fixed
+}
+
+/**
+ * Parse Claude's response as JSON, tolerating prose wrappers and minor
+ * malformations. Order of attempts:
+ *   1. Parse the raw string as-is (fast path).
+ *   2. Extract the first balanced {...} or [...] block and parse that —
+ *      recovers from leading prose ("I need to..."), trailing prose, stray
+ *      fences, and language tags.
+ *   3. Apply trailing-comma / unescaped-newline repairs to the extracted
+ *      slice (or the raw string if no slice found) and parse again.
+ * On total failure, throw an Error whose message includes a preview of the
+ * response so the UI can surface it to the user.
+ */
+function safeParseJSON<T>(raw: string): T {
+  try {
+    return JSON.parse(raw) as T
+  } catch { /* fall through */ }
+
+  const sliced = extractBalancedJson(raw)
+  if (sliced) {
+    try { return JSON.parse(sliced) as T } catch { /* fall through */ }
+    try { return JSON.parse(repairJson(sliced)) as T } catch { /* fall through */ }
+  } else {
+    try { return JSON.parse(repairJson(raw)) as T } catch { /* fall through */ }
+  }
+
+  const preview = raw.trim().slice(0, 200).replace(/\s+/g, ' ')
+  console.error('AI response that failed to parse:', raw.slice(0, 500))
+  throw new Error(`AI tidak mengembalikan JSON valid. Cuplikan respons: "${preview}"`)
 }
 
 /**
@@ -622,6 +683,9 @@ ATURAN:
 export async function extractProjectionMonthly(file: File): Promise<ProjectionUploadPending> {
   const raw = await sendToClaude(file, PROJECTION_MONTHLY_PROMPT)
   const parsed = safeParseJSON<ProjectionUploadPending>(raw)
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.monthlyData)) {
+    throw new Error('Struktur data tidak sesuai — dokumen mungkin tidak berisi proyeksi bulanan')
+  }
   // Normalize proper month names (e.g. "April 2026" → "2026-04").
   // Month-N labels are left as-is so the caller can show a start-month dialog.
   const monthlyData = (parsed.monthlyData ?? []).map((row) => ({

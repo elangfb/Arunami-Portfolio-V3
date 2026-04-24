@@ -537,7 +537,8 @@ export default function PnLPage() {
       }
     } catch (err) {
       console.error('PnL extraction failed:', err)
-      toast.error('Gagal mengekstrak data. Pastikan dokumen valid.')
+      const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
+      toast.error(`Gagal mengekstrak data${detail}. Pastikan dokumen valid.`)
     } finally {
       setMode('idle')
       if (fileRef.current) fileRef.current.value = ''

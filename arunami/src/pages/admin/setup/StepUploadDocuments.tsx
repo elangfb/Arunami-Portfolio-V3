@@ -160,7 +160,8 @@ export default function StepUploadDocuments({
     } catch (err) {
       console.error('Extraction failed:', err)
       setStage('error')
-      setError('Gagal mengekstrak data. Pastikan dokumen berisi data keuangan yang valid.')
+      const detail = err instanceof Error && err.message ? ` Detail: ${err.message}` : ''
+      setError(`Gagal mengekstrak data. Pastikan dokumen berisi data keuangan yang valid.${detail}`)
     }
   }, [pnlFile, projectionFile, industryType, hasFiles, onExtractionComplete])
 
