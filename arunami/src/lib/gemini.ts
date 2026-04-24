@@ -333,8 +333,11 @@ async function sendToClaude(file: File, prompt: string): Promise<string> {
     text: 'Ekstrak sekarang dan balas HANYA dengan JSON valid sesuai skema di instruksi. Jangan menyertakan markdown fence atau penjelasan.',
   })
 
+  // Streaming is required by the SDK whenever max_tokens is high enough that a
+  // non-streaming call could exceed the 10-minute safety cap. Using stream()
+  // + finalMessage() keeps the same return shape while lifting that limit.
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: MAX_TOKENS,
       system: [
@@ -345,7 +348,7 @@ async function sendToClaude(file: File, prompt: string): Promise<string> {
         },
       ],
       messages: [{ role: 'user', content: userContent }],
-    }),
+    }).finalMessage(),
   )
 
   const first = response.content[0]
