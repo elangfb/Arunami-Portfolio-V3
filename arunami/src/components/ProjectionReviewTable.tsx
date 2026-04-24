@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { formatPeriod } from '@/lib/dateUtils'
+import { formatPeriod, addMonthOffset } from '@/lib/dateUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Loader2, CheckCircle2, ChevronDown, ChevronUp, Plus, X } from 'lucide-react'
+import { Loader2, CheckCircle2, ChevronDown, ChevronUp, Plus, X, Pencil, Check } from 'lucide-react'
 import type {
   ProjectionUploadPending,
   MonthlyProjectionRow,
@@ -90,6 +90,33 @@ export function ProjectionReviewTable({
 }: Props) {
   const months = data.monthlyData
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
+  const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({})
+  const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null)
+  const [labelDraft, setLabelDraft] = useState('')
+
+  const isValidPeriodKey = (s: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(s)
+
+  const startLabelEdit = (key: string, current: string) => {
+    setEditingLabelKey(key)
+    setLabelDraft(current)
+  }
+  const commitLabelEdit = () => {
+    if (editingLabelKey === null) return
+    const trimmed = labelDraft.trim()
+    setLabelOverrides(prev => {
+      const next = { ...prev }
+      if (trimmed) next[editingLabelKey] = trimmed
+      else delete next[editingLabelKey]
+      return next
+    })
+    setEditingLabelKey(null)
+    setLabelDraft('')
+  }
+  const cancelLabelEdit = () => {
+    setEditingLabelKey(null)
+    setLabelDraft('')
+  }
+  const getLabel = (key: string, fallback: string) => labelOverrides[key] ?? fallback
 
   const rawOpexNames = [...new Set(months.flatMap(m => m.opexBreakdown.map(o => o.name)))]
   const rawCategories = unionCategories(months.map(m => m.customCategories))
@@ -213,16 +240,78 @@ export function ProjectionReviewTable({
     onDataChange({ ...data, assumptions: value })
   }
 
-  const handleMonthChange = (monthIdx: number, nextMonth: string) => {
-    if (!nextMonth) return
-    if (months.some((m, i) => i !== monthIdx && m.month === nextMonth)) {
-      window.alert(`Bulan ${nextMonth} sudah ada di tabel.`)
-      return
+  // Month 1 is the baseline. Changing it shifts every subsequent month by the
+  // same offset (when the old baseline was a valid YYYY-MM) or reassigns them
+  // sequentially from the new baseline (when the old baseline was a label like
+  // "Month-1" that we can't diff against).
+  const handleBaselineMonthChange = (nextMonth: string) => {
+    if (!nextMonth || months.length === 0) return
+    const oldFirst = months[0].month
+    if (oldFirst === nextMonth) return
+
+    let nextMonths: MonthlyProjectionRow[]
+    if (isValidPeriodKey(oldFirst)) {
+      const [oy, om] = oldFirst.split('-').map(Number)
+      const [ny, nm] = nextMonth.split('-').map(Number)
+      const offset = (ny * 12 + nm) - (oy * 12 + om)
+      nextMonths = months.map((m, i) => ({
+        ...m,
+        month: i === 0 ? nextMonth : (isValidPeriodKey(m.month) ? addMonthOffset(m.month, offset) : addMonthOffset(nextMonth, i)),
+      }))
+    } else {
+      nextMonths = months.map((m, i) => ({
+        ...m,
+        month: addMonthOffset(nextMonth, i),
+      }))
     }
-    const nextMonths = months.map((m, i) =>
-      i === monthIdx ? { ...m, month: nextMonth } : m,
-    )
     onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
+  const renderEditableLabel = (key: string, fallback: string) => {
+    const current = getLabel(key, fallback)
+    if (editingLabelKey === key) {
+      return (
+        <div className="flex items-center gap-1">
+          <Input
+            autoFocus
+            value={labelDraft}
+            onChange={e => setLabelDraft(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); commitLabelEdit() }
+              else if (e.key === 'Escape') { e.preventDefault(); cancelLabelEdit() }
+            }}
+            onBlur={commitLabelEdit}
+            className="h-7 text-sm"
+          />
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 shrink-0 text-green-600"
+            onMouseDown={e => e.preventDefault()}
+            onClick={commitLabelEdit}
+            title="Simpan"
+          >
+            <Check className="h-3 w-3" />
+          </Button>
+        </div>
+      )
+    }
+    return (
+      <div className="group flex items-center gap-1">
+        <span className="flex-1 truncate">{current}</span>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+          onClick={() => startLabelEdit(key, current)}
+          title="Ubah nama"
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </div>
+    )
   }
 
   const renderStandardRow = (row: RowDef) => {
@@ -230,7 +319,7 @@ export function ProjectionReviewTable({
     return (
       <tr key={row.key} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
         <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.isBold ? 'font-semibold bg-muted/20' : ''}`}>
-          {row.label}
+          {renderEditableLabel(row.key, row.label)}
         </td>
         {months.map((m, monthIdx) => {
           const val = getCellValue(m, row.key)
@@ -281,13 +370,19 @@ export function ProjectionReviewTable({
                   Variable
                 </th>
                 {months.map((m, monthIdx) => (
-                  <th key={m.month} className="px-4 py-2.5 text-right font-medium whitespace-nowrap min-w-50">
+                  <th key={`${monthIdx}-${m.month}`} className="px-4 py-2.5 text-right font-medium whitespace-nowrap min-w-50">
                     <div className="space-y-1">
                       <div className="text-xs text-muted-foreground text-left">{formatPeriod(m.month)}</div>
-                      <MonthYearPicker
-                        value={m.month}
-                        onChange={(v) => handleMonthChange(monthIdx, v)}
-                      />
+                      {monthIdx === 0 ? (
+                        <MonthYearPicker
+                          value={m.month}
+                          onChange={handleBaselineMonthChange}
+                        />
+                      ) : (
+                        <div className="text-sm font-semibold text-foreground text-left">
+                          {formatPeriod(m.month)}
+                        </div>
+                      )}
                     </div>
                   </th>
                 ))}
@@ -397,7 +492,7 @@ export function ProjectionReviewTable({
               {/* Net Profit row (readOnly, auto-calculated) */}
               <tr className="bg-muted/20">
                 <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
-                  {netProfitRow.label}
+                  {renderEditableLabel(netProfitRow.key, netProfitRow.label)}
                 </td>
                 {months.map(m => {
                   const val = getCellValue(m, netProfitRow.key)
