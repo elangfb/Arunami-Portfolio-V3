@@ -394,14 +394,14 @@ async function sendToClaude(file: File, prompt: string): Promise<string> {
     text: 'Ekstrak sekarang dan balas HANYA dengan JSON valid sesuai skema di instruksi. Jangan menyertakan markdown fence atau penjelasan.',
   })
 
-  // Streaming is required by the SDK whenever max_tokens is high enough that a
-  // non-streaming call could exceed the 10-minute safety cap. Using stream()
-  // + finalMessage() keeps the same return shape while lifting that limit.
+  // Force structured output via tool use. Defining a `submit_extraction` tool
+  // with an open object schema and forcing tool_choice to it makes Claude emit
+  // a tool_use block whose `input` is already a parsed object — no prose
+  // preamble, no markdown fences, no JSON.parse risk. Works on models that
+  // don't support assistant-message prefill (Sonnet 4.6 on some deployments).
   //
-  // Prefilling the assistant turn with "{" forces Claude's completion to begin
-  // as a JSON object — it cannot emit a prose preamble like "I need to analyze
-  // this document..." before the data. The prefill character is NOT included
-  // in the returned text, so we prepend it back before parsing.
+  // Streaming is still required because max_tokens is high enough that a
+  // non-streaming call could exceed the 10-minute safety cap.
   const response = await withRetry(() =>
     anthropic.messages.stream({
       model: CLAUDE_MODEL,
@@ -413,20 +413,31 @@ async function sendToClaude(file: File, prompt: string): Promise<string> {
           cache_control: { type: 'ephemeral' },
         },
       ],
-      messages: [
-        { role: 'user', content: userContent },
-        { role: 'assistant', content: '{' },
+      tools: [
+        {
+          name: 'submit_extraction',
+          description: 'Submit the extracted financial data as a structured object matching the schema described in the system instructions.',
+          input_schema: {
+            type: 'object',
+            additionalProperties: true,
+          },
+        },
       ],
+      tool_choice: { type: 'tool', name: 'submit_extraction' },
+      messages: [{ role: 'user', content: userContent }],
     }).finalMessage(),
   )
 
-  const first = response.content[0]
-  if (!first || first.type !== 'text') {
-    throw new Error('Claude response did not contain text content')
+  const toolUse = response.content.find(
+    (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use' && b.name === 'submit_extraction',
+  )
+  if (!toolUse) {
+    throw new Error('Claude did not call submit_extraction tool')
   }
-  // Re-attach the prefilled "{" and strip any stray closing fence Claude may
-  // have emitted at the end. safeParseJSON handles any residual prose.
-  return ('{' + first.text).replace(/```json|```/g, '').trim()
+  // toolUse.input is already the parsed object. Re-stringify so existing
+  // callers (which expect a JSON string they feed into safeParseJSON) keep
+  // working unchanged. JSON.stringify on a plain object cannot fail.
+  return JSON.stringify(toolUse.input)
 }
 
 /**
