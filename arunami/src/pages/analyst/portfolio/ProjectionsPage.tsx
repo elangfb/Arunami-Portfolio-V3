@@ -71,6 +71,7 @@ export default function ProjectionsPage() {
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineData, setInlineData] = useState<Record<string, number>>({})
   const [inlineCategories, setInlineCategories] = useState<CustomCategory[]>([])
+  const [inlinePeriod, setInlinePeriod] = useState<string>('')
   const [inlineSaving, setInlineSaving] = useState(false)
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
 
@@ -201,6 +202,7 @@ export default function ProjectionsPage() {
     }
     setInlineCategories(catsUnion)
     setInlineData(recalcProjection(data, catsUnion))
+    setInlinePeriod(report.period)
     setInlineEditId(report.id)
   }
 
@@ -291,8 +293,10 @@ export default function ProjectionsPage() {
         })),
       }))
 
+      const nextPeriod = inlinePeriod || report.period
       const extractedData: ProjectionExtractedData = {
         ...d,
+        period: nextPeriod,
         projectedRevenue,
         projectedCogsPercent,
         projectedCogs,
@@ -303,11 +307,12 @@ export default function ProjectionsPage() {
         customCategories,
       }
 
-      await updateReport(portfolioId, report.id, { extractedData })
+      await updateReport(portfolioId, report.id, { period: nextPeriod, extractedData })
       await syncFinancialData(portfolioId)
       setInlineEditId(null)
       setInlineData({})
       setInlineCategories([])
+      setInlinePeriod('')
       fetchReports()
       toast.success('Proyeksi berhasil diperbarui')
     } catch {
@@ -321,6 +326,7 @@ export default function ProjectionsPage() {
     setInlineEditId(null)
     setInlineData({})
     setInlineCategories([])
+    setInlinePeriod('')
   }
 
   const handleMonthStartConfirm = () => {
@@ -693,7 +699,14 @@ export default function ProjectionsPage() {
                           </th>
                           {sorted.map(r => (
                             <th key={r.id} className="px-3 py-2 text-right font-medium whitespace-nowrap min-w-[170px]">
-                              <div>{formatPeriod(r.period)}</div>
+                              {inlineEditId === r.id ? (
+                                <MonthYearPicker
+                                  value={inlinePeriod}
+                                  onChange={setInlinePeriod}
+                                />
+                              ) : (
+                                <div>{formatPeriod(r.period)}</div>
+                              )}
                               <div className="flex justify-end gap-1 mt-1">
                                 {inlineEditId === r.id ? (
                                   <>
