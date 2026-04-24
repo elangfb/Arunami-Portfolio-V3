@@ -535,7 +535,8 @@ export default function PnLPage() {
       } catch (err) {
         console.warn('Config enrichment failed:', err)
       }
-    } catch {
+    } catch (err) {
+      console.error('PnL extraction failed:', err)
       toast.error('Gagal mengekstrak data. Pastikan dokumen valid.')
     } finally {
       setMode('idle')

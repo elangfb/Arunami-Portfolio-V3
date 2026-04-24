@@ -39,7 +39,13 @@ function parseSpreadsheetToText(file: File): Promise<string> {
         const texts: string[] = []
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName]
-          texts.push(`=== Sheet: ${sheetName} ===\n${XLSX.utils.sheet_to_csv(sheet)}`)
+          const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false }).trim()
+          if (!csv) continue
+          texts.push(`=== Sheet: ${sheetName} ===\n${csv}`)
+        }
+        if (texts.length === 0) {
+          reject(new Error('Spreadsheet kosong atau tidak bisa dibaca'))
+          return
         }
         resolve(texts.join('\n\n'))
       } catch (err) {

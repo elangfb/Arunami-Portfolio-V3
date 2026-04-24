@@ -387,7 +387,8 @@ export default function ProjectionsPage() {
       } catch (err) {
         console.warn('Config enrichment failed:', err)
       }
-    } catch {
+    } catch (err) {
+      console.error('Projection extraction failed:', err)
       toast.error('Gagal mengekstrak data')
     } finally {
       setMode('idle')
