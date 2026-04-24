@@ -93,6 +93,16 @@ export function ProjectionReviewTable({
   const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({})
   const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null)
   const [labelDraft, setLabelDraft] = useState('')
+  const [hiddenRowKeys, setHiddenRowKeys] = useState<Set<string>>(new Set())
+
+  // Only data-entry rows are deletable. Derived rows (Gross Profit, Total Opex,
+  // Net Profit) are sums of the others — hiding them would be meaningless.
+  const DELETABLE_STANDARD_KEYS = new Set([
+    'projectedRevenue',
+    'projectedCogs',
+    'projectedDepreciationAmortization',
+    'projectedTax',
+  ])
 
   const isValidPeriodKey = (s: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(s)
 
@@ -157,6 +167,19 @@ export function ProjectionReviewTable({
       return { ...m, opexBreakdown: [...m.opexBreakdown, { name: name.trim(), amount: 0 }] }
     })
     onDataChange({ ...data, monthlyData: nextMonths })
+  }
+
+  const handleDeleteStandardRow = (key: string) => {
+    if (!DELETABLE_STANDARD_KEYS.has(key)) return
+    const label = getLabel(key, key)
+    if (!window.confirm(`Hapus baris "${label}" dari seluruh bulan? Nilai akan direset ke 0.`)) return
+    const nextMonths = months.map(m => recalculateMonth(setCellValue(m, key, 0)))
+    onDataChange({ ...data, monthlyData: nextMonths })
+    setHiddenRowKeys(prev => {
+      const next = new Set(prev)
+      next.add(key)
+      return next
+    })
   }
 
   const handleRemoveOpex = (opexName: string) => {
@@ -316,10 +339,27 @@ export function ProjectionReviewTable({
 
   const renderStandardRow = (row: RowDef) => {
     const total = getTotal(row.key)
+    const canDelete = DELETABLE_STANDARD_KEYS.has(row.key)
     return (
       <tr key={row.key} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
         <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.isBold ? 'font-semibold bg-muted/20' : ''}`}>
-          {renderEditableLabel(row.key, row.label)}
+          <div className="flex items-center gap-1 group">
+            <div className="flex-1 min-w-0">
+              {renderEditableLabel(row.key, row.label)}
+            </div>
+            {canDelete && editingLabelKey !== row.key && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                onClick={() => handleDeleteStandardRow(row.key)}
+                title="Hapus baris dari seluruh bulan"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
         </td>
         {months.map((m, monthIdx) => {
           const val = getCellValue(m, row.key)
@@ -392,7 +432,7 @@ export function ProjectionReviewTable({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rowsBeforeBody.map(renderStandardRow)}
+              {rowsBeforeBody.filter(r => !hiddenRowKeys.has(r.key)).map(renderStandardRow)}
 
               {/* Interleaved body zone: opex items + custom category blocks */}
               {bodyOrder.map((entry, bodyIdx) => {
@@ -487,7 +527,7 @@ export function ProjectionReviewTable({
                 )
               })}
 
-              {rowsAfterBody.map(renderStandardRow)}
+              {rowsAfterBody.filter(r => !hiddenRowKeys.has(r.key)).map(renderStandardRow)}
 
               {/* Net Profit row (readOnly, auto-calculated) */}
               <tr className="bg-muted/20">
