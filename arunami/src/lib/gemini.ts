@@ -397,6 +397,11 @@ async function sendToClaude(file: File, prompt: string): Promise<string> {
   // Streaming is required by the SDK whenever max_tokens is high enough that a
   // non-streaming call could exceed the 10-minute safety cap. Using stream()
   // + finalMessage() keeps the same return shape while lifting that limit.
+  //
+  // Prefilling the assistant turn with "{" forces Claude's completion to begin
+  // as a JSON object — it cannot emit a prose preamble like "I need to analyze
+  // this document..." before the data. The prefill character is NOT included
+  // in the returned text, so we prepend it back before parsing.
   const response = await withRetry(() =>
     anthropic.messages.stream({
       model: CLAUDE_MODEL,
@@ -408,7 +413,10 @@ async function sendToClaude(file: File, prompt: string): Promise<string> {
           cache_control: { type: 'ephemeral' },
         },
       ],
-      messages: [{ role: 'user', content: userContent }],
+      messages: [
+        { role: 'user', content: userContent },
+        { role: 'assistant', content: '{' },
+      ],
     }).finalMessage(),
   )
 
@@ -416,7 +424,9 @@ async function sendToClaude(file: File, prompt: string): Promise<string> {
   if (!first || first.type !== 'text') {
     throw new Error('Claude response did not contain text content')
   }
-  return first.text.replace(/```json|```/g, '').trim()
+  // Re-attach the prefilled "{" and strip any stray closing fence Claude may
+  // have emitted at the end. safeParseJSON handles any residual prose.
+  return ('{' + first.text).replace(/```json|```/g, '').trim()
 }
 
 /**
