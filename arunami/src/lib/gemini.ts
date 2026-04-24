@@ -18,7 +18,7 @@ const anthropic = new Anthropic({
   dangerouslyAllowBrowser: true,
 })
 const CLAUDE_MODEL = 'claude-sonnet-4-6'
-const MAX_TOKENS = 8192
+const MAX_TOKENS = 16384
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
