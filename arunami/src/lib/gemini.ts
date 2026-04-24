@@ -17,7 +17,7 @@ const anthropic = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
   dangerouslyAllowBrowser: true,
 })
-const CLAUDE_MODEL = 'claude-sonnet-4-5'
+const CLAUDE_MODEL = 'claude-sonnet-4-6'
 const MAX_TOKENS = 8192
 
 function fileToBase64(file: File): Promise<string> {
