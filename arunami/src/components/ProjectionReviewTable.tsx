@@ -32,6 +32,7 @@ import {
   AddCustomCategoryDialog,
   type AddCategoryPayload,
 } from '@/components/AddCustomCategoryDialog'
+import { MonthYearPicker } from '@/components/MonthYearPicker'
 
 interface Props {
   data: ProjectionUploadPending
@@ -71,16 +72,14 @@ function setCellValue(month: MonthlyProjectionRow, key: string, value: number): 
   return { ...month, [key]: value } as MonthlyProjectionRow
 }
 
-/**
- * Projection recalc: only Net Profit is auto-calculated. Gross Profit and
- * Total Opex remain free-form user-editable (preserves existing behavior).
- */
-function recalculateNetProfit(month: MonthlyProjectionRow): MonthlyProjectionRow {
-  const grossProfit = Number(month.projectedGrossProfit) || 0
-  const totalOpex = Number(month.totalOpex) || 0
+function recalculateMonth(month: MonthlyProjectionRow): MonthlyProjectionRow {
+  const revenue = Number(month.projectedRevenue) || 0
+  const cogs = Number(month.projectedCogs) || 0
+  const projectedGrossProfit = revenue - cogs
+  const totalOpex = month.opexBreakdown.reduce((sum, o) => sum + (Number(o.amount) || 0), 0)
   const projectedNetProfit =
-    grossProfit - totalOpex + customNetAdjustment(month.customCategories)
-  return { ...month, projectedNetProfit }
+    projectedGrossProfit - totalOpex + customNetAdjustment(month.customCategories)
+  return { ...month, projectedGrossProfit, totalOpex, projectedNetProfit }
 }
 
 export function ProjectionReviewTable({
@@ -99,10 +98,10 @@ export function ProjectionReviewTable({
   const rowsBeforeBody: RowDef[] = [
     { label: 'Projected Revenue', key: 'projectedRevenue', isBold: true },
     { label: 'COGS', key: 'projectedCogs', className: 'text-red-600' },
-    { label: 'Gross Profit', key: 'projectedGrossProfit', isBold: true, className: 'text-green-700' },
+    { label: 'Gross Profit', key: 'projectedGrossProfit', isBold: true, className: 'text-green-700', readOnly: true },
   ]
   const rowsAfterBody: RowDef[] = [
-    { label: 'Total Opex', key: 'totalOpex', className: 'text-red-600 font-medium' },
+    { label: 'Total Opex', key: 'totalOpex', className: 'text-red-600 font-medium', readOnly: true },
   ]
   const netProfitRow: RowDef = {
     label: 'Net Profit', key: 'projectedNetProfit', isBold: true, readOnly: true,
@@ -113,7 +112,7 @@ export function ProjectionReviewTable({
 
   const handleCellChange = (monthIdx: number, key: string, value: number) => {
     const nextMonths = months.map((m, i) =>
-      i === monthIdx ? recalculateNetProfit(setCellValue(m, key, value)) : m,
+      i === monthIdx ? recalculateMonth(setCellValue(m, key, value)) : m,
     )
     onDataChange({ ...data, monthlyData: nextMonths })
   }
@@ -131,7 +130,7 @@ export function ProjectionReviewTable({
 
   const handleRemoveOpex = (opexName: string) => {
     const nextMonths = months.map(m =>
-      recalculateNetProfit({
+      recalculateMonth({
         ...m,
         opexBreakdown: m.opexBreakdown.filter(o => o.name !== opexName),
       }),
@@ -162,7 +161,7 @@ export function ProjectionReviewTable({
 
   const handleAddCategory = (name: string, type: CustomCategoryType) => {
     const { months: nextMonths } = addCategoryAcrossMonths(months, name, type)
-    onDataChange({ ...data, monthlyData: nextMonths.map(recalculateNetProfit) })
+    onDataChange({ ...data, monthlyData: nextMonths.map(recalculateMonth) })
   }
 
   const handleDialogSubmit = (payload: AddCategoryPayload) => {
@@ -171,11 +170,11 @@ export function ProjectionReviewTable({
       return
     }
     const { months: nextMonths } = addSubItemAcrossMonths(months, payload.parentId, payload.name)
-    onDataChange({ ...data, monthlyData: nextMonths.map(recalculateNetProfit) })
+    onDataChange({ ...data, monthlyData: nextMonths.map(recalculateMonth) })
   }
 
   const handleRemoveCategory = (catId: string) => {
-    const nextMonths = removeCategoryAcrossMonths(months, catId).map(recalculateNetProfit)
+    const nextMonths = removeCategoryAcrossMonths(months, catId).map(recalculateMonth)
     onDataChange({ ...data, monthlyData: nextMonths })
   }
 
@@ -184,11 +183,11 @@ export function ProjectionReviewTable({
     const name = window.prompt(`Nama sub-kategori baru untuk "${catName}":`)
     if (!name?.trim()) return
     const { months: nextMonths } = addSubItemAcrossMonths(months, catId, name)
-    onDataChange({ ...data, monthlyData: nextMonths.map(recalculateNetProfit) })
+    onDataChange({ ...data, monthlyData: nextMonths.map(recalculateMonth) })
   }
 
   const handleRemoveSubItem = (catId: string, subId: string) => {
-    const nextMonths = removeSubItemAcrossMonths(months, catId, subId).map(recalculateNetProfit)
+    const nextMonths = removeSubItemAcrossMonths(months, catId, subId).map(recalculateMonth)
     onDataChange({ ...data, monthlyData: nextMonths })
   }
 
@@ -201,13 +200,25 @@ export function ProjectionReviewTable({
     const monthIdx = months.findIndex(m => m.month === monthKey)
     if (monthIdx < 0) return
     const nextMonths = setSubItemAmountInMonth(months, monthIdx, catId, subId, value).map(
-      (m, i) => (i === monthIdx ? recalculateNetProfit(m) : m),
+      (m, i) => (i === monthIdx ? recalculateMonth(m) : m),
     )
     onDataChange({ ...data, monthlyData: nextMonths })
   }
 
   const handleAssumptionsChange = (value: string) => {
     onDataChange({ ...data, assumptions: value })
+  }
+
+  const handleMonthChange = (monthIdx: number, nextMonth: string) => {
+    if (!nextMonth) return
+    if (months.some((m, i) => i !== monthIdx && m.month === nextMonth)) {
+      window.alert(`Bulan ${nextMonth} sudah ada di tabel.`)
+      return
+    }
+    const nextMonths = months.map((m, i) =>
+      i === monthIdx ? { ...m, month: nextMonth } : m,
+    )
+    onDataChange({ ...data, monthlyData: nextMonths })
   }
 
   const renderStandardRow = (row: RowDef) => {
@@ -221,12 +232,18 @@ export function ProjectionReviewTable({
           const val = getCellValue(m, row.key)
           return (
             <td key={m.month} className="px-2 py-1 text-right whitespace-nowrap">
-              <Input
-                type="number"
-                value={val}
-                onChange={e => handleCellChange(monthIdx, row.key, Number(e.target.value) || 0)}
-                className="h-8 text-right text-xs tabular-nums"
-              />
+              {row.readOnly ? (
+                <div className={`h-8 flex items-center justify-end px-3 text-xs tabular-nums ${row.className ?? ''}`}>
+                  {val.toLocaleString('id-ID')}
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  value={val}
+                  onChange={e => handleCellChange(monthIdx, row.key, Number(e.target.value) || 0)}
+                  className="h-8 text-right text-xs tabular-nums"
+                />
+              )}
             </td>
           )
         })}
@@ -259,9 +276,15 @@ export function ProjectionReviewTable({
                 <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
                   Variable
                 </th>
-                {months.map(m => (
-                  <th key={m.month} className="px-4 py-2.5 text-right font-medium whitespace-nowrap min-w-[160px]">
-                    {formatPeriod(m.month)}
+                {months.map((m, monthIdx) => (
+                  <th key={m.month} className="px-4 py-2.5 text-right font-medium whitespace-nowrap min-w-50">
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground text-left">{formatPeriod(m.month)}</div>
+                      <MonthYearPicker
+                        value={m.month}
+                        onChange={(v) => handleMonthChange(monthIdx, v)}
+                      />
+                    </div>
                   </th>
                 ))}
                 <th className="px-4 py-2.5 text-right font-semibold whitespace-nowrap min-w-[155px] border-l bg-muted/80">
