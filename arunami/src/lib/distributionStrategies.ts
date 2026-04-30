@@ -30,6 +30,18 @@ export interface DistributionInput {
   allocation: InvestorAllocation
   portfolio: Portfolio
   isArunamiTeam?: boolean
+  /**
+   * Number of months covered by this distribution. Defaults to 1 (monthly).
+   * Set to 3 for quarterly. Affects time-based strategies (fixed_yield) and
+   * extrapolation factors (annualRoiPercent), and instructs fixed_schedule
+   * to sum payments across the period rather than match a single month.
+   */
+  monthsInPeriod?: number
+  /**
+   * Months whose schedule entries should be aggregated for `fixed_schedule`.
+   * Optional; when omitted falls back to single-period match using reportData.period.
+   */
+  scheduleMonths?: string[]
 }
 
 export interface DistributionStrategy {
@@ -94,7 +106,7 @@ const netProfitShareStrategy: DistributionStrategy = {
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
-      annualRoiPercent: monthlyROI * 12,
+      annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
       breakdown: {
         netProfit,
         investorPool,
@@ -139,7 +151,7 @@ const fixedReturnStrategy: DistributionStrategy = {
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
-      annualRoiPercent: monthlyROI * 12,
+      annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
       breakdown: { netProfit, investorPool, grossPerInvestor, arunamiFee, perInvestor },
       label: this.displayName,
     }
@@ -155,12 +167,13 @@ const fixedYieldStrategy: DistributionStrategy = {
     const { config, allocation, portfolio } = input
     const c = config as FixedYieldConfig
     const isFeeExempt = input.isArunamiTeam === true
+    const months = input.monthsInPeriod ?? 1
     const principal = c.principalReference === 'investasi_awal'
       ? portfolio.investasiAwal
       : allocation.investedAmount
     const ownership = ownershipFraction(allocation, portfolio)
 
-    const totalYield = principal * (c.fixedYieldPercent / 100)
+    const totalYield = principal * (c.fixedYieldPercent / 100) * months
     const grossPerInvestor = c.principalReference === 'investasi_awal'
       ? totalYield * ownership
       : totalYield
@@ -169,7 +182,7 @@ const fixedYieldStrategy: DistributionStrategy = {
 
     const monthlyROI = allocation.investedAmount > 0
       ? (perInvestor / allocation.investedAmount) * 100
-      : c.fixedYieldPercent
+      : c.fixedYieldPercent * months
 
     return {
       totalDistribution: totalYield,
@@ -178,7 +191,7 @@ const fixedYieldStrategy: DistributionStrategy = {
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
-      annualRoiPercent: monthlyROI * 12,
+      annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
       breakdown: {
         principal,
         fixedYieldPercent: c.fixedYieldPercent,
@@ -222,7 +235,7 @@ const revenueShareStrategy: DistributionStrategy = {
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
-      annualRoiPercent: monthlyROI * 12,
+      annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
       breakdown: {
         revenue,
         revenueSharePercent: c.revenueSharePercent,
@@ -249,12 +262,14 @@ const fixedScheduleStrategy: DistributionStrategy = {
     const period = reportData?.period ?? ''
     const ownership = ownershipFraction(allocation, portfolio)
 
-    const scheduled = c.scheduledPayments.find(
-      p => p.dueDate === period && p.status === 'paid',
+    const targetMonths = input.scheduleMonths ?? (period ? [period] : [])
+    const matchedPayments = c.scheduledPayments.filter(
+      p => targetMonths.includes(p.dueDate) && p.status === 'paid',
     )
-    if (!scheduled) return emptyResult(this.displayName)
+    if (matchedPayments.length === 0) return emptyResult(this.displayName)
+    const totalScheduled = matchedPayments.reduce((s, p) => s + p.amount, 0)
 
-    const grossPerInvestor = scheduled.amount * ownership
+    const grossPerInvestor = totalScheduled * ownership
     const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * (c.arunamiFeePercent / 100)
     const perInvestor = grossPerInvestor - arunamiFee
 
@@ -263,15 +278,15 @@ const fixedScheduleStrategy: DistributionStrategy = {
       : 0
 
     return {
-      totalDistribution: scheduled.amount,
+      totalDistribution: totalScheduled,
       perInvestorAmount: perInvestor,
       grossInvestorAmount: grossPerInvestor,
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
-      annualRoiPercent: monthlyROI * 12,
+      annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
       breakdown: {
-        scheduledAmount: scheduled.amount,
+        scheduledAmount: totalScheduled,
         grossPerInvestor,
         arunamiFee,
         ownership: ownership * 100,
@@ -382,7 +397,7 @@ const customStrategy: DistributionStrategy = {
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
-      annualRoiPercent: monthlyROI * 12,
+      annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
       breakdown: { ...variableValues, formulaResult: totalDistribution, grossPerInvestor, arunamiFee, perInvestor },
       label: this.displayName,
     }
@@ -403,7 +418,9 @@ export const DISTRIBUTION_STRATEGIES: Record<ReturnModelType, DistributionStrate
 }
 
 export function calculateDistribution(input: DistributionInput): DistributionResult {
-  const strategy = DISTRIBUTION_STRATEGIES[input.config.type]
+  const strategy =
+    DISTRIBUTION_STRATEGIES[input.config.type] ??
+    DISTRIBUTION_STRATEGIES.net_profit_share
   return strategy.calculate(input)
 }
 

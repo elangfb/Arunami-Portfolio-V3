@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { saveCommunication } from '@/lib/firestore'
 import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
-import { formatPeriod } from '@/lib/dateUtils'
+import { formatPeriod, buildQuarterKey, quarterToMonths } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -39,7 +39,9 @@ interface ReportLine {
 export default function InvestorReportGenerator({ open, onOpenChange, investor, portfolioData }: Props) {
   const { user: admin } = useAuthStore()
   const currentYear = new Date().getFullYear()
+  const [reportType, setReportType] = useState<'monthly' | 'quarterly'>('monthly')
   const [month, setMonth] = useState(String(new Date().getMonth()))
+  const [quarter, setQuarter] = useState(String(Math.floor(new Date().getMonth() / 3) + 1))
   const [year, setYear] = useState(String(currentYear))
   const [selectedPortfolios, setSelectedPortfolios] = useState<Set<string>>(
     new Set(portfolioData.map(p => p.allocation.portfolioId)),
@@ -47,8 +49,14 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
   const [sending, setSending] = useState(false)
   const reportRef = useRef<HTMLDivElement>(null)
 
-  const periodKey = `${year}-${String(Number(month) + 1).padStart(2, '0')}`
+  const periodKey = reportType === 'quarterly'
+    ? buildQuarterKey(year, Number(quarter))
+    : `${year}-${String(Number(month) + 1).padStart(2, '0')}`
   const periodLabel = formatPeriod(periodKey)
+  const monthsInPeriod = reportType === 'quarterly' ? 3 : 1
+  const constituentMonths = reportType === 'quarterly'
+    ? quarterToMonths(periodKey)
+    : [periodKey]
 
   const togglePortfolio = (id: string) => {
     setSelectedPortfolios(prev => {
@@ -67,14 +75,19 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
       let monthlyROI = 0
 
       if (financial && config?.investorConfig && ptf) {
-        const profitPoint = financial.profitData.find(d => d.month === periodKey)
-        const revPoint = financial.revenueData.find(d => d.month === periodKey)
-        netProfit = profitPoint?.aktual ?? 0
+        const monthlyProfits = constituentMonths.map(
+          m => financial.profitData.find(d => d.month === m)?.aktual ?? 0,
+        )
+        const monthlyRevenue = constituentMonths.map(
+          m => financial.revenueData.find(d => d.month === m)?.aktual ?? 0,
+        )
+        netProfit = monthlyProfits.reduce((s, v) => s + v, 0)
+        const revenue = monthlyRevenue.reduce((s, v) => s + v, 0)
 
         const result = calculateDistribution({
           reportData: {
             period: periodKey,
-            revenue: revPoint?.aktual ?? 0,
+            revenue,
             netProfit,
             grossProfit: 0,
           },
@@ -82,6 +95,8 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
           allocation,
           portfolio: ptf,
           isArunamiTeam: investor.isArunamiTeam,
+          monthsInPeriod,
+          scheduleMonths: constituentMonths,
         })
         earnings = result.perInvestorAmount
         monthlyROI = result.roiPercent
@@ -111,7 +126,7 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
       text += `   Investasi: ${formatCurrencyExact(line.invested)}\n`
       text += `   Net Profit: ${formatCurrencyExact(line.netProfit)}\n`
       text += `   Earning Anda: ${formatCurrencyExact(line.earnings)}\n`
-      text += `   ROI Bulanan: ${formatPercent(line.monthlyROI)}\n\n`
+      text += `   ROI Periode: ${formatPercent(line.monthlyROI)}\n\n`
     }
 
     text += `${'─'.repeat(40)}\n`
@@ -234,17 +249,39 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
 
         <div className="space-y-4 mt-2">
           {/* Period Selector */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Bulan</Label>
-              <Select value={month} onValueChange={setMonth}>
+              <Label>Tipe Laporan</Label>
+              <Select value={reportType} onValueChange={v => setReportType(v as 'monthly' | 'quarterly')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {MONTH_NAMES_ID.map((name, i) => (
-                    <SelectItem key={i} value={String(i)}>{name}</SelectItem>
-                  ))}
+                  <SelectItem value="monthly">Bulanan</SelectItem>
+                  <SelectItem value="quarterly">Kuartalan</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{reportType === 'quarterly' ? 'Kuartal' : 'Bulan'}</Label>
+              {reportType === 'quarterly' ? (
+                <Select value={quarter} onValueChange={setQuarter}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Q1 (Jan-Mar)</SelectItem>
+                    <SelectItem value="2">Q2 (Apr-Jun)</SelectItem>
+                    <SelectItem value="3">Q3 (Jul-Sep)</SelectItem>
+                    <SelectItem value="4">Q4 (Okt-Des)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select value={month} onValueChange={setMonth}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MONTH_NAMES_ID.map((name, i) => (
+                      <SelectItem key={i} value={String(i)}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Tahun</Label>

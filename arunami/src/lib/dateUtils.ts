@@ -12,14 +12,39 @@ export const MONTH_OPTIONS = INDONESIAN_MONTHS.map((name, i) => ({
   label: name,
 }))
 
-/** "2026-04" → "April 2026" */
+/** "2026-04" → "April 2026"; "2026-Q1" → "Kuartal 1 2026" */
 export function formatPeriod(period: string): string {
+  const qMatch = period.match(/^(\d{4})-Q([1-4])$/)
+  if (qMatch) return `Kuartal ${qMatch[2]} ${qMatch[1]}`
   const match = period.match(/^(\d{4})-(\d{2})$/)
   if (!match) return period // fallback for legacy data
   const [, year, month] = match
   const idx = parseInt(month, 10) - 1
   if (idx < 0 || idx > 11) return period
   return `${INDONESIAN_MONTHS[idx]} ${year}`
+}
+
+/** Returns true if period is a "YYYY-Qn" key */
+export function isQuarterPeriod(period: string): boolean {
+  return /^\d{4}-Q[1-4]$/.test(period)
+}
+
+/** "2026-Q1" → ["2026-01", "2026-02", "2026-03"] */
+export function quarterToMonths(period: string): string[] {
+  const match = period.match(/^(\d{4})-Q([1-4])$/)
+  if (!match) return []
+  const [, year, q] = match
+  const startMonth = (parseInt(q, 10) - 1) * 3 + 1
+  return [0, 1, 2].map(o => `${year}-${String(startMonth + o).padStart(2, '0')}`)
+}
+
+/** Convert any period (monthly or quarterly) to its end-month YYYY-MM for chronological sorting. */
+function periodSortKey(period: string): string {
+  if (isQuarterPeriod(period)) {
+    const months = quarterToMonths(period)
+    return months[months.length - 1] ?? period
+  }
+  return period
 }
 
 /** Build "YYYY-MM" from separate month/year values */
@@ -77,9 +102,9 @@ export function addMonthOffset(periodKey: string, offset: number): string {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
 }
 
-/** Sort comparator for "YYYY-MM" period strings (chronological) */
+/** Sort comparator for period strings — handles both "YYYY-MM" and "YYYY-Qn" (chronological) */
 export function comparePeriods(a: string, b: string): number {
-  return a.localeCompare(b) // YYYY-MM sorts correctly with string comparison
+  return periodSortKey(a).localeCompare(periodSortKey(b))
 }
 
 /**

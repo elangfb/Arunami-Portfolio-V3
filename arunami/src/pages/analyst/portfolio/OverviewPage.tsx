@@ -45,13 +45,28 @@ export default function OverviewPage() {
 
   if (!data) return <div className="p-8 text-muted-foreground">Data finansial belum tersedia. Upload dokumen PnL terlebih dahulu.</div>
 
-  const lastRevenue = data.revenueData.at(-1)?.aktual ?? 0
-  const prevRevenue = data.revenueData.at(-2)?.aktual ?? 0
-  const lastProfit = data.profitData.at(-1)?.aktual ?? 0
-  const prevProfit = data.profitData.at(-2)?.aktual ?? 0
-  const lastTx = data.transactionData.at(-1)
+  // Anchor on the latest period that has actual PnL data, not the
+  // chronologically last entry — projection-only future months would otherwise
+  // show Rp 0 on the KPI cards.
+  const latestTxIdx = data.transactionData.length - 1
+  let latestPeriod = data.transactionData[latestTxIdx]?.month
+  let prevPeriod = data.transactionData[latestTxIdx - 1]?.month
+  if (!latestPeriod) {
+    const revWithActual = [...data.revenueData].reverse().find(r => r.aktual !== 0)
+    latestPeriod = revWithActual?.month
+    if (latestPeriod) {
+      const idx = data.revenueData.findIndex(r => r.month === latestPeriod)
+      prevPeriod = data.revenueData[idx - 1]?.month
+    }
+  }
+
+  const lastRevenue = latestPeriod ? data.revenueData.find(r => r.month === latestPeriod)?.aktual ?? 0 : 0
+  const prevRevenue = prevPeriod ? data.revenueData.find(r => r.month === prevPeriod)?.aktual ?? 0 : 0
+  const lastProfit = latestPeriod ? data.profitData.find(r => r.month === latestPeriod)?.aktual ?? 0 : 0
+  const prevProfit = prevPeriod ? data.profitData.find(r => r.month === prevPeriod)?.aktual ?? 0 : 0
+  const lastTx = latestPeriod ? data.transactionData.find(t => t.month === latestPeriod) : undefined
   const totalTx = lastTx ? Object.values(lastTx.categories).reduce((s, v) => s + v, 0) : 0
-  const prevTx = data.transactionData.at(-2)
+  const prevTx = prevPeriod ? data.transactionData.find(t => t.month === prevPeriod) : undefined
   const prevTotalTx = prevTx ? Object.values(prevTx.categories).reduce((s, v) => s + v, 0) : 0
 
   // Total Investment ROI: net-for-investor / total investment

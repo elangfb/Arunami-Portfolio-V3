@@ -1,10 +1,11 @@
 import { formatCurrencyExact, formatPercent } from './utils'
-import { formatPeriod, comparePeriods } from './dateUtils'
+import { formatPeriod, comparePeriods, isQuarterPeriod, quarterToMonths } from './dateUtils'
 import { calculateDistribution } from './distributionStrategies'
 import type { DistributionResult } from './distributionStrategies'
 import type {
   Portfolio, PortfolioConfig, PnLExtractedData, ProjectionExtractedData,
   ManagementReport, Note, InvestorAllocation, InvestorConfigUnion,
+  OpexItem, CustomSubItem,
 } from '@/types'
 
 interface BuildArgs {
@@ -163,20 +164,93 @@ function buildKpiBlock(
   result: DistributionResult,
   allocation: InvestorAllocation,
   modelType: string,
+  monthsInPeriod: number = 1,
 ): string {
+  const periodRoiLabel = monthsInPeriod === 3 ? 'Quarterly ROI' : 'Monthly ROI'
+  const annualMultiplier = 12 / monthsInPeriod
   return `
     <h2>Ringkasan Saya</h2>
     <div class="kpi">
       <div><span>Total Investasi</span><strong>${formatCurrencyExact(allocation.investedAmount)}</strong></div>
       <div><span>Kepemilikan</span><strong>${formatPercent(allocation.ownershipPercent ?? 0)}</strong></div>
       <div><span>Distribusi Periode Ini</span><strong>${formatCurrencyExact(result.perInvestorAmount)}</strong></div>
-      <div><span>Monthly ROI</span><strong>${formatPercent(result.roiPercent, true)}</strong></div>
+      <div><span>${periodRoiLabel}</span><strong>${formatPercent(result.roiPercent, true)}</strong></div>
       ${modelType !== 'annual_dividend'
-        ? `<div><span>Annual ROI (×12)</span><strong>${formatPercent(result.annualRoiPercent, true)}</strong></div>`
+        ? `<div><span>Annual ROI (×${annualMultiplier})</span><strong>${formatPercent(result.annualRoiPercent, true)}</strong></div>`
         : `<div><span>Annual ROI</span><strong>${formatPercent(result.annualRoiPercent, true)}</strong></div>`
       }
     </div>
   `
+}
+
+// ─── Aggregation helpers (quarterly) ─────────────────────────────────────
+
+function sumOpex(rows: OpexItem[][]): OpexItem[] {
+  const map = new Map<string, number>()
+  for (const list of rows) {
+    for (const item of list ?? []) {
+      map.set(item.name, (map.get(item.name) ?? 0) + (item.amount ?? 0))
+    }
+  }
+  return [...map.entries()].map(([name, amount]) => ({ name, amount }))
+}
+
+function sumSubItems(rows: (CustomSubItem[] | undefined)[]): CustomSubItem[] | undefined {
+  const map = new Map<string, number>()
+  let any = false
+  for (const list of rows) {
+    if (!list) continue
+    for (const item of list) {
+      any = true
+      map.set(item.name, (map.get(item.name) ?? 0) + (item.amount ?? 0))
+    }
+  }
+  if (!any) return undefined
+  return [...map.entries()].map(([name, amount], i) => ({ id: `agg-${i}`, name, amount }))
+}
+
+function aggregatePnls(items: PnLExtractedData[], periodLabel: string): PnLExtractedData | null {
+  if (items.length === 0) return null
+  return {
+    period: periodLabel,
+    revenue: items.reduce((s, r) => s + (r.revenue ?? 0), 0),
+    cogs: items.reduce((s, r) => s + (r.cogs ?? 0), 0),
+    grossProfit: items.reduce((s, r) => s + (r.grossProfit ?? 0), 0),
+    opex: sumOpex(items.map(r => r.opex ?? [])),
+    totalOpex: items.reduce((s, r) => s + (r.totalOpex ?? 0), 0),
+    operatingProfit: items.reduce((s, r) => s + (r.operatingProfit ?? 0), 0),
+    interest: items.reduce((s, r) => s + (r.interest ?? 0), 0),
+    taxes: items.reduce((s, r) => s + (r.taxes ?? 0), 0),
+    netProfit: items.reduce((s, r) => s + (r.netProfit ?? 0), 0),
+    unitBreakdown: {},
+    notes: '',
+    cogsSubItems: sumSubItems(items.map(r => r.cogsSubItems)),
+    revenueSubItems: sumSubItems(items.map(r => r.revenueSubItems)),
+  }
+}
+
+function aggregateProjections(
+  items: ProjectionExtractedData[],
+  periodLabel: string,
+): ProjectionExtractedData | null {
+  if (items.length === 0) return null
+  const projectedRevenue = items.reduce((s, r) => s + (r.projectedRevenue ?? 0), 0)
+  const projectedCogs = items.reduce((s, r) => s + (r.projectedCogs ?? 0), 0)
+  return {
+    period: periodLabel,
+    projectedRevenue,
+    projectedCogsPercent: projectedRevenue > 0 ? (projectedCogs / projectedRevenue) * 100 : 0,
+    projectedCogs,
+    projectedGrossProfit: items.reduce((s, r) => s + (r.projectedGrossProfit ?? 0), 0),
+    projectedOpex: sumOpex(items.map(r => r.projectedOpex ?? [])),
+    projectedTotalOpex: items.reduce((s, r) => s + (r.projectedTotalOpex ?? 0), 0),
+    projectedDepreciationAmortization: items.reduce(
+      (s, r) => s + (r.projectedDepreciationAmortization ?? 0), 0,
+    ),
+    projectedTax: items.reduce((s, r) => s + (r.projectedTax ?? 0), 0),
+    projectedNetProfit: items.reduce((s, r) => s + (r.projectedNetProfit ?? 0), 0),
+    assumptions: '',
+  }
 }
 
 // ─── Main Builder ─────────────────────────────────────────────────────────
@@ -187,11 +261,26 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
     pnlReports, projectionReports, managementReports, notes,
   } = args
 
-  const latestPnl = pnlReports.find(r => r.period === period) ?? null
-  const latestProj = projectionReports.find(r => r.period === period) ?? null
+  const isQuarterly = isQuarterPeriod(period)
+  const monthsInPeriod = isQuarterly ? 3 : 1
+  const constituentMonths = isQuarterly ? quarterToMonths(period) : [period]
+
+  const latestPnl = isQuarterly
+    ? aggregatePnls(
+        pnlReports.filter(r => constituentMonths.includes(r.period)),
+        period,
+      )
+    : pnlReports.find(r => r.period === period) ?? null
+  const latestProj = isQuarterly
+    ? aggregateProjections(
+        projectionReports.filter(r => constituentMonths.includes(r.period)),
+        period,
+      )
+    : projectionReports.find(r => r.period === period) ?? null
+  const mgmtCutoff = constituentMonths[constituentMonths.length - 1]
   const latestMgmt = [...managementReports]
     .sort((a, b) => comparePeriods(a.period, b.period))
-    .filter(r => comparePeriods(r.period, period) <= 0)
+    .filter(r => comparePeriods(r.period, mgmtCutoff) <= 0)
     .at(-1) ?? null
 
   const derivedOperatingProfit = latestPnl
@@ -225,10 +314,12 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
       allocation,
       portfolio,
       isArunamiTeam,
+      monthsInPeriod,
+      scheduleMonths: constituentMonths,
     })
 
     if (latestPnl || ['fixed_yield', 'fixed_schedule', 'annual_dividend'].includes(modelType)) {
-      investorKpiBlock = buildKpiBlock(distributionResult, allocation, modelType)
+      investorKpiBlock = buildKpiBlock(distributionResult, allocation, modelType, monthsInPeriod)
       distributionSection = buildDistributionSection(
         modelType, distributionResult, investorConfig, allocation, formatPeriod(period),
       )

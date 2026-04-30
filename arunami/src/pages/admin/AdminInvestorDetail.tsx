@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
-  getUser, getAllocationsForInvestor, getPortfolioConfig, getFinancialData,
+  getUser, getAllocationsForInvestor, getPortfolioConfigOrDefault, getFinancialData,
   getCommunicationsForInvestor, getPortfolio,
 } from '@/lib/firestore'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
@@ -68,7 +68,7 @@ export default function AdminInvestorDetail() {
     const enriched = await Promise.all(
       allocations.map(async (allocation) => {
         const [config, financial, ptf] = await Promise.all([
-          getPortfolioConfig(allocation.portfolioId),
+          getPortfolioConfigOrDefault(allocation.portfolioId),
           getFinancialData(allocation.portfolioId),
           getPortfolio(allocation.portfolioId),
         ])

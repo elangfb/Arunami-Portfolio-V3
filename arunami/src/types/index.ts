@@ -345,6 +345,8 @@ export interface PortfolioReport {
 
 export type InvestorReportStatus = 'draft' | 'published'
 
+export type InvestorReportType = 'monthly' | 'quarterly'
+
 export interface InvestorReportDoc {
   id: string
   portfolioId: string
@@ -352,6 +354,7 @@ export interface InvestorReportDoc {
   investorUid: string
   investorName: string
   period: string
+  reportType?: InvestorReportType
   status: InvestorReportStatus
   htmlContent: string
   publishedAt?: Timestamp

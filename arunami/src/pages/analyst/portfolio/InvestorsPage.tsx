@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   getFinancialData, getTransferProofs,
-  getAllocationsForPortfolio, getPortfolioConfig, getAllUsers,
+  getAllocationsForPortfolio, getPortfolioConfigOrDefault, getAllUsers,
 } from '@/lib/firestore'
 import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
@@ -30,7 +30,7 @@ export default function InvestorsPage() {
       getFinancialData(portfolioId),
       getTransferProofs(portfolioId),
       getAllocationsForPortfolio(portfolioId),
-      getPortfolioConfig(portfolioId),
+      getPortfolioConfigOrDefault(portfolioId),
       getAllUsers(),
     ]).then(([d, p, allocs, cfg, u]) => {
       setData(d)

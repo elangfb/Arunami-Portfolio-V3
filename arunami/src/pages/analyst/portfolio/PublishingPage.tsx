@@ -10,7 +10,7 @@ import {
   getAllUsers,
 } from '@/lib/firestore'
 import { buildInvestorReportHtml } from '@/lib/reportHtml'
-import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
+import { formatPeriod, comparePeriods, extractAvailablePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,7 @@ export default function PublishingPage() {
   const [loading, setLoading] = useState(true)
 
   // Publishing state
+  const [reportType, setReportType] = useState<'monthly' | 'quarterly'>('monthly')
   const [selectedPeriod, setSelectedPeriod] = useState<string>('')
   const [selectedInvestorUid, setSelectedInvestorUid] = useState<string>('')
   const [existingReports, setExistingReports] = useState<InvestorReportDoc[]>([])
@@ -90,11 +91,29 @@ export default function PublishingPage() {
 
   useEffect(() => { refreshExisting() }, [portfolioId, selectedPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const availablePeriods = useMemo(
+  const availableMonths = useMemo(
     () => [...new Set([...pnlReports, ...projReports].map(r => r.period))]
       .sort((a, b) => comparePeriods(b, a)),
     [pnlReports, projReports],
   )
+
+  const availableQuarters = useMemo(
+    () => extractAvailablePeriods(availableMonths).quarterly,
+    [availableMonths],
+  )
+
+  const availablePeriods = reportType === 'quarterly'
+    ? availableQuarters.map(q => q.value)
+    : availableMonths
+
+  // Reset selection when toggling report type (avoids stale period for the other type).
+  useEffect(() => {
+    if (reportType === 'quarterly') {
+      if (availableQuarters.length > 0) setSelectedPeriod(availableQuarters[0].value)
+    } else {
+      if (availableMonths.length > 0) setSelectedPeriod(availableMonths[0])
+    }
+  }, [reportType, availableMonths, availableQuarters])
 
   const selectedAllocation = allocations.find(a => a.investorUid === selectedInvestorUid) ?? null
 
@@ -129,6 +148,7 @@ export default function PublishingPage() {
         investorUid: selectedAllocation.investorUid,
         investorName: selectedAllocation.investorName,
         period: selectedPeriod,
+        reportType,
         htmlContent: previewHtml,
       })
       await publishInvestorReport({ portfolioId, reportId, publishedBy: user.uid })
@@ -215,6 +235,7 @@ export default function PublishingPage() {
       await publishAllInvestorReports({
         portfolioId,
         period: selectedPeriod,
+        reportType,
         reports,
         publishedBy: user.uid,
       })
@@ -244,14 +265,28 @@ export default function PublishingPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={reportType} onValueChange={v => setReportType(v as 'monthly' | 'quarterly')}>
+            <SelectTrigger className="h-9 w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="monthly">Bulanan</SelectItem>
+              <SelectItem value="quarterly">Kuartalan</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="h-9 w-40 text-xs">
+            <SelectTrigger className="h-9 w-44 text-xs">
               <SelectValue placeholder="Pilih periode" />
             </SelectTrigger>
             <SelectContent>
-              {availablePeriods.map(p => (
-                <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
-              ))}
+              {reportType === 'quarterly'
+                ? availableQuarters.map(q => (
+                    <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
+                  ))
+                : availableMonths.map(p => (
+                    <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
+                  ))
+              }
             </SelectContent>
           </Select>
           <Button

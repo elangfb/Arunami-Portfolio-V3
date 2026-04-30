@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { getFinancialData, getAllocationsForInvestor, getPortfolioConfig } from '@/lib/firestore'
+import { getFinancialData, getAllocationsForInvestor, getPortfolioConfigOrDefault } from '@/lib/firestore'
 import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -25,7 +25,7 @@ export default function InvestorOverviewPage() {
     Promise.all([
       getFinancialData(portfolioId),
       getAllocationsForInvestor(user.uid),
-      getPortfolioConfig(portfolioId),
+      getPortfolioConfigOrDefault(portfolioId),
     ]).then(([d, allocs, cfg]) => {
       setData(d)
       setAllocation(allocs.find(a => a.portfolioId === portfolioId) ?? null)

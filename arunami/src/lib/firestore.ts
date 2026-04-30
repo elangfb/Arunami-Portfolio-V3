@@ -599,10 +599,12 @@ export async function upsertInvestorReportDraft(data: {
   investorName: string
   period: string
   htmlContent: string
+  reportType?: 'monthly' | 'quarterly'
 }): Promise<string> {
   const id = `${data.portfolioId}_${data.investorUid}_${data.period}`
   const payload = {
     ...data,
+    reportType: data.reportType ?? 'monthly',
     status: 'draft' as const,
     updatedAt: serverTimestamp(),
   }
@@ -638,6 +640,7 @@ export async function publishInvestorReport(params: {
 export async function publishAllInvestorReports(params: {
   portfolioId: string
   period: string
+  reportType?: 'monthly' | 'quarterly'
   reports: {
     portfolioName: string
     investorUid: string
@@ -655,6 +658,7 @@ export async function publishAllInvestorReports(params: {
       investorUid: r.investorUid,
       investorName: r.investorName,
       period: params.period,
+      reportType: params.reportType ?? 'monthly',
       htmlContent: r.htmlContent,
       status: 'published' as const,
       publishedAt: serverTimestamp(),
