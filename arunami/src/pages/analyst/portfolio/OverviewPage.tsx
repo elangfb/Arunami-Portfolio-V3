@@ -49,8 +49,8 @@ export default function OverviewPage() {
   // chronologically last entry — projection-only future months would otherwise
   // show Rp 0 on the KPI cards.
   const latestTxIdx = data.transactionData.length - 1
-  let latestPeriod = data.transactionData[latestTxIdx]?.month
-  let prevPeriod = data.transactionData[latestTxIdx - 1]?.month
+  let latestPeriod: string | undefined = data.transactionData[latestTxIdx]?.month
+  let prevPeriod: string | undefined = data.transactionData[latestTxIdx - 1]?.month
   if (!latestPeriod) {
     const revWithActual = [...data.revenueData].reverse().find(r => r.aktual !== 0)
     latestPeriod = revWithActual?.month
