@@ -38,10 +38,6 @@ const baseStyles = `
   .kpi strong { display: block; font-size: 15px; color: #1e5f3f; margin-top: 2px; }
 `
 
-function row(label: string, val: number): string {
-  return `<tr><td>${label}</td><td style="text-align:right">${formatCurrencyExact(val)}</td></tr>`
-}
-
 function descRow(label: string, desc: string, val: string): string {
   return `<tr>
     <td><strong>${label}</strong><div style="font-size:11px;color:#666;margin-top:2px">${desc}</div></td>
