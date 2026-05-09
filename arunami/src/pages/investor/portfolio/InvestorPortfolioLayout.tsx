@@ -1,26 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet, useParams, useNavigate, Link } from 'react-router-dom'
+import { NavLink, Outlet, useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
-import { getPortfolio, getPublishedInvestorReports } from '@/lib/firestore'
+import { getPortfolio, getPortfolioConfigOrDefault, getPublishedInvestorReports } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
-import type { Portfolio, InvestorReportDoc } from '@/types'
+import { isFixedReturnModel, FIXED_RETURN_VISIBLE_ROUTES } from '@/lib/projectTypeRules'
+import type { Portfolio, PortfolioConfig, InvestorReportDoc } from '@/types'
 import {
   TrendingUp, LayoutDashboard, TrendingDown, BarChart2,
   DollarSign, ClipboardList, StickyNote, FileText,
   ChevronLeft, LogOut,
 } from 'lucide-react'
 
+export type InvestorReportTypeFilter = 'monthly' | 'quarterly'
+
 export interface InvestorPortfolioOutletContext {
   portfolio: Portfolio | null
+  portfolioConfig: PortfolioConfig | null
   portfolioId: string | undefined
   selectedPeriod: string
   setSelectedPeriod: (p: string) => void
   availablePeriods: string[]
   publishedReports: InvestorReportDoc[]
+  reportTypeFilter: InvestorReportTypeFilter
+  setReportTypeFilter: (t: InvestorReportTypeFilter) => void
+  hasMonthly: boolean
+  hasQuarterly: boolean
 }
 
 const navGroups = [
@@ -51,13 +59,24 @@ const navGroups = [
 export default function InvestorPortfolioLayout() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, setUser } = useAuthStore()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
+  const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
+  const [configLoaded, setConfigLoaded] = useState(false)
   const [publishedReports, setPublishedReports] = useState<InvestorReportDoc[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<string>('')
+  const [reportTypeFilter, setReportTypeFilter] = useState<InvestorReportTypeFilter>('monthly')
 
   useEffect(() => {
-    if (id) getPortfolio(id).then(setPortfolio)
+    if (!id) return
+    setConfigLoaded(false)
+    Promise.all([getPortfolio(id), getPortfolioConfigOrDefault(id)])
+      .then(([p, c]) => {
+        setPortfolio(p)
+        setPortfolioConfig(c)
+      })
+      .finally(() => setConfigLoaded(true))
   }, [id])
 
   // Fetch this investor's published reports for this portfolio
@@ -69,15 +88,59 @@ export default function InvestorPortfolioLayout() {
         .filter(r => r.portfolioId === id)
         .sort((a, b) => comparePeriods(b.period, a.period))
       setPublishedReports(forPortfolio)
-      if (forPortfolio.length > 0) {
-        setSelectedPeriod(prev => prev || forPortfolio[0].period)
-      }
     })()
   }, [id, user])
 
-  const availablePeriods = useMemo(
-    () => [...new Set(publishedReports.map(r => r.period))],
+  const isFixed = isFixedReturnModel(portfolioConfig?.returnModel)
+
+  const monthlyReports = useMemo(
+    () => publishedReports.filter(r => (r.reportType ?? 'monthly') === 'monthly'),
     [publishedReports],
+  )
+  const quarterlyReports = useMemo(
+    () => publishedReports.filter(r => r.reportType === 'quarterly'),
+    [publishedReports],
+  )
+  const hasMonthly = monthlyReports.length > 0
+  const hasQuarterly = quarterlyReports.length > 0
+
+  // Default the report-type filter to whichever group has data.
+  useEffect(() => {
+    if (hasMonthly) setReportTypeFilter('monthly')
+    else if (hasQuarterly) setReportTypeFilter('quarterly')
+  }, [hasMonthly, hasQuarterly])
+
+  const activeReports = reportTypeFilter === 'quarterly' ? quarterlyReports : monthlyReports
+  const availablePeriods = useMemo(
+    () => [...new Set(activeReports.map(r => r.period))],
+    [activeReports],
+  )
+
+  // Pin selectedPeriod to the active report-type group whenever the filter
+  // changes or the underlying reports load.
+  useEffect(() => {
+    if (availablePeriods.length === 0) {
+      setSelectedPeriod('')
+      return
+    }
+    if (!availablePeriods.includes(selectedPeriod)) {
+      setSelectedPeriod(availablePeriods[0])
+    }
+  }, [availablePeriods, selectedPeriod])
+
+  // For fixed-return projects, redirect away from any hidden operational page.
+  useEffect(() => {
+    if (!configLoaded || !id || !isFixed) return
+    const sub = location.pathname.split(`/investor/portfolios/${id}/`)[1] ?? ''
+    const segment = sub.split('/')[0] ?? ''
+    if (segment && !FIXED_RETURN_VISIBLE_ROUTES.has(segment)) {
+      navigate(`/investor/portfolios/${id}/report`, { replace: true })
+    }
+  }, [configLoaded, isFixed, id, location.pathname, navigate])
+
+  const filteredNavGroups = useMemo(
+    () => (isFixed ? navGroups.filter(g => g.label === 'Laporan') : navGroups),
+    [isFixed],
   )
 
   const handleLogout = async () => {
@@ -88,11 +151,16 @@ export default function InvestorPortfolioLayout() {
 
   const outletContext: InvestorPortfolioOutletContext = {
     portfolio,
+    portfolioConfig,
     portfolioId: id,
     selectedPeriod,
     setSelectedPeriod,
     availablePeriods,
-    publishedReports,
+    publishedReports: activeReports,
+    reportTypeFilter,
+    setReportTypeFilter,
+    hasMonthly,
+    hasQuarterly,
   }
 
   return (
@@ -108,6 +176,25 @@ export default function InvestorPortfolioLayout() {
         {/* Period Selector */}
         <div className="px-4 pt-3">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6b7280] mb-1">Periode Laporan</p>
+          {hasMonthly && hasQuarterly && (
+            <div className="mb-2 flex rounded-md border border-white/10 bg-white/5 p-0.5">
+              {(['monthly', 'quarterly'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setReportTypeFilter(t)}
+                  className={cn(
+                    'flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors',
+                    reportTypeFilter === t
+                      ? 'bg-[#38a169] text-white'
+                      : 'text-[#9ca3af] hover:text-white',
+                  )}
+                >
+                  {t === 'monthly' ? 'Bulanan' : 'Kuartalan'}
+                </button>
+              ))}
+            </div>
+          )}
           {availablePeriods.length > 0 ? (
             <select
               value={selectedPeriod}
@@ -132,7 +219,7 @@ export default function InvestorPortfolioLayout() {
 
         {/* Grouped navigation */}
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
-          {navGroups.map(group => (
+          {filteredNavGroups.map(group => (
             <div key={group.label} className="px-3">
               <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6b7280]">{group.label}</p>
               <div className="space-y-0.5">

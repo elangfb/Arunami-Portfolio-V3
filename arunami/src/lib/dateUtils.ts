@@ -102,6 +102,22 @@ export function addMonthOffset(periodKey: string, offset: number): string {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
 }
 
+/**
+ * Returns the previous period for a "YYYY-MM" or "YYYY-Qn" key.
+ * Examples: "2026-04" → "2026-03"; "2026-Q1" → "2025-Q4"; "2026-Q2" → "2026-Q1".
+ * Returns the input unchanged if it doesn't match either format.
+ */
+export function previousPeriod(period: string): string {
+  const qMatch = period.match(/^(\d{4})-Q([1-4])$/)
+  if (qMatch) {
+    const year = parseInt(qMatch[1], 10)
+    const q = parseInt(qMatch[2], 10)
+    return q === 1 ? `${year - 1}-Q4` : `${year}-Q${q - 1}`
+  }
+  if (/^\d{4}-\d{2}$/.test(period)) return addMonthOffset(period, -1)
+  return period
+}
+
 /** Sort comparator for period strings — handles both "YYYY-MM" and "YYYY-Qn" (chronological) */
 export function comparePeriods(a: string, b: string): number {
   return periodSortKey(a).localeCompare(periodSortKey(b))

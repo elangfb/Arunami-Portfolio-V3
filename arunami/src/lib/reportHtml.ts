@@ -1,5 +1,5 @@
 import { formatCurrencyExact, formatPercent } from './utils'
-import { formatPeriod, comparePeriods, isQuarterPeriod, quarterToMonths } from './dateUtils'
+import { formatPeriod, comparePeriods, isQuarterPeriod, quarterToMonths, previousPeriod } from './dateUtils'
 import { calculateDistribution } from './distributionStrategies'
 import type { DistributionResult } from './distributionStrategies'
 import type {
@@ -53,6 +53,78 @@ function highlightRow(label: string, desc: string, val: string): string {
   return `<tr style="background:#f5faf7">
     <td><strong style="color:#1e5f3f">${label}</strong><div style="font-size:11px;color:#666;margin-top:2px">${desc}</div></td>
     <td style="text-align:right"><strong style="color:#1e5f3f;font-size:15px">${val}</strong></td>
+  </tr>`
+}
+
+// ─── Three-column comparison row (current / previous / projection) ───────
+
+export interface ThreeColRow {
+  label: string
+  current: number | null
+  previous: number | null
+  projection: number | null
+}
+
+/**
+ * Build the four canonical comparison rows (Revenue, Gross Profit,
+ * Operating Profit, Net Profit) from current PnL, previous PnL, and projection.
+ * Operating Profit is derived (Gross Profit - Total Opex) for parity with
+ * the legacy single-column section, since some uploads omit it directly.
+ */
+export function buildThreeColRows(
+  currentPnl: PnLExtractedData | null,
+  prevPnl: PnLExtractedData | null,
+  projection: ProjectionExtractedData | null,
+): ThreeColRow[] {
+  const opOf = (p: PnLExtractedData | null): number | null =>
+    p ? (p.grossProfit ?? 0) - (p.totalOpex ?? 0) : null
+  return [
+    {
+      label: 'Revenue',
+      current: currentPnl?.revenue ?? null,
+      previous: prevPnl?.revenue ?? null,
+      projection: projection?.projectedRevenue ?? null,
+    },
+    {
+      label: 'Gross Profit',
+      current: currentPnl?.grossProfit ?? null,
+      previous: prevPnl?.grossProfit ?? null,
+      projection: projection?.projectedGrossProfit ?? null,
+    },
+    {
+      label: 'Operating Profit',
+      current: opOf(currentPnl),
+      previous: opOf(prevPnl),
+      // Projections don't store operating profit explicitly; derive from net + interest + tax + D&A is unreliable, so leave null.
+      projection: null,
+    },
+    {
+      label: 'Net Profit',
+      current: currentPnl?.netProfit ?? null,
+      previous: prevPnl?.netProfit ?? null,
+      projection: projection?.projectedNetProfit ?? null,
+    },
+  ]
+}
+
+function deltaBadge(cur: number | null, base: number | null): string {
+  if (cur == null || base == null || base === 0) return ''
+  const pct = ((cur - base) / Math.abs(base)) * 100
+  const positive = pct >= 0
+  const color = positive ? '#1e7d3a' : '#b91c1c'
+  const sign = positive ? '+' : ''
+  return `<div style="font-size:10px;color:${color};margin-top:2px">${sign}${pct.toFixed(1)}%</div>`
+}
+
+function threeColRow(r: ThreeColRow): string {
+  const cell = (v: number | null, badge: string = '') => v == null
+    ? `<td style="text-align:right;color:#9ca3af">—</td>`
+    : `<td style="text-align:right">${formatCurrencyExact(v)}${badge}</td>`
+  return `<tr>
+    <td>${r.label}</td>
+    ${cell(r.current)}
+    ${cell(r.previous, deltaBadge(r.current, r.previous))}
+    ${cell(r.projection, deltaBadge(r.current, r.projection))}
   </tr>`
 }
 
@@ -277,15 +349,22 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
         period,
       )
     : projectionReports.find(r => r.period === period) ?? null
+
+  // Previous period (for the 3-column comparison table)
+  const prevPeriodKey = previousPeriod(period)
+  const prevConstituentMonths = isQuarterly ? quarterToMonths(prevPeriodKey) : [prevPeriodKey]
+  const prevPnl = isQuarterly
+    ? aggregatePnls(
+        pnlReports.filter(r => prevConstituentMonths.includes(r.period)),
+        prevPeriodKey,
+      )
+    : pnlReports.find(r => r.period === prevPeriodKey) ?? null
+
   const mgmtCutoff = constituentMonths[constituentMonths.length - 1]
   const latestMgmt = [...managementReports]
     .sort((a, b) => comparePeriods(a.period, b.period))
     .filter(r => comparePeriods(r.period, mgmtCutoff) <= 0)
     .at(-1) ?? null
-
-  const derivedOperatingProfit = latestPnl
-    ? (latestPnl.grossProfit ?? 0) - (latestPnl.totalOpex ?? 0)
-    : 0
 
   // Determine model type from config, falling back to percentage_based
   const modelType = config?.investorConfig?.type ?? 'percentage_based'
@@ -326,53 +405,25 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
     }
   }
 
-  const cogsRows = latestPnl && (latestPnl.cogsSubItems?.length ?? 0) > 0
-    ? `${row('COGS', latestPnl.cogs)}${latestPnl.cogsSubItems!.map(s =>
-        `<tr><td style="padding-left:20px;color:#666;font-size:12px">${s.name}</td><td style="text-align:right;color:#666;font-size:12px">${formatCurrencyExact(s.amount)}</td></tr>`,
-      ).join('')}`
-    : (latestPnl ? row('COGS', latestPnl.cogs) : '')
-
+  // Three-column comparison table: current period / previous period / projection.
+  // Replaces the legacy single-column "Laporan Keuangan" + "Struktur Biaya" sections.
+  const periodNoun = isQuarterly ? 'Kuartal' : 'Bulan'
   const pnlSection = latestPnl ? `
     <h2>Laporan Keuangan — ${formatPeriod(latestPnl.period)}</h2>
     <table class="data">
-      ${row('Revenue', latestPnl.revenue)}
-      ${cogsRows}
-      ${row('Gross Profit', latestPnl.grossProfit)}
-      ${row('Total Opex', latestPnl.totalOpex)}
-      ${row('Operating Profit', derivedOperatingProfit)}
-      ${row('Net Profit', latestPnl.netProfit)}
+      <tr>
+        <th></th>
+        <th style="text-align:right">Aktual ${formatPeriod(period)}</th>
+        <th style="text-align:right">Aktual ${periodNoun} Lalu</th>
+        <th style="text-align:right">Proyeksi ${formatPeriod(period)}</th>
+      </tr>
+      ${buildThreeColRows(latestPnl, prevPnl, latestProj).map(threeColRow).join('')}
     </table>
   ` : '<p><em>Belum ada data P&amp;L untuk periode ini.</em></p>'
 
-  const projSection = latestProj ? `
-    <h2>Proyeksi — ${formatPeriod(latestProj.period)}</h2>
-    <table class="data">
-      ${row('Projected Revenue', latestProj.projectedRevenue)}
-      ${row('Projected COGS', latestProj.projectedCogs)}
-      ${row('Projected Gross Profit', latestProj.projectedGrossProfit)}
-      ${row('Projected Total Opex', latestProj.projectedTotalOpex)}
-      ${row('Depreciation & Amortization', latestProj.projectedDepreciationAmortization ?? 0)}
-      ${row('Tax', latestProj.projectedTax ?? 0)}
-      ${row('Projected Net Profit', latestProj.projectedNetProfit)}
-    </table>
-  ` : ''
-
-  const hasCogsBreakdown = (latestPnl?.cogsSubItems?.length ?? 0) > 0
-  const hasOpex = (latestPnl?.opex?.length ?? 0) > 0
-  const costSection = latestPnl && (hasOpex || hasCogsBreakdown) ? `
-    <h2>Struktur Biaya</h2>
-    <table class="data">
-      <tr><th>Item</th><th style="text-align:right">Jumlah</th></tr>
-      ${hasCogsBreakdown ? `
-        <tr><td colspan="2" style="font-weight:600;background:#f5f5f5">COGS</td></tr>
-        ${latestPnl.cogsSubItems!.map(s => `<tr><td style="padding-left:20px">${s.name}</td><td style="text-align:right">${formatCurrencyExact(s.amount)}</td></tr>`).join('')}
-      ` : ''}
-      ${hasOpex ? `
-        <tr><td colspan="2" style="font-weight:600;background:#f5f5f5">Operating Expenses</td></tr>
-        ${latestPnl.opex.map(o => `<tr><td style="padding-left:20px">${o.name}</td><td style="text-align:right">${formatCurrencyExact(o.amount)}</td></tr>`).join('')}
-      ` : ''}
-    </table>
-  ` : ''
+  // projSection and costSection removed per CEO feedback:
+  // the 3-column pnlSection above already surfaces projection alongside actuals,
+  // and cost-structure detail is intentionally hidden from the investor view.
 
   const summarySection = latestMgmt?.businessSummary
     ? `<h2>Business Summary</h2><p>${latestMgmt.businessSummary.replace(/\n/g, '<br/>')}</p>`
@@ -412,8 +463,6 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
   ${summarySection}
   ${pnlSection}
   ${distributionSection}
-  ${projSection}
-  ${costSection}
   ${issuesSection}
   ${actionsSection}
   ${notesSection}

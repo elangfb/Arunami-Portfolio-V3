@@ -41,9 +41,14 @@ export default function InvestorReportPage() {
       {selected ? (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">
-              {selected.portfolioName} — {formatPeriod(selected.period)}
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">
+                {selected.portfolioName} — {formatPeriod(selected.period)}
+              </CardTitle>
+              <span className="rounded-full bg-[#38a169]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#1e5f3f]">
+                {selected.reportType === 'quarterly' ? 'Kuartalan' : 'Bulanan'}
+              </span>
+            </div>
             <p className="text-xs text-muted-foreground">
               Laporan ini bersifat view-only. Unduhan tidak tersedia.
             </p>

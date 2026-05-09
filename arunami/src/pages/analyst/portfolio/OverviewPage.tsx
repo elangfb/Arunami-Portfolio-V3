@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { getFinancialData } from '@/lib/firestore'
-import { formatCurrencyCompact, formatPercent, calcMoM } from '@/lib/utils'
+import { getFinancialData, getReports } from '@/lib/firestore'
+import { formatCurrencyCompact, formatCurrencyExact, formatPercent, calcMoM } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2, AlertTriangle } from 'lucide-react'
-import { formatPeriod } from '@/lib/dateUtils'
-import type { FinancialData, Portfolio } from '@/types'
+import { formatPeriod, previousPeriod } from '@/lib/dateUtils'
+import { buildThreeColRows } from '@/lib/reportHtml'
+import type { FinancialData, Portfolio, PnLExtractedData, ProjectionExtractedData, PortfolioReport } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -19,9 +20,22 @@ export default function OverviewPage() {
   const { portfolio, portfolioId } = useOutletContext<Context>()
   const [data, setData] = useState<FinancialData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pnlReports, setPnlReports] = useState<PortfolioReport[]>([])
+  const [projReports, setProjReports] = useState<PortfolioReport[]>([])
 
   useEffect(() => {
     if (portfolioId) getFinancialData(portfolioId).then(d => { setData(d); setLoading(false) })
+  }, [portfolioId])
+
+  useEffect(() => {
+    if (!portfolioId) return
+    Promise.all([
+      getReports(portfolioId, 'pnl'),
+      getReports(portfolioId, 'projection'),
+    ]).then(([pnls, projs]) => {
+      setPnlReports(pnls)
+      setProjReports(projs)
+    })
   }, [portfolioId])
 
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
@@ -77,6 +91,20 @@ export default function OverviewPage() {
   const totalInvestment = portfolio?.investasiAwal ?? 0
   const totalInvestmentROI = totalInvestment > 0 ? (netForInvestor / totalInvestment) * 100 : 0
 
+  // Three-column comparison rows (current / previous / projection) — same data
+  // shape as the investor report's Laporan Keuangan section.
+  const comparisonRows = useMemo(() => {
+    if (!latestPeriod) return []
+    const prevKey = previousPeriod(latestPeriod)
+    const cur = (pnlReports.find(r => r.period === latestPeriod)
+      ?.extractedData as PnLExtractedData | undefined) ?? null
+    const prev = (pnlReports.find(r => r.period === prevKey)
+      ?.extractedData as PnLExtractedData | undefined) ?? null
+    const proj = (projReports.find(r => r.period === latestPeriod)
+      ?.extractedData as ProjectionExtractedData | undefined) ?? null
+    return buildThreeColRows(cur, prev, proj)
+  }, [latestPeriod, pnlReports, projReports])
+
   const kpis = [
     {
       label: 'Revenue', value: formatCurrencyCompact(lastRevenue),
@@ -120,6 +148,59 @@ export default function OverviewPage() {
           </Card>
         ))}
       </div>
+
+      {/* Three-column comparison: current / last month / projection */}
+      {comparisonRows.length > 0 && latestPeriod && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">
+              Perbandingan {formatPeriod(latestPeriod)} vs Bulan Lalu vs Proyeksi
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="py-2 text-left font-medium"></th>
+                  <th className="py-2 text-right font-medium">Aktual {formatPeriod(latestPeriod)}</th>
+                  <th className="py-2 text-right font-medium">Aktual Bulan Lalu</th>
+                  <th className="py-2 text-right font-medium">Proyeksi {formatPeriod(latestPeriod)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonRows.map(r => {
+                  const delta = (cur: number | null, base: number | null) => {
+                    if (cur == null || base == null || base === 0) return null
+                    return ((cur - base) / Math.abs(base)) * 100
+                  }
+                  const dPrev = delta(r.current, r.previous)
+                  const dProj = delta(r.current, r.projection)
+                  const cell = (v: number | null, d: number | null) => (
+                    v == null
+                      ? <td className="py-2 text-right text-muted-foreground">—</td>
+                      : <td className="py-2 text-right">
+                          {formatCurrencyExact(v)}
+                          {d !== null && (
+                            <div className={`text-[10px] ${d >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              {d >= 0 ? '+' : ''}{d.toFixed(1)}%
+                            </div>
+                          )}
+                        </td>
+                  )
+                  return (
+                    <tr key={r.label} className="border-b last:border-0">
+                      <td className="py-2 font-medium">{r.label}</td>
+                      {cell(r.current, null)}
+                      {cell(r.previous, dPrev)}
+                      {cell(r.projection, dProj)}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Revenue Bar Chart */}
       <Card>
