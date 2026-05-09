@@ -38,6 +38,25 @@ export default function OverviewPage() {
     })
   }, [portfolioId])
 
+  // Three-column comparison rows (current / previous / projection) — same data
+  // shape as the investor report's Laporan Keuangan section. Declared here,
+  // above the early returns below, so the hook count stays stable across the
+  // loading → loaded transition (otherwise React throws error #310).
+  const comparisonRows = useMemo(() => {
+    if (!data) return []
+    const txs = data.transactionData
+    let latest: string | undefined = txs[txs.length - 1]?.month
+    if (!latest) {
+      latest = [...data.revenueData].reverse().find(r => r.aktual !== 0)?.month
+    }
+    if (!latest) return []
+    const prevKey = previousPeriod(latest)
+    const cur  = (pnlReports.find(r => r.period === latest)?.extractedData as PnLExtractedData | undefined) ?? null
+    const prev = (pnlReports.find(r => r.period === prevKey)?.extractedData as PnLExtractedData | undefined) ?? null
+    const proj = (projReports.find(r => r.period === latest)?.extractedData as ProjectionExtractedData | undefined) ?? null
+    return buildThreeColRows(cur, prev, proj)
+  }, [data, pnlReports, projReports])
+
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
 
   if (!data && portfolio?.isGracePeriod) return (
@@ -90,20 +109,6 @@ export default function OverviewPage() {
   const netForInvestor = investorShare - arunamiFee
   const totalInvestment = portfolio?.investasiAwal ?? 0
   const totalInvestmentROI = totalInvestment > 0 ? (netForInvestor / totalInvestment) * 100 : 0
-
-  // Three-column comparison rows (current / previous / projection) — same data
-  // shape as the investor report's Laporan Keuangan section.
-  const comparisonRows = useMemo(() => {
-    if (!latestPeriod) return []
-    const prevKey = previousPeriod(latestPeriod)
-    const cur = (pnlReports.find(r => r.period === latestPeriod)
-      ?.extractedData as PnLExtractedData | undefined) ?? null
-    const prev = (pnlReports.find(r => r.period === prevKey)
-      ?.extractedData as PnLExtractedData | undefined) ?? null
-    const proj = (projReports.find(r => r.period === latestPeriod)
-      ?.extractedData as ProjectionExtractedData | undefined) ?? null
-    return buildThreeColRows(cur, prev, proj)
-  }, [latestPeriod, pnlReports, projReports])
 
   const kpis = [
     {
