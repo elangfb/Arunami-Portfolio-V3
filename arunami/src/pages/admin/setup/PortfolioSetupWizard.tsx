@@ -52,6 +52,14 @@ const customVariableSchema = z.object({
   ]),
 })
 
+// Treat NaN / empty / null as "not provided" so .optional() works with
+// react-hook-form's `valueAsNumber` (which emits NaN for blank inputs).
+const optionalNumber = (min = 0) =>
+  z.preprocess(
+    v => (v === '' || v === null || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+    z.number().min(min).optional()
+  )
+
 const wizardSchema = z.object({
   // Step 1: Basic Info
   name: z.string().min(2, 'Nama minimal 2 karakter'),
@@ -76,11 +84,11 @@ const wizardSchema = z.object({
   arunamiFeePercent: z.number().min(0).max(100),
 
   // Fixed Yield
-  fixedYieldPercent: z.number().min(0).optional(),
+  fixedYieldPercent: optionalNumber(0),
   principalReference: z.enum(['invested_amount', 'investasi_awal']).optional(),
 
   // Revenue Share
-  revenueSharePercent: z.number().min(0).optional(),
+  revenueSharePercent: optionalNumber(0),
 
   // Fixed Schedule
   scheduledPayments: z.array(scheduledPaymentSchema).optional(),
@@ -99,6 +107,18 @@ const STEP_FIELDS: (keyof WizardFormData)[][] = [
   ['name', 'brandName', 'code', 'industryType', 'stage', 'periode', 'investasiAwal'],
   ['returnModel', 'investorSharePercent', 'arunamiFeePercent'],
 ]
+
+// Fields that should be validated on final submit, per selected distribution model.
+// Other model fields are skipped so a stale value from a previously-viewed model
+// (e.g. NaN on fixedYieldPercent after toggling cards) doesn't block submission.
+const MODEL_SPECIFIC_FIELDS: Record<ReturnModelType, (keyof WizardFormData)[]> = {
+  net_profit_share: ['investorSharePercent', 'arunamiFeePercent'],
+  fixed_yield:      ['fixedYieldPercent', 'principalReference', 'arunamiFeePercent'],
+  revenue_share:    ['revenueSharePercent', 'investorSharePercent', 'arunamiFeePercent'],
+  fixed_schedule:   ['scheduledPayments', 'arunamiFeePercent'],
+  annual_dividend:  ['arunamiFeePercent'],
+  custom:           ['customVariables', 'formula', 'distributionFrequency', 'arunamiFeePercent'],
+}
 
 const STEPS = [
   { label: 'Info' },
@@ -228,7 +248,15 @@ export default function PortfolioSetupWizard() {
   const handleBack = () => setCurrentStep(prev => Math.max(prev - 1, 0))
 
   const handleSubmit = async () => {
-    const isValid = await form.trigger()
+    const returnModel = form.getValues('returnModel') as ReturnModelType
+    const fieldsToValidate: (keyof WizardFormData)[] = [
+      ...STEP_FIELDS[0],
+      'revenueCategories',
+      'kpiMetrics',
+      'returnModel',
+      ...MODEL_SPECIFIC_FIELDS[returnModel],
+    ]
+    const isValid = await form.trigger(fieldsToValidate as any)
     if (!isValid) {
       const errors = form.formState.errors
       const erroredFields = Object.keys(errors) as (keyof WizardFormData)[]
