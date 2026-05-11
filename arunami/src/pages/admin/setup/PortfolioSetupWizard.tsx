@@ -229,7 +229,38 @@ export default function PortfolioSetupWizard() {
 
   const handleSubmit = async () => {
     const isValid = await form.trigger()
-    if (!isValid) return
+    if (!isValid) {
+      const errors = form.formState.errors
+      const erroredFields = Object.keys(errors) as (keyof WizardFormData)[]
+      console.warn('[PortfolioSetupWizard] validation failed', errors)
+
+      // Jump back to the earliest step that contains an errored field so the
+      // inline red error messages become visible to the user.
+      const firstBadStep = STEP_FIELDS.findIndex(stepFields =>
+        stepFields.some(f => erroredFields.includes(f))
+      )
+      if (firstBadStep !== -1 && firstBadStep !== currentStep) {
+        setCurrentStep(firstBadStep)
+      }
+
+      const fieldLabels: Partial<Record<keyof WizardFormData, string>> = {
+        name: 'Nama',
+        brandName: 'Brand Name',
+        code: 'Kode',
+        stage: 'Tahap',
+        periode: 'Periode',
+        investasiAwal: 'Total Investasi',
+        investorSharePercent: 'Investor Share',
+        arunamiFeePercent: 'Arunami Fee',
+        returnModel: 'Model Distribusi',
+      }
+      const missing = erroredFields
+        .map(f => fieldLabels[f] ?? String(f))
+        .slice(0, 4)
+        .join(', ')
+      toast.error(`Lengkapi dulu: ${missing || 'beberapa field belum valid'}`)
+      return
+    }
 
     setSubmitting(true)
     try {
