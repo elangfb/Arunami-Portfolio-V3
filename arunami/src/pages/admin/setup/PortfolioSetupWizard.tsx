@@ -112,12 +112,14 @@ const STEP_FIELDS: (keyof WizardFormData)[][] = [
 // Other model fields are skipped so a stale value from a previously-viewed model
 // (e.g. NaN on fixedYieldPercent after toggling cards) doesn't block submission.
 const MODEL_SPECIFIC_FIELDS: Record<ReturnModelType, (keyof WizardFormData)[]> = {
-  net_profit_share: ['investorSharePercent', 'arunamiFeePercent'],
-  fixed_yield:      ['fixedYieldPercent', 'principalReference', 'arunamiFeePercent'],
-  revenue_share:    ['revenueSharePercent', 'investorSharePercent', 'arunamiFeePercent'],
-  fixed_schedule:   ['scheduledPayments', 'arunamiFeePercent'],
-  annual_dividend:  ['arunamiFeePercent'],
-  custom:           ['customVariables', 'formula', 'distributionFrequency', 'arunamiFeePercent'],
+  net_profit_share:  ['investorSharePercent', 'arunamiFeePercent'],
+  percentage_based:  ['investorSharePercent', 'arunamiFeePercent'], // legacy alias → net_profit_share
+  fixed_return:      ['fixedYieldPercent', 'principalReference', 'arunamiFeePercent'], // legacy → fixed_yield
+  fixed_yield:       ['fixedYieldPercent', 'principalReference', 'arunamiFeePercent'],
+  revenue_share:     ['revenueSharePercent', 'investorSharePercent', 'arunamiFeePercent'],
+  fixed_schedule:    ['scheduledPayments', 'arunamiFeePercent'],
+  annual_dividend:   ['arunamiFeePercent'],
+  custom:            ['customVariables', 'formula', 'distributionFrequency', 'arunamiFeePercent'],
 }
 
 const STEPS = [
