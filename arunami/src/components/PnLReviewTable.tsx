@@ -3,7 +3,7 @@ import { formatPeriod } from '@/lib/dateUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Loader2, CheckCircle2, Plus, X } from 'lucide-react'
+import { Loader2, CheckCircle2, Plus, X, Eye, EyeOff } from 'lucide-react'
 import type {
   PnLUploadPending,
   MonthlyPnLRow,
@@ -38,6 +38,8 @@ import {
   applySubItemOrder,
   moveSubItemInCategory,
   setSubItemOrder,
+  isRowHidden,
+  setRowHidden,
   type MoveDirection,
 } from '@/lib/rowOrder'
 import { CustomCategoryBlock } from '@/components/CustomCategoryBlock'
@@ -316,9 +318,26 @@ export function PnLReviewTable({
 
   const renderEditableRow = (row: EditableRowDef) => {
     const total = months.reduce((s, m) => s + (Number(m[row.key]) || 0), 0)
+    const canToggleHidden = !!onRowOrderChange
     return (
       <tr key={row.key} className="hover:bg-muted/10">
-        <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r">{row.label}</td>
+        <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r">
+          <div className="flex items-center gap-1">
+            <span className="flex-1 truncate">{row.label}</span>
+            {canToggleHidden && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={() => onRowOrderChange?.(setRowHidden(rowOrder, row.key, true))}
+                title={`Sembunyikan baris ${row.label}`}
+              >
+                <EyeOff className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </td>
         {months.map((m, idx) => (
           <td key={m.month} className="px-2 py-1 text-right whitespace-nowrap">
             <Input
@@ -569,8 +588,43 @@ export function PnLReviewTable({
                 )
               })}
 
-              {renderEditableRow({ label: 'Interest', key: 'interest', className: 'text-red-600' })}
-              {renderEditableRow({ label: 'Taxes', key: 'taxes', className: 'text-red-600' })}
+              {!isRowHidden(rowOrder, 'interest') && renderEditableRow({ label: 'Interest', key: 'interest', className: 'text-red-600' })}
+              {!isRowHidden(rowOrder, 'taxes') && renderEditableRow({ label: 'Taxes', key: 'taxes', className: 'text-red-600' })}
+
+              {onRowOrderChange && (isRowHidden(rowOrder, 'interest') || isRowHidden(rowOrder, 'taxes')) && (
+                <tr>
+                  <td
+                    colSpan={months.length + (showGrandTotal ? 2 : 1)}
+                    className="sticky left-0 z-10 bg-muted/5 px-4 py-1 border-r"
+                  >
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Disembunyikan:</span>
+                      {isRowHidden(rowOrder, 'interest') && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => onRowOrderChange(setRowHidden(rowOrder, 'interest', false))}
+                        >
+                          <Eye className="h-3 w-3 mr-1" /> Tampilkan Interest
+                        </Button>
+                      )}
+                      {isRowHidden(rowOrder, 'taxes') && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => onRowOrderChange(setRowHidden(rowOrder, 'taxes', false))}
+                        >
+                          <Eye className="h-3 w-3 mr-1" /> Tampilkan Taxes
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
 
               {renderComputedRow({ label: 'Net Profit', key: 'netProfit', isBold: true })}
             </tbody>

@@ -134,6 +134,21 @@ export function moveSubItemInCategory(
   return next
 }
 
+export const isRowHidden = (order: RowOrder | undefined, key: string): boolean =>
+  !!order?.hiddenRows?.includes(key)
+
+export function setRowHidden(
+  current: RowOrder | undefined,
+  key: string,
+  hidden: boolean,
+): RowOrder {
+  const existing = current?.hiddenRows ?? []
+  const nextHidden = hidden
+    ? Array.from(new Set([...existing, key]))
+    : existing.filter(k => k !== key)
+  return { ...(current ?? {}), hiddenRows: nextHidden }
+}
+
 export function setSubItemOrder(
   current: RowOrder | undefined,
   catId: string,

@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check } from 'lucide-react'
+import { Upload, Loader2, Plus, Pencil, Trash2, X, AlertTriangle, Check, Eye, EyeOff } from 'lucide-react'
 import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { PnLReviewTable } from '@/components/PnLReviewTable'
 import { CustomCategoryBlock } from '@/components/CustomCategoryBlock'
@@ -40,6 +40,8 @@ import {
   applySubItemOrder,
   moveSubItemInCategory,
   setSubItemOrder,
+  isRowHidden,
+  setRowHidden,
   type MoveDirection,
 } from '@/lib/rowOrder'
 import type {
@@ -931,7 +933,21 @@ export default function PnLPage() {
               )
               const renderEditableRow = (row: { label: string; key: string; className?: string }) => (
                 <tr key={row.key} className="hover:bg-muted/10">
-                  <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r">{row.label}</td>
+                  <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r">
+                    <div className="flex items-center gap-1">
+                      <span className="flex-1 truncate">{row.label}</span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={() => handleRowOrderChange(setRowHidden(rowOrder, row.key, true))}
+                        title={`Sembunyikan baris ${row.label}`}
+                      >
+                        <EyeOff className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </td>
                   {sorted.map(r => {
                     const isEditing = inlineEditId === r.id
                     const val = isEditing ? (inlineData[row.key] ?? 0) : getCell(r, row.key)
@@ -1184,8 +1200,43 @@ export default function PnLPage() {
                           )
                         })}
 
-                        {renderEditableRow({ label: 'Interest', key: 'interest', className: 'text-red-600' })}
-                        {renderEditableRow({ label: 'Taxes', key: 'taxes', className: 'text-red-600' })}
+                        {!isRowHidden(rowOrder, 'interest') && renderEditableRow({ label: 'Interest', key: 'interest', className: 'text-red-600' })}
+                        {!isRowHidden(rowOrder, 'taxes') && renderEditableRow({ label: 'Taxes', key: 'taxes', className: 'text-red-600' })}
+
+                        {(isRowHidden(rowOrder, 'interest') || isRowHidden(rowOrder, 'taxes')) && (
+                          <tr>
+                            <td
+                              colSpan={sorted.length + 1}
+                              className="sticky left-0 z-10 bg-muted/5 px-4 py-1 border-r"
+                            >
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>Disembunyikan:</span>
+                                {isRowHidden(rowOrder, 'interest') && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => handleRowOrderChange(setRowHidden(rowOrder, 'interest', false))}
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" /> Tampilkan Interest
+                                  </Button>
+                                )}
+                                {isRowHidden(rowOrder, 'taxes') && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => handleRowOrderChange(setRowHidden(rowOrder, 'taxes', false))}
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" /> Tampilkan Taxes
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
 
                         {renderComputedRow({ label: 'Net Profit', key: 'netProfit', bold: true })}
                       </tbody>

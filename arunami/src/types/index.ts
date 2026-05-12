@@ -134,6 +134,13 @@ export interface RowOrder {
   body?: string[]
   /** Per-category sub-item order (keyed by category id). */
   customSubItems?: Record<string, string[]>
+  /**
+   * Display-only: row keys hidden from the PnL tables. Currently used for
+   * 'interest' | 'taxes', but kept as `string[]` so future system rows can be
+   * toggled without a schema change. Underlying numeric values are untouched —
+   * hiding a row never affects computations like `netProfit`.
+   */
+  hiddenRows?: string[]
   /** @deprecated — superseded by `body`. Preserved for backwards read. */
   opex?: string[]
   /** @deprecated — superseded by `body`. Preserved for backwards read. */
