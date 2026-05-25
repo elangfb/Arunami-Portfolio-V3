@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Pencil, Trash2, PlusCircle } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, PlusCircle, Film } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
 import type { ManagementReport, IssueSeverity, ActionStatus } from '@/types'
 
@@ -93,6 +93,29 @@ export function ReportList({
                           <span className="text-sm">{issue.title}</span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+                {r.media && r.media.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">LAMPIRAN</p>
+                    <div className="flex flex-wrap gap-2">
+                      {r.media.slice(0, 5).map(m => (
+                        <div key={m.id} className="h-12 w-12 overflow-hidden rounded-md border bg-muted">
+                          {m.type === 'image' ? (
+                            <img src={m.fileUrl} alt={m.fileName} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <Film className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {r.media.length > 5 && (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-muted text-xs font-medium text-muted-foreground">
+                          +{r.media.length - 5}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

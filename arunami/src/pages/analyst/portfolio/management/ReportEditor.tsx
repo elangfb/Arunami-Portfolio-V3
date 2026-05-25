@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -7,14 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, PlusCircle, Trash2, Wand2 } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
-import type { ManagementReport, Issue, ActionItem, IssueSeverity, ActionStatus, ActionCategory } from '@/types'
+import { uploadReportMedia, deleteReportMedia } from '@/lib/storage'
+import MediaUploader from '@/components/MediaUploader'
+import type { ManagementReport, Issue, ActionItem, IssueSeverity, ActionStatus, ActionCategory, ReportMedia } from '@/types'
 
 export type ManagementFormData = Omit<ManagementReport, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>
 
 interface ReportEditorProps {
   mode: 'create' | 'edit'
   period: string // locked "YYYY-MM"
-  initial?: Pick<ManagementReport, 'businessSummary' | 'issues' | 'actionItems'>
+  portfolioId: string
+  initial?: Pick<ManagementReport, 'businessSummary' | 'issues' | 'actionItems' | 'media'>
   saving: boolean
   /** Calls AI to refine the given draft, returns refined text or null on failure/empty. */
   onRefine: (draft: string) => Promise<string | null>
@@ -27,8 +31,10 @@ const emptyAction = (): ActionItem => ({
   id: crypto.randomUUID(), title: '', status: 'pending', assignee: '', dueDate: '', category: 'business',
 })
 
-export function ReportEditor({ mode, period, initial, saving, onRefine, onSubmit, onCancel }: ReportEditorProps) {
+export function ReportEditor({ mode, period, portfolioId, initial, saving, onRefine, onSubmit, onCancel }: ReportEditorProps) {
   const [refining, setRefining] = useState(false)
+  const [media, setMedia] = useState<ReportMedia[]>(initial?.media ?? [])
+  const [uploading, setUploading] = useState(false)
 
   const { register, handleSubmit, control, setValue, watch, getValues } = useForm<ManagementFormData>({
     defaultValues: {
@@ -54,7 +60,33 @@ export function ReportEditor({ mode, period, initial, saving, onRefine, onSubmit
     }
   }
 
-  const submit = (data: ManagementFormData) => onSubmit({ ...data, period })
+  const handleUpload = async (file: File) => {
+    setUploading(true)
+    try {
+      const uploaded = await uploadReportMedia(portfolioId, file)
+      setMedia(prev => [...prev, uploaded])
+    } catch (err) {
+      console.error(err)
+      toast.error(`Gagal mengunggah ${file.name}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleRemoveMedia = async (id: string) => {
+    const item = media.find(m => m.id === id)
+    if (!item) return
+    setMedia(prev => prev.filter(m => m.id !== id))
+    try {
+      await deleteReportMedia(item.storagePath)
+    } catch (err) {
+      console.error(err)
+      toast.error('Gagal menghapus media')
+      setMedia(prev => [...prev, item])
+    }
+  }
+
+  const submit = (data: ManagementFormData) => onSubmit({ ...data, period, media })
 
   return (
     <div className="space-y-4">
@@ -180,9 +212,28 @@ export function ReportEditor({ mode, period, initial, saving, onRefine, onSubmit
           </CardContent>
         </Card>
 
+        {/* Lampiran / Dokumentasi */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Lampiran / Dokumentasi ({media.length})</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Lampirkan foto atau video pendukung. Akan tampil di laporan yang dibagikan ke investor.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <MediaUploader
+              media={media}
+              onUpload={handleUpload}
+              onRemove={handleRemoveMedia}
+              uploading={uploading}
+              disabled={saving}
+            />
+          </CardContent>
+        </Card>
+
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || uploading}>
             {saving ? 'Menyimpan...' : mode === 'edit' ? 'Simpan Perubahan' : 'Simpan'}
           </Button>
         </div>

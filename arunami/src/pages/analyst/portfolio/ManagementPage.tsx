@@ -6,6 +6,7 @@ import {
   getReports, getNotes,
 } from '@/lib/firestore'
 import { generateManagementReport, refineBusinessSummary } from '@/lib/gemini'
+import { deleteReportMedia } from '@/lib/storage'
 import { useAuthStore } from '@/store/authStore'
 import { comparePeriods } from '@/lib/dateUtils'
 import { ManagementHome } from './management/ManagementHome'
@@ -26,7 +27,7 @@ interface EditorState {
   period: string
   editingId: string | null
   origin: 'list' | 'pick'
-  initial?: Pick<ManagementReport, 'businessSummary' | 'issues' | 'actionItems'>
+  initial?: Pick<ManagementReport, 'businessSummary' | 'issues' | 'actionItems' | 'media'>
 }
 
 export default function ManagementPage() {
@@ -72,7 +73,7 @@ export default function ManagementPage() {
   const openEdit = (r: ManagementReport, origin: 'list' | 'pick' = 'list') => {
     setEditor({
       mode: 'edit', period: r.period, editingId: r.id, origin,
-      initial: { businessSummary: r.businessSummary, issues: r.issues, actionItems: r.actionItems },
+      initial: { businessSummary: r.businessSummary, issues: r.issues, actionItems: r.actionItems, media: r.media ?? [] },
     })
     setView('editor')
   }
@@ -114,7 +115,7 @@ export default function ManagementPage() {
 
       setEditor({
         mode: 'create', period, editingId: null, origin: 'pick',
-        initial: { businessSummary: generated.businessSummary, issues: [], actionItems: [] },
+        initial: { businessSummary: generated.businessSummary, issues: [], actionItems: [], media: [] },
       })
       setView('editor')
     } catch (err) {
@@ -178,6 +179,10 @@ export default function ManagementPage() {
     if (!portfolioId) return
     if (!window.confirm('Hapus report ini? Tindakan ini tidak dapat dibatalkan.')) return
     try {
+      const target = reports.find(r => r.id === id)
+      if (target?.media?.length) {
+        await Promise.allSettled(target.media.map(m => deleteReportMedia(m.storagePath)))
+      }
       await deleteManagementReport(portfolioId, id)
       toast.success('Report dihapus')
       fetchAll()
@@ -262,6 +267,7 @@ export default function ManagementPage() {
           key={editor.editingId ?? `new-${editor.period}-${editor.initial ? 'ai' : 'manual'}`}
           mode={editor.mode}
           period={editor.period}
+          portfolioId={portfolioId!}
           initial={editor.initial}
           saving={saving}
           onRefine={handleEditorRefine}

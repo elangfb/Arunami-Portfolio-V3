@@ -435,6 +435,16 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
     <ul>${latestMgmt.actionItems.map(a => `<li><strong>[${a.status}]</strong> ${a.title}${a.assignee ? ` — ${a.assignee}` : ''}</li>`).join('')}</ul>
   ` : ''
 
+  const mediaSection = latestMgmt && latestMgmt.media?.length ? `
+    <h2>Dokumentasi</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+      ${latestMgmt.media.map(m => m.type === 'image'
+        ? `<img src="${m.fileUrl}" alt="${m.fileName}" style="max-width:240px;max-height:180px;border-radius:6px;border:1px solid #e5e7eb;object-fit:cover" />`
+        : `<a href="${m.fileUrl}" style="display:inline-block;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;text-decoration:none">▶ ${m.fileName}</a>`,
+      ).join('')}
+    </div>
+  ` : ''
+
   const notesSection = notes.length ? `
     <h2>Arunami Notes</h2>
     ${[...notes]
@@ -461,6 +471,7 @@ export function buildInvestorReportHtml(args: BuildArgs): string {
   ${distributionSection}
   ${issuesSection}
   ${actionsSection}
+  ${mediaSection}
   ${notesSection}
   <div class="footer">Diterbitkan oleh Tim Arunami — ${new Date().toLocaleString('id-ID')}</div>
 </body>
