@@ -493,12 +493,22 @@ export interface ActionItem {
   category: ActionCategory
 }
 
+export interface ReportMedia {
+  id: string
+  type: 'image' | 'video'
+  fileName: string
+  fileUrl: string       // Firebase download URL
+  fileSize: number
+  storagePath: string   // full path for deletion from Storage
+}
+
 export interface ManagementReport {
   id: string
   period: string
   businessSummary: string
   issues: Issue[]
   actionItems: ActionItem[]
+  media?: ReportMedia[]
   createdBy: string
   createdAt: Timestamp
   updatedAt: Timestamp
