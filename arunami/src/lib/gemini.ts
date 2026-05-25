@@ -864,7 +864,7 @@ export async function generateManagementReport(args: GenerateArgs): Promise<Gene
   lines.push(MGMT_REPORT_SCHEMA)
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: MAX_TOKENS,
       system: [
@@ -880,7 +880,7 @@ export async function generateManagementReport(args: GenerateArgs): Promise<Gene
           content: [{ type: 'text', text: lines.join('\n') }],
         },
       ],
-    }),
+    }).finalMessage(),
   )
 
   const first = response.content[0]
@@ -943,7 +943,7 @@ export async function refineBusinessSummary(args: RefineArgs): Promise<RefinedSu
   lines.push(REFINE_SUMMARY_SCHEMA)
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: MAX_TOKENS,
       system: [
@@ -959,7 +959,7 @@ export async function refineBusinessSummary(args: RefineArgs): Promise<RefinedSu
           content: [{ type: 'text', text: lines.join('\n') }],
         },
       ],
-    }),
+    }).finalMessage(),
   )
 
   const first = response.content[0]
