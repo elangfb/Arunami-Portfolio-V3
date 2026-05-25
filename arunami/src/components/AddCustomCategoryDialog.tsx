@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { CustomCategory, CustomCategoryType } from '@/types'
 
 export type AddCategoryPayload =
@@ -158,18 +159,18 @@ export function AddCustomCategoryDialog({
                   {existingMainCategories.find(c => c.id === parentId)?.name ?? parentId}
                 </div>
               ) : (
-                <select
-                  id="custom-cat-parent"
-                  value={parentId}
-                  onChange={e => { setSelectedParentId(e.target.value); setError(null) }}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {existingMainCategories.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.type === 'income' ? 'Income' : 'Expense'})
-                    </option>
-                  ))}
-                </select>
+                <Select value={parentId} onValueChange={v => { setSelectedParentId(v); setError(null) }}>
+                  <SelectTrigger id="custom-cat-parent" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {existingMainCategories.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.type === 'income' ? 'Income' : 'Expense'})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
           )}

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { isFixedReturnModel, FIXED_RETURN_VISIBLE_ROUTES } from '@/lib/projectTypeRules'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Portfolio, PortfolioConfig, InvestorReportDoc } from '@/types'
 import {
   TrendingUp, LayoutDashboard, TrendingDown, BarChart2,
@@ -196,15 +197,16 @@ export default function InvestorPortfolioLayout() {
             </div>
           )}
           {availablePeriods.length > 0 ? (
-            <select
-              value={selectedPeriod}
-              onChange={e => setSelectedPeriod(e.target.value)}
-              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#38a169]"
-            >
-              {availablePeriods.map(p => (
-                <option key={p} value={p} className="text-black">{formatPeriod(p)}</option>
-              ))}
-            </select>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger className="w-full rounded-md border border-white/10 bg-white/5 text-sm text-white focus:ring-0 focus:ring-offset-0 focus:border-[#38a169]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border-white/10 bg-[#1f2937] text-white">
+                {availablePeriods.map(p => (
+                  <SelectItem key={p} value={p} className="focus:bg-white/10 focus:text-white">{formatPeriod(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
             <p className="text-xs text-[#6b7280] italic">Belum ada laporan diterbitkan</p>
           )}
