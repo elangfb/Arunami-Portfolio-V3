@@ -171,7 +171,16 @@ export default function InvestorPortfolioLayout() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38a169]">
             <TrendingUp className="h-5 w-5 text-white" />
           </div>
-          <span className="text-base font-bold text-white truncate">{portfolio?.name ?? 'ARUNAMI'}</span>
+          <div className="flex min-w-0 flex-col">
+            <span className="text-base font-bold text-white truncate leading-tight">
+              {portfolio?.brandName || portfolio?.name || 'ARUNAMI'}
+            </span>
+            {portfolio?.name && (
+              <span className="text-[10px] text-white/60 truncate leading-tight">
+                {portfolio.name}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Period Selector */}

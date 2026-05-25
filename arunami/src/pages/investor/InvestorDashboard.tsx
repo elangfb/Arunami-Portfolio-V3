@@ -81,8 +81,9 @@ export default function InvestorDashboard() {
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle className="text-base">{p.name}</CardTitle>
-                          <p className="text-xs text-muted-foreground mt-1">{p.code} · {p.stage}</p>
+                          <CardTitle className="text-base">{p.brandName || p.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{p.code} · {p.stage}</p>
                         </div>
                         <span className="text-xs bg-[#1e5f3f]/10 text-[#1e5f3f] rounded-full px-2 py-0.5 font-medium">{p.periode}</span>
                       </div>

@@ -8,7 +8,7 @@ import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
 // Investor Relations — not generated or listed in this view.
 
 export default function InvestorReportPage() {
-  const { publishedReports, selectedPeriod, availablePeriods } =
+  const { portfolio, publishedReports, selectedPeriod, availablePeriods } =
     useOutletContext<InvestorPortfolioOutletContext>()
 
   const selected = useMemo(
@@ -43,14 +43,14 @@ export default function InvestorReportPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <CardTitle className="text-base">
-                {selected.portfolioName} — {formatPeriod(selected.period)}
+                {(portfolio?.brandName || selected.portfolioName)} — {formatPeriod(selected.period)}
               </CardTitle>
               <span className="rounded-full bg-[#38a169]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#1e5f3f]">
                 {selected.reportType === 'quarterly' ? 'Kuartalan' : 'Bulanan'}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Laporan ini bersifat view-only. Unduhan tidak tersedia.
+              {selected.portfolioName} · Laporan ini bersifat view-only. Unduhan tidak tersedia.
             </p>
           </CardHeader>
           <CardContent>
