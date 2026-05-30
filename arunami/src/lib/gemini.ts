@@ -3,6 +3,7 @@
 // unchanged so callers (PnLPage, ProjectionsPage, StepUploadDocuments,
 // portfolioEnrichment) don't need to change their imports.
 import Anthropic from '@anthropic-ai/sdk'
+import { auth } from '@/lib/firebase'
 import * as XLSX from 'xlsx'
 import type {
   PnLExtractedData, ProjectionExtractedData, PortfolioConfig,
@@ -13,9 +14,21 @@ import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 import { slugifyCategory } from '@/lib/customCategories'
 import { normalizePeriod } from '@/lib/dateUtils'
 
+// The real API key lives server-side in the /api/anthropic relay (see
+// api/anthropic/[...path].ts). The browser never holds it: requests go to our
+// own origin, the relay verifies the caller's Firebase ID token and injects the
+// key before forwarding to api.anthropic.com. `apiKey` here is a placeholder the
+// relay ignores; the custom `fetch` attaches the user's ID token per request.
 const anthropic = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+  baseURL: `${window.location.origin}/api/anthropic`,
+  apiKey: 'proxy',
   dangerouslyAllowBrowser: true,
+  fetch: async (input, init) => {
+    const token = await auth.currentUser?.getIdToken()
+    const headers = new Headers(init?.headers)
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+    return fetch(input, { ...init, headers })
+  },
 })
 const CLAUDE_MODEL = 'claude-sonnet-4-6'
 const MAX_TOKENS = 32768
