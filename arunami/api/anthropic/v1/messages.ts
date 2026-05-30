@@ -1,19 +1,22 @@
-// Server-side relay for the Anthropic API. The real API key lives only here
-// (server env `ANTHROPIC_API_KEY`) and never reaches the browser. The client
-// SDK in src/lib/gemini.ts points at /api/anthropic and sends the user's
-// Firebase ID token; this function verifies it, then forwards the request to
-// api.anthropic.com with the real key injected, streaming the response back so
-// the SDK's .stream() / SSE behavior is preserved.
+// Server-side relay for the Anthropic Messages API. The real API key lives only
+// here (server env `ANTHROPIC_API_KEY`) and never reaches the browser. The
+// client SDK in src/lib/gemini.ts is pointed at baseURL `${origin}/api/anthropic`,
+// so it calls POST /api/anthropic/v1/messages — which maps to this file.
+//
+// This is a FIXED path (not a catch-all): plain Vercel `/api` functions only
+// support single-segment dynamic routes, so `[...path].ts` did not match the
+// two-segment `/v1/messages` and requests fell through to static (HTTP 405).
+// The SDK only ever calls this one endpoint (streaming uses the same URL with
+// `stream:true` in the body), so a fixed path is both sufficient and reliable.
 //
 // Uses the Vercel "web handler" signature for non-Next.js projects: named
-// method exports (POST/GET/OPTIONS) that take a web `Request` and return a
-// `Response`. A default export would be treated as the legacy Node (req, res)
-// signature, where `request.headers.get()` does not exist. firebase-admin
-// requires the Node runtime (the default for this style).
+// method exports that take a web `Request` and return a `Response`. A default
+// export would be treated as the legacy Node (req, res) signature, where
+// `request.headers.get()` does not exist. firebase-admin needs the Node runtime.
 import { initializeApp, getApps, cert } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 
-const ANTHROPIC_BASE = 'https://api.anthropic.com'
+const UPSTREAM = 'https://api.anthropic.com/v1/messages'
 
 function ensureAdmin() {
   if (getApps().length > 0) return
@@ -47,10 +50,6 @@ async function relay(req: Request): Promise<Response> {
   }
 
   // ── Forward to Anthropic with the real key injected ────────────────────
-  const url = new URL(req.url)
-  const path = url.pathname.replace(/^\/api\/anthropic/, '') // e.g. /v1/messages
-  const upstreamUrl = `${ANTHROPIC_BASE}${path}${url.search}`
-
   const headers: Record<string, string> = {
     'content-type': req.headers.get('content-type') ?? 'application/json',
     'anthropic-version': req.headers.get('anthropic-version') ?? '2023-06-01',
@@ -59,10 +58,11 @@ async function relay(req: Request): Promise<Response> {
   const beta = req.headers.get('anthropic-beta')
   if (beta) headers['anthropic-beta'] = beta
 
-  const body =
-    req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.arrayBuffer()
-
-  const upstream = await fetch(upstreamUrl, { method: req.method, headers, body })
+  const upstream = await fetch(UPSTREAM, {
+    method: 'POST',
+    headers,
+    body: await req.arrayBuffer(),
+  })
 
   // Stream the upstream body straight back (handles both JSON and SSE).
   return new Response(upstream.body, {
@@ -74,5 +74,4 @@ async function relay(req: Request): Promise<Response> {
 }
 
 export const POST = relay
-export const GET = relay
 export const OPTIONS = (): Response => new Response(null, { status: 204 })
