@@ -5,14 +5,13 @@
 // api.anthropic.com with the real key injected, streaming the response back so
 // the SDK's .stream() / SSE behavior is preserved.
 //
-// Runs on the Vercel Node runtime (firebase-admin needs Node). Uses the Web
-// handler signature (Request -> Response) so streaming is a straight body
-// pass-through.
+// Uses the Vercel "web handler" signature for non-Next.js projects: named
+// method exports (POST/GET/OPTIONS) that take a web `Request` and return a
+// `Response`. A default export would be treated as the legacy Node (req, res)
+// signature, where `request.headers.get()` does not exist. firebase-admin
+// requires the Node runtime (the default for this style).
 import { initializeApp, getApps, cert } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
-
-// Extractions with max_tokens=32768 over PDFs can take 30-90s.
-export const config = { maxDuration: 60 }
 
 const ANTHROPIC_BASE = 'https://api.anthropic.com'
 
@@ -23,33 +22,28 @@ function ensureAdmin() {
   initializeApp({ credential: cert(JSON.parse(raw)) })
 }
 
-function unauthorized(): Response {
-  return new Response(JSON.stringify({ error: { message: 'Unauthorized' } }), {
-    status: 401,
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
     headers: { 'content-type': 'application/json' },
   })
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204 })
-
+async function relay(req: Request): Promise<Response> {
   // ── Verify the caller is a signed-in app user ──────────────────────────
   const authz = req.headers.get('authorization') ?? ''
   const token = authz.startsWith('Bearer ') ? authz.slice(7) : ''
-  if (!token) return unauthorized()
+  if (!token) return json(401, { error: { message: 'Unauthorized' } })
   try {
     ensureAdmin()
     await getAuth().verifyIdToken(token)
   } catch {
-    return unauthorized()
+    return json(401, { error: { message: 'Unauthorized' } })
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: { message: 'Server misconfigured: ANTHROPIC_API_KEY missing' } }), {
-      status: 500,
-      headers: { 'content-type': 'application/json' },
-    })
+    return json(500, { error: { message: 'Server misconfigured: ANTHROPIC_API_KEY missing' } })
   }
 
   // ── Forward to Anthropic with the real key injected ────────────────────
@@ -68,11 +62,7 @@ export default async function handler(req: Request): Promise<Response> {
   const body =
     req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.arrayBuffer()
 
-  const upstream = await fetch(upstreamUrl, {
-    method: req.method,
-    headers,
-    body,
-  })
+  const upstream = await fetch(upstreamUrl, { method: req.method, headers, body })
 
   // Stream the upstream body straight back (handles both JSON and SSE).
   return new Response(upstream.body, {
@@ -82,3 +72,7 @@ export default async function handler(req: Request): Promise<Response> {
     },
   })
 }
+
+export const POST = relay
+export const GET = relay
+export const OPTIONS = (): Response => new Response(null, { status: 204 })
