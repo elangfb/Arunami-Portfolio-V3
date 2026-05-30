@@ -73,5 +73,21 @@ async function relay(req: Request): Promise<Response> {
   })
 }
 
-export const POST = relay
-export const OPTIONS = (): Response => new Response(null, { status: 204 })
+// Health check — open /api/anthropic/v1/messages in a browser (a GET). If you
+// see this JSON, the function is deployed and routing works; if you get a 405 or
+// the SPA, the new code is NOT live yet (stale deploy / wrong root dir / build
+// failed). It touches no secret, so it's safe to leave in.
+export async function GET(): Promise<Response> {
+  return new Response(JSON.stringify({ ok: true, relay: 'anthropic', version: 2 }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return relay(request)
+}
+
+export async function OPTIONS(): Promise<Response> {
+  return new Response(null, { status: 204 })
+}
