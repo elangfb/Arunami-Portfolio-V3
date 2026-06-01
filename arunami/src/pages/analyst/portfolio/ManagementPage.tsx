@@ -229,7 +229,7 @@ export default function ManagementPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {view === 'home' && (
         <ManagementHome
           reportCount={reports.length}

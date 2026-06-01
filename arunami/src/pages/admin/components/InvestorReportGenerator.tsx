@@ -249,7 +249,7 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
 
         <div className="space-y-4 mt-2">
           {/* Period Selector */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Tipe Laporan</Label>
               <Select value={reportType} onValueChange={v => setReportType(v as 'monthly' | 'quarterly')}>

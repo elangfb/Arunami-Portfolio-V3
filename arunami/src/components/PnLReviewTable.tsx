@@ -466,8 +466,9 @@ export function PnLReviewTable({
       </div>
 
       {/* Main multi-month review table */}
+      <p className="mb-1 text-xs text-muted-foreground md:hidden">Geser tabel ke samping untuk melihat semua kolom →</p>
       <div className="rounded-lg border overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted/50 border-b">

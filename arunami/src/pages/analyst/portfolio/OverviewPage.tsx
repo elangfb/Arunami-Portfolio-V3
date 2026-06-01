@@ -130,7 +130,7 @@ export default function OverviewPage() {
   ]
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h2 className="text-xl font-bold">Overview Portofolio</h2>
 
       {/* KPI Cards */}

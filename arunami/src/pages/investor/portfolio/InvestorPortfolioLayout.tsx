@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { isFixedReturnModel, FIXED_RETURN_VISIBLE_ROUTES } from '@/lib/projectTypeRules'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
 import type { Portfolio, PortfolioConfig, InvestorReportDoc } from '@/types'
 import {
   TrendingUp, LayoutDashboard, TrendingDown, BarChart2,
@@ -164,9 +165,8 @@ export default function InvestorPortfolioLayout() {
     hasQuarterly,
   }
 
-  return (
-    <div className="flex h-screen bg-background">
-      <aside className="flex w-64 flex-col flex-shrink-0" style={{ background: 'var(--sidebar-bg)' }}>
+  const sidebarContent = (
+    <>
         <div className="flex h-16 items-center gap-3 px-4 border-b border-white/10">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38a169]">
             <TrendingUp className="h-5 w-5 text-white" />
@@ -270,11 +270,15 @@ export default function InvestorPortfolioLayout() {
             <LogOut className="h-4 w-4" />Keluar
           </button>
         </div>
-      </aside>
+    </>
+  )
 
-      <main className="flex-1 overflow-y-auto">
-        <Outlet context={outletContext} />
-      </main>
-    </div>
+  return (
+    <ResponsiveSidebarShell
+      sidebar={sidebarContent}
+      mobileTitle={portfolio?.brandName || portfolio?.name || 'ARUNAMI'}
+    >
+      <Outlet context={outletContext} />
+    </ResponsiveSidebarShell>
   )
 }

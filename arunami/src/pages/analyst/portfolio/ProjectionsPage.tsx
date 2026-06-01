@@ -546,7 +546,7 @@ export default function ProjectionsPage() {
   }, [watchedRevenue])
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Proyeksi Plan</h2>
         <Button onClick={openManualInput} size="sm">
@@ -905,7 +905,7 @@ export default function ProjectionsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit(onSave)} className="space-y-5">
             {/* Period & Revenue */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Periode</Label>
                 <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} />
@@ -919,7 +919,7 @@ export default function ProjectionsPage() {
             {/* COGS as % of Revenue */}
             <div className="rounded-lg border p-4 space-y-3">
               <h4 className="text-sm font-semibold">COGS</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label className="text-xs">% of Revenue</Label>
                   <div className="relative">
@@ -941,7 +941,7 @@ export default function ProjectionsPage() {
             </div>
 
             {/* Gross Profit (auto) */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Gross Profit (IDR)</Label>
                 <div className="h-9 flex items-center px-3 rounded-md bg-muted text-sm font-medium">
@@ -997,7 +997,7 @@ export default function ProjectionsPage() {
             </div>
 
             {/* Depreciation & Amortization / Tax */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Depreciation & Amortization (IDR)</Label>
                 <Input

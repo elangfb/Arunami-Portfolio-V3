@@ -302,7 +302,7 @@ export default function AdminPortfolios() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Manajemen Portofolio</h1>
@@ -310,7 +310,7 @@ export default function AdminPortfolios() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Cari portofolio..."
@@ -691,7 +691,7 @@ export default function AdminPortfolios() {
             <DialogTitle>Edit Portofolio — {editTarget?.name}</DialogTitle>
           </DialogHeader>
           <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-4 mt-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Nama Portofolio</Label>
                 <Input placeholder="Nama portofolio" {...editForm.register('name')} />
@@ -714,7 +714,7 @@ export default function AdminPortfolios() {
                 <p className="text-xs text-destructive">{String(editForm.formState.errors.brandName.message)}</p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Tahap</Label>
                 <Input placeholder="Seed / Series A" {...editForm.register('stage')} />

@@ -32,7 +32,7 @@ export default function InvestorReportPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 sm:p-6 space-y-4">
       <h2 className="text-xl font-bold">Laporan Saya</h2>
       <p className="text-xs text-muted-foreground">
         Pilih periode pada dropdown di sidebar untuk mengganti laporan.

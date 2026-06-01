@@ -38,7 +38,7 @@ export default function InvestorDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-8">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
               <TrendingUp className="h-5 w-5 text-white" />
@@ -46,7 +46,7 @@ export default function InvestorDashboard() {
             <span className="text-lg font-bold">ARUNAMI</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Halo, {user?.displayName}</span>
+            <span className="hidden text-sm text-muted-foreground sm:inline">Halo, {user?.displayName}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="mr-1 h-4 w-4" />Keluar
             </Button>
@@ -54,7 +54,7 @@ export default function InvestorDashboard() {
         </div>
       </header>
 
-      <main className="p-8">
+      <main className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Portofolio Saya</h1>
           <p className="text-muted-foreground">Portofolio yang ditugaskan kepada Anda</p>

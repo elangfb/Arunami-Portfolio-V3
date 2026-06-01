@@ -62,7 +62,7 @@ export default function RevenuePage() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h2 className="text-xl font-bold">Revenue & Profit</h2>
 
       <div className="grid gap-6 lg:grid-cols-2">

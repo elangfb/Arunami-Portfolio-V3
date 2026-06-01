@@ -84,7 +84,7 @@ export default function InvestorOverviewPage() {
     .map(r => ({ month: r.month, aktual: r.aktual }))
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h2 className="text-xl font-bold">Overview Portofolio</h2>
 
       {/* My Allocation Card */}
@@ -94,7 +94,7 @@ export default function InvestorOverviewPage() {
             <span className="text-sm font-medium">Alokasi Saya</span>
             <Badge variant="secondary">{ownershipPct.toFixed(1)}% kepemilikan</Badge>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 text-sm">
             <div>
               <p className="text-xs text-muted-foreground">Investasi</p>
               <p className="font-semibold">{formatCurrencyCompact(allocation.investedAmount)}</p>

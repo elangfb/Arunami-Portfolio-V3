@@ -97,7 +97,7 @@ export default function InvestorReturnsPage() {
   const totalEarnings = monthlyBreakdown.reduce((sum, m) => sum + m.myEarnings, 0)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h2 className="text-xl font-bold">Return Saya</h2>
 
       {/* Summary cards */}

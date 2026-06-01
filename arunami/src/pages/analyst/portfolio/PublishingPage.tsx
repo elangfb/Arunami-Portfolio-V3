@@ -256,7 +256,7 @@ export default function PublishingPage() {
   const publishedCount = existingReports.filter(r => r.status === 'published').length
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold">Review &amp; Publishing</h2>

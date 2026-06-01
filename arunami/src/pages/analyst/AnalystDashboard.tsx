@@ -76,7 +76,7 @@ export default function AnalystDashboard() {
     <div className="min-h-screen bg-background">
       {/* Sticky header */}
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-8">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
               <TrendingUp className="h-5 w-5 text-white" />
@@ -84,7 +84,7 @@ export default function AnalystDashboard() {
             <span className="text-lg font-bold">ARUNAMI</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Halo, {user?.displayName}</span>
+            <span className="hidden text-sm text-muted-foreground sm:inline">Halo, {user?.displayName}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="mr-1 h-4 w-4" />Keluar
             </Button>
@@ -92,14 +92,14 @@ export default function AnalystDashboard() {
         </div>
       </header>
 
-      <main className="p-8">
-        <div className="mb-6 flex items-center justify-between gap-4">
+      <main className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Dashboard Analis</h1>
             <p className="text-muted-foreground">Kelola dan analisis semua portofolio investasi</p>
           </div>
           {!loading && portfolios.length > 0 && (
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Cari portofolio..."
@@ -121,7 +121,43 @@ export default function AnalystDashboard() {
         ) : sorted.length === 0 ? (
           <Card><CardContent className="py-12 text-center text-muted-foreground">Tidak ada portofolio yang cocok</CardContent></Card>
         ) : (
-          <Card className="overflow-hidden">
+          <>
+          {/* Mobile: card list */}
+          <div className="space-y-3 md:hidden">
+            {sorted.map(p => (
+              <Card
+                key={p.id}
+                className="cursor-pointer transition-shadow hover:shadow-md"
+                onClick={() => navigate(`/analyst/portfolios/${p.id}/overview`)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{p.name}</div>
+                      {p.brandName && (
+                        <div className="truncate text-xs text-muted-foreground">{p.brandName}</div>
+                      )}
+                      <div className="mt-0.5 text-xs text-muted-foreground">{p.code} · {p.stage}</div>
+                    </div>
+                    <Badge variant="outline" className="flex-shrink-0">{p.periode}</Badge>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{INDUSTRY_PRESETS[p.industryType]?.label ?? p.industryType}</span>
+                    <span className="font-semibold text-[#1e5f3f]">{formatCurrencyCompact(p.investasiAwal)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{p.assignedInvestors.length} investor</span>
+                    {p.isGracePeriod
+                      ? <Badge variant="warning">Grace</Badge>
+                      : <span>—</span>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <Card className="hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
@@ -174,6 +210,7 @@ export default function AnalystDashboard() {
               </table>
             </div>
           </Card>
+          </>
         )}
       </main>
     </div>

@@ -128,7 +128,7 @@ function NetProfitShareFields({ register, errors }: any) {
   return (
     <div className="space-y-2">
       <Label className="text-sm font-semibold">Profit-Sharing</Label>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="investorSharePercent">Investor Share (%) *</Label>
           <Input
@@ -228,7 +228,7 @@ function RevenueShareFields({ register, errors }: any) {
           Persentase dari pendapatan bruto (gross revenue) yang dibagikan ke investor pool.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="investorSharePercent">Investor Share (%) *</Label>
           <Input

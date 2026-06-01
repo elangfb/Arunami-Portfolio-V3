@@ -106,7 +106,7 @@ export default function ProfitSharingPage() {
   const currentUser = user ? { uid: user.uid, displayName: user.displayName } : null
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto text-black">
+    <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto text-black">
       <div>
         <h2 className="text-xl font-bold text-black">Profit Sharing Management</h2>
         <p className="text-sm text-black mt-1">

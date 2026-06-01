@@ -686,7 +686,7 @@ export default function PnLPage() {
   const returnModel = portfolioConfig?.returnModel
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {returnModel === 'fixed_yield' && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
           <p className="text-sm text-blue-800">
@@ -1272,7 +1272,7 @@ export default function PnLPage() {
             <DialogTitle>Input Laporan PnL</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSave)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Periode</Label>
                 <MonthYearPicker value={watch('period')} onChange={(v) => setValue('period', v)} />
@@ -1316,7 +1316,7 @@ export default function PnLPage() {
             {/* Unit Breakdown */}
             <div>
               <Label className="text-xs font-semibold">Unit Breakdown</Label>
-              <div className="grid grid-cols-3 gap-4 mt-1">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mt-1">
                 {categories.map(cat => (
                   <div key={cat.id} className="space-y-1">
                     <Label className="text-xs">{cat.name}</Label>

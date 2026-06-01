@@ -51,13 +51,13 @@ export default function AdminInvestors() {
   const totalInvested = summaries.reduce((s, i) => s + i.totalInvested, 0)
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Manajemen Investor</h1>
           <p className="text-muted-foreground">Kelola data dan komunikasi dengan investor</p>
         </div>
-        <div className="relative w-64">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Cari investor..."
@@ -69,7 +69,7 @@ export default function AdminInvestors() {
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardContent className="flex items-center gap-3 py-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1e5f3f]/10">

@@ -30,7 +30,7 @@ export default function StepBasicInfo({ form }: Props) {
         <p className="text-sm text-gray-500">Masukkan informasi dasar perusahaan portofolio.</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="name">Nama Portofolio *</Label>
             <Input id="name" placeholder="PT Contoh Teknologi" {...register('name')} />
@@ -49,7 +49,7 @@ export default function StepBasicInfo({ form }: Props) {
           {errors.brandName && <p className="text-xs text-red-500">{errors.brandName.message}</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Industri / Jenis Bisnis *</Label>
             <Select
@@ -86,7 +86,7 @@ export default function StepBasicInfo({ form }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Periode Mulai *</Label>
             <MonthYearPicker
