@@ -1,13 +1,32 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { getAllUsers, getAllPortfolios } from '@/lib/firestore'
+import { buildAdminExport, downloadJson } from '@/lib/exportData'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Briefcase, UserCheck, BarChart2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Users, Briefcase, UserCheck, BarChart2, Download } from 'lucide-react'
 import type { AppUser, Portfolio } from '@/types'
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const data = await buildAdminExport()
+      const date = new Date().toISOString().slice(0, 10)
+      downloadJson(data, `arunami-export-${date}.json`)
+      toast.success('Data berhasil diekspor')
+    } catch (err) {
+      console.error('Export failed', err)
+      toast.error('Gagal mengekspor data')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   useEffect(() => {
     Promise.all([getAllUsers(), getAllPortfolios()]).then(([u, p]) => {
@@ -29,9 +48,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Dashboard Admin</h1>
-        <p className="text-muted-foreground">Selamat datang di panel administrasi ARUNAMI</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard Admin</h1>
+          <p className="text-muted-foreground">Selamat datang di panel administrasi ARUNAMI</p>
+        </div>
+        <Button onClick={handleExport} disabled={exporting} className="shrink-0">
+          <Download className="mr-1 h-4 w-4" />
+          {exporting ? 'Mengekspor…' : 'Ekspor Data'}
+        </Button>
       </div>
 
       {loading ? (
