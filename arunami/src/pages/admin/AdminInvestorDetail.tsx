@@ -12,11 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, FileText, Search } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, FileText, Search, Eye } from 'lucide-react'
 import InvestorReportGenerator from './components/InvestorReportGenerator'
 import type {
   AppUser, InvestorAllocation, FinancialData as FinancialDataType,
-  PortfolioConfig, InvestorCommunication, Portfolio,
+  PortfolioConfig, InvestorCommunication, Portfolio, InvestorReportDoc,
 } from '@/types'
 
 interface PortfolioEnriched {
@@ -43,10 +44,12 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
   const [investor, setInvestor] = useState<AppUser | null>(null)
   const [portfolios, setPortfolios] = useState<PortfolioEnriched[]>([])
   const [communications, setCommunications] = useState<InvestorCommunication[]>([])
+  const [reports, setReports] = useState<InvestorReportDoc[]>([])
   const [loading, setLoading] = useState(true)
 
   // Report dialog
   const [reportOpen, setReportOpen] = useState(false)
+  const [viewReport, setViewReport] = useState<InvestorReportDoc | null>(null)
 
   // Communication filters
   const [commsSearch, setCommsSearch] = useState('')
@@ -70,6 +73,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
 
     setInvestor(user)
     setCommunications(comms)
+    setReports([...publishedReports].sort((a, b) => comparePeriods(b.period, a.period)))
 
     // Published per-project report periods, keyed by portfolio. Earnings are
     // summed only over these so the totals match what the investor actually
@@ -164,6 +168,12 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
   const formatCommsDate = (comm: InvestorCommunication) => {
     if (!comm.createdAt?.toDate) return '—'
     const d = comm.createdAt.toDate()
+    return `${d.getDate()} ${MONTH_NAMES_ID[d.getMonth()]} ${d.getFullYear()}`
+  }
+
+  const formatReportDate = (report: InvestorReportDoc) => {
+    if (!report.publishedAt?.toDate) return '—'
+    const d = report.publishedAt.toDate()
     return `${d.getDate()} ${MONTH_NAMES_ID[d.getMonth()]} ${d.getFullYear()}`
   }
 
@@ -329,6 +339,54 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
         </CardContent>
       </Card>
 
+      {/* Report History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Riwayat Laporan ({reports.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {reports.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Belum ada laporan
+            </p>
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left py-2.5 px-3 font-medium">Periode</th>
+                    <th className="text-left py-2.5 px-3 font-medium">Tipe</th>
+                    <th className="text-left py-2.5 px-3 font-medium">Portofolio</th>
+                    <th className="text-left py-2.5 px-3 font-medium">Tanggal Terbit</th>
+                    <th className="text-right py-2.5 px-3 font-medium">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {reports.map(r => (
+                    <tr key={r.id} className="hover:bg-muted/30">
+                      <td className="py-2.5 px-3 font-medium">{formatPeriod(r.period)}</td>
+                      <td className="py-2.5 px-3">
+                        <Badge variant="outline">{r.reportType === 'quarterly' ? 'Kuartalan' : 'Bulanan'}</Badge>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {r.scope === 'accumulated' ? 'Semua Portofolio' : r.portfolioName}
+                      </td>
+                      <td className="py-2.5 px-3">{formatReportDate(r)}</td>
+                      <td className="py-2.5 px-3 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setViewReport(r)}>
+                          <Eye className="mr-1.5 h-3.5 w-3.5" />
+                          Lihat
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Communication History */}
       <Card>
         <CardHeader>
@@ -416,6 +474,25 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
           portfolio: p.portfolio,
         }))}
       />
+
+      {/* Report Viewer Dialog */}
+      <Dialog open={!!viewReport} onOpenChange={(o) => !o && setViewReport(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {viewReport && `${viewReport.scope === 'accumulated' ? 'Semua Portofolio' : viewReport.portfolioName} — ${formatPeriod(viewReport.period)}`}
+            </DialogTitle>
+          </DialogHeader>
+          {viewReport && (
+            <iframe
+              title={`Report ${viewReport.id}`}
+              srcDoc={viewReport.htmlContent}
+              sandbox=""
+              className="w-full min-h-[70vh] rounded-md border bg-white"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
