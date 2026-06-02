@@ -6,7 +6,7 @@ import {
   getCommunicationsForInvestor, getPortfolio, getPublishedInvestorReports,
 } from '@/lib/firestore'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
-import { formatCurrencyCompact, formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
+import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -213,7 +213,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Investasi</p>
-                <p className="text-lg font-bold">{formatCurrencyCompact(totalInvested)}</p>
+                <p className="text-lg font-bold">{formatCurrencyExact(totalInvested)}</p>
               </div>
             </div>
           </CardContent>
@@ -226,7 +226,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Earning</p>
-                <p className="text-lg font-bold">{formatCurrencyCompact(totalEarnings)}</p>
+                <p className="text-lg font-bold">{formatCurrencyExact(totalEarnings)}</p>
               </div>
             </div>
           </CardContent>
@@ -298,7 +298,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
                           {formatPercent(ownershipPct)}
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          {formatCurrencyCompact(p.allocation.investedAmount)}
+                          {formatCurrencyExact(p.allocation.investedAmount)}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           {formatCurrencyExact(p.earnings)}
@@ -317,7 +317,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
                   <tr className="bg-muted/30 font-medium">
                     <td className="py-2.5 px-3">Total</td>
                     <td></td>
-                    <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(totalInvested)}</td>
+                    <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalInvested)}</td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalLatestEarnings)}</td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalEarnings)}</td>
                     <td className="py-2.5 px-3 text-right">{formatPercent(avgROI)}</td>
