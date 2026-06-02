@@ -226,7 +226,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Earning</p>
-                <p className="text-lg font-bold">{formatCurrencyExact(totalEarnings)}</p>
+                <p className="text-lg font-bold">{formatCurrencyExact(Math.round(totalEarnings))}</p>
               </div>
             </div>
           </CardContent>
@@ -304,7 +304,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
                           {formatCurrencyExact(p.earnings)}
                         </td>
                         <td className="py-2.5 px-3 text-right font-medium">
-                          {formatCurrencyExact(p.totalEarnings)}
+                          {formatCurrencyExact(Math.round(p.totalEarnings))}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           {formatPercent(p.monthlyROI)}
@@ -319,7 +319,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
                     <td></td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalInvested)}</td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalLatestEarnings)}</td>
-                    <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalEarnings)}</td>
+                    <td className="py-2.5 px-3 text-right">{formatCurrencyExact(Math.round(totalEarnings))}</td>
                     <td className="py-2.5 px-3 text-right">{formatPercent(avgROI)}</td>
                   </tr>
                 </tfoot>
