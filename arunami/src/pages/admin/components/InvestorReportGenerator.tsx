@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
 import { saveCommunication, publishAccumulatedReport } from '@/lib/firestore'
 import { calculateDistribution } from '@/lib/distributionStrategies'
 import { buildAccumulatedReportHtml } from '@/lib/reportHtml'
-import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
-import { formatPeriod, buildQuarterKey, quarterToMonths } from '@/lib/dateUtils'
+import { formatCurrencyExact, formatPercent } from '@/lib/utils'
+import { formatPeriod, buildQuarterKey, quarterToMonths, comparePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -37,27 +37,61 @@ interface ReportLine {
   monthlyROI: number
 }
 
+/** A month has reportable data if revenue or profit has a non-zero actual. */
+function monthHasData(financial: FinancialData | null, month: string): boolean {
+  if (!financial) return false
+  const rev = financial.revenueData.find(d => d.month === month)?.aktual ?? 0
+  const profit = financial.profitData.find(d => d.month === month)?.aktual ?? 0
+  return rev !== 0 || profit !== 0
+}
+
+/** Quarter key (e.g. "2026-Q2") that a "YYYY-MM" month falls into. */
+function monthToQuarterKey(month: string): string {
+  const [y, mm] = month.split('-')
+  return buildQuarterKey(y, Math.floor((Number(mm) - 1) / 3) + 1)
+}
+
 export default function InvestorReportGenerator({ open, onOpenChange, investor, portfolioData }: Props) {
   const { user: admin } = useAuthStore()
-  const currentYear = new Date().getFullYear()
   const [reportType, setReportType] = useState<'monthly' | 'quarterly'>('monthly')
-  const [month, setMonth] = useState(String(new Date().getMonth()))
-  const [quarter, setQuarter] = useState(String(Math.floor(new Date().getMonth() / 3) + 1))
-  const [year, setYear] = useState(String(currentYear))
+  const [selectedPeriod, setSelectedPeriod] = useState('')  // '' = follow latest available
   const [selectedPortfolios, setSelectedPortfolios] = useState<Set<string>>(
     new Set(portfolioData.map(p => p.allocation.portfolioId)),
   )
   const [sending, setSending] = useState(false)
   const reportRef = useRef<HTMLDivElement>(null)
 
-  const periodKey = reportType === 'quarterly'
-    ? buildQuarterKey(year, Number(quarter))
-    : `${year}-${String(Number(month) + 1).padStart(2, '0')}`
-  const periodLabel = formatPeriod(periodKey)
+  // Every month (across the investor's portfolios) that has actual data.
+  const monthsWithData = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of portfolioData) {
+      if (!p.financial) continue
+      for (const d of [...p.financial.revenueData, ...p.financial.profitData]) {
+        if (d.aktual !== 0) set.add(d.month)
+      }
+    }
+    return [...set].sort((a, b) => comparePeriods(b, a)) // newest first
+  }, [portfolioData])
+
+  // Periods offered in the chooser for the current report type — only ones with data.
+  const availablePeriods = useMemo(() => {
+    if (reportType === 'monthly') return monthsWithData
+    const quarters = new Set<string>()
+    for (const m of monthsWithData) quarters.add(monthToQuarterKey(m))
+    return [...quarters].sort((a, b) => comparePeriods(b, a))
+  }, [reportType, monthsWithData])
+
+  // Default to the latest available period until the user explicitly picks one.
+  const periodKey = availablePeriods.includes(selectedPeriod)
+    ? selectedPeriod
+    : (availablePeriods[0] ?? '')
+  const periodLabel = periodKey ? formatPeriod(periodKey) : '—'
   const monthsInPeriod = reportType === 'quarterly' ? 3 : 1
-  const constituentMonths = reportType === 'quarterly'
-    ? quarterToMonths(periodKey)
-    : [periodKey]
+  const constituentMonths = !periodKey
+    ? []
+    : reportType === 'quarterly'
+      ? quarterToMonths(periodKey)
+      : [periodKey]
 
   const togglePortfolio = (id: string) => {
     setSelectedPortfolios(prev => {
@@ -68,7 +102,13 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
     })
   }
 
-  const reportLines: ReportLine[] = portfolioData
+  // Only portfolios that actually have data in the selected period — a project
+  // with no report for the month would otherwise show a misleading "0".
+  const portfoliosInPeriod = portfolioData.filter(p =>
+    constituentMonths.some(m => monthHasData(p.financial, m)),
+  )
+
+  const reportLines: ReportLine[] = portfoliosInPeriod
     .filter(p => selectedPortfolios.has(p.allocation.portfolioId))
     .map(({ allocation, financial, config, portfolio: ptf }) => {
       let netProfit = 0
@@ -238,8 +278,8 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
-          {/* Period Selector */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* Period Selector — only periods that actually have data */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Tipe Laporan</Label>
               <Select value={reportType} onValueChange={v => setReportType(v as 'monthly' | 'quarterly')}>
@@ -251,60 +291,49 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{reportType === 'quarterly' ? 'Kuartal' : 'Bulan'}</Label>
-              {reportType === 'quarterly' ? (
-                <Select value={quarter} onValueChange={setQuarter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Q1 (Jan-Mar)</SelectItem>
-                    <SelectItem value="2">Q2 (Apr-Jun)</SelectItem>
-                    <SelectItem value="3">Q3 (Jul-Sep)</SelectItem>
-                    <SelectItem value="4">Q4 (Okt-Des)</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Select value={month} onValueChange={setMonth}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MONTH_NAMES_ID.map((name, i) => (
-                      <SelectItem key={i} value={String(i)}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Tahun</Label>
-              <Select value={year} onValueChange={setYear}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label>Periode</Label>
+              <Select
+                value={periodKey}
+                onValueChange={setSelectedPeriod}
+                disabled={availablePeriods.length === 0}
+              >
+                <SelectTrigger><SelectValue placeholder="Belum ada data" /></SelectTrigger>
                 <SelectContent>
-                  {[currentYear - 1, currentYear, currentYear + 1].map(y => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  {availablePeriods.map(p => (
+                    <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Portfolio Selection */}
-          <div className="space-y-2">
-            <Label>Portofolio</Label>
-            <div className="flex flex-wrap gap-2">
-              {portfolioData.map(p => {
-                const isSelected = selectedPortfolios.has(p.allocation.portfolioId)
-                return (
-                  <Badge
-                    key={p.allocation.portfolioId}
-                    variant={isSelected ? 'default' : 'outline'}
-                    className="cursor-pointer"
-                    onClick={() => togglePortfolio(p.allocation.portfolioId)}
-                  >
-                    {p.allocation.portfolioCode}
-                  </Badge>
-                )
-              })}
+          {availablePeriods.length === 0 && (
+            <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              Belum ada data finansial aktual untuk investor ini, sehingga laporan belum dapat dibuat.
+            </p>
+          )}
+
+          {/* Portfolio Selection — only projects with data in the selected period */}
+          {portfoliosInPeriod.length > 0 && (
+            <div className="space-y-2">
+              <Label>Portofolio</Label>
+              <div className="flex flex-wrap gap-2">
+                {portfoliosInPeriod.map(p => {
+                  const isSelected = selectedPortfolios.has(p.allocation.portfolioId)
+                  return (
+                    <Badge
+                      key={p.allocation.portfolioId}
+                      variant={isSelected ? 'default' : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => togglePortfolio(p.allocation.portfolioId)}
+                    >
+                      {p.allocation.portfolioCode}
+                    </Badge>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Preview */}
           <div ref={reportRef} className="rounded-lg border p-4 space-y-3">
