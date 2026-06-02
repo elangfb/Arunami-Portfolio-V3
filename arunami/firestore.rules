@@ -29,8 +29,19 @@ service cloud.firestore {
       return isSignedIn() && userRole() == 'investor';
     }
 
+    function isInvestorRelation() {
+      return isSignedIn() && userRole() == 'investor_relation';
+    }
+
     function isStaff() {
       return isAdmin() || isAnalyst();
+    }
+
+    // Read-only access to the whole investor domain (all investors, allocations,
+    // performance, communications). Investor Relations gets this in addition to
+    // staff; it never grants write access.
+    function canViewInvestorDomain() {
+      return isStaff() || isInvestorRelation();
     }
 
     // Inline (resource.data) variants — used inside /portfolios/{id} where
@@ -44,7 +55,7 @@ service cloud.firestore {
     }
 
     function canReadPortfolioResource() {
-      return isAdmin() || isAssignedAnalystResource() || isAssignedInvestorResource();
+      return isAdmin() || isInvestorRelation() || isAssignedAnalystResource() || isAssignedInvestorResource();
     }
 
     function canWritePortfolioResource() {
@@ -66,7 +77,7 @@ service cloud.firestore {
     }
 
     function canReadPortfolio(portfolioId) {
-      return isAdmin() || isAssignedAnalystOf(portfolioId) || isAssignedInvestorOf(portfolioId);
+      return isAdmin() || isInvestorRelation() || isAssignedAnalystOf(portfolioId) || isAssignedInvestorOf(portfolioId);
     }
 
     function canWritePortfolio(portfolioId) {
@@ -77,8 +88,8 @@ service cloud.firestore {
     // Admin manages all users; signed-in users can read their own profile so
     // role lookup works on the client without leaking other users' data.
     match /users/{uid} {
-      allow read: if isStaff() || (isSignedIn() && request.auth.uid == uid);
-      allow list: if isStaff();
+      allow read: if canViewInvestorDomain() || (isSignedIn() && request.auth.uid == uid);
+      allow list: if canViewInvestorDomain();
       allow create, update, delete: if isAdmin();
     }
 
@@ -150,31 +161,34 @@ service cloud.firestore {
     // The investor side queries this collection by (investorUid, status) to
     // avoid having to know which portfolios they belong to up front.
     match /investorReports/{reportId} {
-      allow read: if isAdmin() ||
+      allow read: if isAdmin() || isInvestorRelation() ||
         (isInvestor() && resource.data.investorUid == request.auth.uid && resource.data.status == 'published');
-      allow list: if isAdmin() ||
+      allow list: if isAdmin() || isInvestorRelation() ||
         (isInvestor() && request.query.limit <= 200);
-      allow create, update: if isStaff();
+      // Staff publish per-project reports; Investor Relations publishes the
+      // accumulated (all-projects) report.
+      allow create, update: if isStaff() || isInvestorRelation();
       allow delete: if isAdmin();
     }
 
     // ─── Investor allocations ────────────────────────────────────────────
     // Admin manages; staff read all; investors read only their own.
     match /investorAllocations/{allocationId} {
-      allow read: if isStaff() ||
+      allow read: if canViewInvestorDomain() ||
         (isInvestor() && resource.data.investorUid == request.auth.uid);
-      allow list: if isStaff() ||
+      allow list: if canViewInvestorDomain() ||
         (isInvestor() && request.query.limit <= 200);
       allow create, update, delete: if isAdmin();
     }
 
     // ─── Investor communications log ─────────────────────────────────────
     match /investorCommunications/{commId} {
-      allow read: if isStaff() ||
+      allow read: if canViewInvestorDomain() ||
         (isInvestor() && resource.data.investorUid == request.auth.uid);
-      allow list: if isStaff() ||
+      allow list: if canViewInvestorDomain() ||
         (isInvestor() && request.query.limit <= 200);
-      allow create, update: if isStaff();
+      // Investor Relations logs a communication entry when publishing reports.
+      allow create, update: if isStaff() || isInvestorRelation();
       allow delete: if isAdmin();
     }
   }

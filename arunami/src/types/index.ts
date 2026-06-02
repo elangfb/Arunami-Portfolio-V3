@@ -2,7 +2,7 @@ import type { Timestamp } from 'firebase/firestore'
 
 // ─── Roles ─────────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'analyst' | 'investor'
+export type UserRole = 'admin' | 'analyst' | 'investor' | 'investor_relation'
 
 // ─── Portfolio Configuration ──────────────────────────────────────────────
 
@@ -354,6 +354,18 @@ export type InvestorReportStatus = 'draft' | 'published'
 
 export type InvestorReportType = 'monthly' | 'quarterly'
 
+/**
+ * Scope of an investor report:
+ * - 'portfolio'    → one report per (portfolio × investor × period). Default for
+ *                    existing docs that omit the field.
+ * - 'accumulated'  → one report per (investor × period) spanning ALL portfolios,
+ *                    published by Investor Relations. Stored with
+ *                    portfolioId = '__accumulated__'.
+ */
+export type InvestorReportScope = 'portfolio' | 'accumulated'
+
+export const ACCUMULATED_PORTFOLIO_ID = '__accumulated__'
+
 export interface InvestorReportDoc {
   id: string
   portfolioId: string
@@ -362,6 +374,7 @@ export interface InvestorReportDoc {
   investorName: string
   period: string
   reportType?: InvestorReportType
+  scope?: InvestorReportScope
   status: InvestorReportStatus
   htmlContent: string
   publishedAt?: Timestamp
@@ -566,7 +579,7 @@ export interface TransferProof {
 // ─── Investor CRM ────────────────────────────────────────────────────────
 
 export type CommunicationType = 'report' | 'custom_message'
-export type CommunicationChannel = 'clipboard' | 'email' | 'download'
+export type CommunicationChannel = 'clipboard' | 'email' | 'download' | 'publish'
 
 export interface InvestorCommunication {
   id: string

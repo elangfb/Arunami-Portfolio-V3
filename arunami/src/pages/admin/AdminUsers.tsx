@@ -13,18 +13,19 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { UserPlus, Pencil, Trash2, Search } from 'lucide-react'
-import type { AppUser } from '@/types'
+import { ROLE_LABELS } from '@/lib/roles'
+import type { AppUser, UserRole } from '@/types'
 
 const createSchema = z.object({
   displayName: z.string().min(2, 'Nama minimal 2 karakter'),
   email: z.string().email('Email tidak valid'),
   password: z.string().min(6, 'Password minimal 6 karakter'),
-  role: z.enum(['admin', 'analyst', 'investor']),
+  role: z.enum(['admin', 'analyst', 'investor', 'investor_relation']),
 })
 
 const editSchema = z.object({
   displayName: z.string().min(2, 'Nama minimal 2 karakter'),
-  role: z.enum(['admin', 'analyst', 'investor']),
+  role: z.enum(['admin', 'analyst', 'investor', 'investor_relation']),
 })
 
 type CreateFormData = z.infer<typeof createSchema>
@@ -84,7 +85,7 @@ export default function AdminUsers() {
 
   const openEdit = (u: AppUser) => {
     setEditTarget(u)
-    editForm.reset({ displayName: u.displayName, role: u.role as 'admin' | 'analyst' | 'investor' })
+    editForm.reset({ displayName: u.displayName, role: u.role })
     setEditIsTeam(u.isArunamiTeam ?? false)
     setEditOpen(true)
   }
@@ -164,12 +165,13 @@ export default function AdminUsers() {
               </div>
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Select defaultValue="analyst" onValueChange={(v) => createForm.setValue('role', v as 'admin' | 'analyst' | 'investor')}>
+                <Select defaultValue="analyst" onValueChange={(v) => createForm.setValue('role', v as UserRole)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="analyst">Analis</SelectItem>
                     <SelectItem value="investor">Investor</SelectItem>
+                    <SelectItem value="investor_relation">Investor Relations</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -218,7 +220,7 @@ export default function AdminUsers() {
                     <p className="font-medium truncate">{u.displayName}</p>
                     <p className="text-sm text-muted-foreground truncate">{u.email}</p>
                   </div>
-                  <Badge variant={roleBadgeVariant(u.role)} className="capitalize">{u.role}</Badge>
+                  <Badge variant={roleBadgeVariant(u.role)}>{ROLE_LABELS[u.role] ?? u.role}</Badge>
                   {u.isArunamiTeam && (
                     <Badge variant="outline" className="border-green-600 text-green-700 text-xs">Tim Arunami</Badge>
                   )}
@@ -257,13 +259,14 @@ export default function AdminUsers() {
               <Label>Role</Label>
               <Select
                 value={editForm.watch('role')}
-                onValueChange={(v) => editForm.setValue('role', v as 'admin' | 'analyst' | 'investor')}
+                onValueChange={(v) => editForm.setValue('role', v as UserRole)}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="analyst">Analis</SelectItem>
                   <SelectItem value="investor">Investor</SelectItem>
+                  <SelectItem value="investor_relation">Investor Relations</SelectItem>
                 </SelectContent>
               </Select>
             </div>

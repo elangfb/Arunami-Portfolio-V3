@@ -14,6 +14,7 @@ import type {
   InvestorReportDoc, EquityChangeEntry,
   InvestorConfigUnion, ConfigChangeKind, ReturnModelType,
 } from '@/types'
+import { ACCUMULATED_PORTFOLIO_ID } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 
 // ─── Users ────────────────────────────────────────────────────────────────
@@ -712,4 +713,59 @@ export async function unpublishAllInvestorReports(params: {
   }
   await batch.commit()
   return published.length
+}
+
+// ─── Accumulated (all-projects) investor reports ─────────────────────────────
+//
+// Stored in the same top-level `investorReports` collection as per-portfolio
+// reports, but keyed per (investor × period) with portfolioId = '__accumulated__'
+// and scope = 'accumulated'. No portfolio subcollection mirror (there is no
+// single owning portfolio). `getPublishedInvestorReports` already returns these;
+// callers filter by `scope`.
+
+function accumulatedReportId(investorUid: string, period: string): string {
+  return `accumulated_${investorUid}_${period}`
+}
+
+export async function publishAccumulatedReport(params: {
+  investorUid: string
+  investorName: string
+  period: string
+  reportType?: 'monthly' | 'quarterly'
+  htmlContent: string
+  publishedBy: string
+}): Promise<string> {
+  const id = accumulatedReportId(params.investorUid, params.period)
+  await setDoc(
+    doc(db, 'investorReports', id),
+    {
+      portfolioId: ACCUMULATED_PORTFOLIO_ID,
+      portfolioName: 'Semua Proyek',
+      investorUid: params.investorUid,
+      investorName: params.investorName,
+      period: params.period,
+      reportType: params.reportType ?? 'monthly',
+      scope: 'accumulated' as const,
+      status: 'published' as const,
+      htmlContent: params.htmlContent,
+      publishedAt: serverTimestamp(),
+      publishedBy: params.publishedBy,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+  return id
+}
+
+export async function unpublishAccumulatedReport(params: {
+  investorUid: string
+  period: string
+}): Promise<void> {
+  const id = accumulatedReportId(params.investorUid, params.period)
+  await updateDoc(doc(db, 'investorReports', id), {
+    status: 'draft' as const,
+    publishedAt: deleteField(),
+    publishedBy: deleteField(),
+    updatedAt: serverTimestamp(),
+  })
 }

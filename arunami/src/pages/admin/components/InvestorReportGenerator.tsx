@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
 import { toast } from 'sonner'
-import { saveCommunication } from '@/lib/firestore'
+import { saveCommunication, publishAccumulatedReport } from '@/lib/firestore'
 import { calculateDistribution } from '@/lib/distributionStrategies'
+import { buildAccumulatedReportHtml } from '@/lib/reportHtml'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
 import { formatPeriod, buildQuarterKey, quarterToMonths } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ClipboardCopy, Printer, Mail } from 'lucide-react'
+import { ClipboardCopy, Printer, Send } from 'lucide-react'
 import type { AppUser, InvestorAllocation, FinancialData, PortfolioConfig, Portfolio } from '@/types'
 
 interface PortfolioData {
@@ -160,6 +161,9 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
     }
   }
 
+  const reportPortfolioIds = () =>
+    reportLines.map(l => portfolioData.find(p => p.allocation.portfolioCode === l.portfolioCode)!.allocation.portfolioId)
+
   const handlePrint = async () => {
     setSending(true)
     try {
@@ -169,57 +173,9 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
         return
       }
 
-      printWindow.document.write(`
-        <html>
-        <head>
-          <title>Laporan Investor - ${investor.displayName} - ${periodLabel}</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 40px; color: #1a1a1a; }
-            h1 { color: #1e5f3f; font-size: 20px; margin-bottom: 4px; }
-            h2 { font-size: 14px; color: #666; font-weight: normal; margin-top: 0; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th { background: #f5f5f5; text-align: left; padding: 8px 12px; font-size: 12px; border-bottom: 2px solid #ddd; }
-            td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #eee; }
-            .text-right { text-align: right; }
-            .total-row { font-weight: bold; background: #f9fafb; }
-            .footer { margin-top: 32px; font-size: 12px; color: #888; }
-          </style>
-        </head>
-        <body>
-          <h1>Laporan Investor</h1>
-          <h2>${investor.displayName} &mdash; ${periodLabel}</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Portofolio</th>
-                <th class="text-right">Investasi</th>
-                <th class="text-right">Net Profit</th>
-                <th class="text-right">Earning</th>
-                <th class="text-right">ROI</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${reportLines.map(l => `
-                <tr>
-                  <td>${l.portfolioName} (${l.portfolioCode})</td>
-                  <td class="text-right">${formatCurrencyExact(l.invested)}</td>
-                  <td class="text-right">${formatCurrencyExact(l.netProfit)}</td>
-                  <td class="text-right">${formatCurrencyExact(l.earnings)}</td>
-                  <td class="text-right">${formatPercent(l.monthlyROI)}</td>
-                </tr>
-              `).join('')}
-              <tr class="total-row">
-                <td colspan="2">Total</td>
-                <td class="text-right"></td>
-                <td class="text-right">${formatCurrencyExact(totalEarnings)}</td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="footer">Diterbitkan oleh Tim Arunami</div>
-        </body>
-        </html>
-      `)
+      printWindow.document.write(
+        buildAccumulatedReportHtml({ investorName: investor.displayName, periodLabel, lines: reportLines }),
+      )
       printWindow.document.close()
       printWindow.print()
 
@@ -229,12 +185,46 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
         channel: 'download',
         subject: `Laporan ${periodLabel}`,
         period: periodLabel,
-        portfolioIds: reportLines.map(l => portfolioData.find(p => p.allocation.portfolioCode === l.portfolioCode)!.allocation.portfolioId),
+        portfolioIds: reportPortfolioIds(),
         sentBy: admin!.uid,
       })
       toast.success('Laporan siap dicetak/diunduh')
     } catch {
       toast.error('Gagal membuka halaman cetak')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handlePublish = async () => {
+    setSending(true)
+    try {
+      const html = buildAccumulatedReportHtml({
+        investorName: investor.displayName,
+        periodLabel,
+        lines: reportLines,
+      })
+      await publishAccumulatedReport({
+        investorUid: investor.uid,
+        investorName: investor.displayName,
+        period: periodKey,
+        reportType,
+        htmlContent: html,
+        publishedBy: admin!.uid,
+      })
+      await saveCommunication({
+        investorUid: investor.uid,
+        type: 'report',
+        channel: 'publish',
+        subject: `Laporan Semua Proyek ${periodLabel}`,
+        period: periodLabel,
+        portfolioIds: reportPortfolioIds(),
+        sentBy: admin!.uid,
+      })
+      toast.success('Laporan diterbitkan ke landing page investor')
+      onOpenChange(false)
+    } catch {
+      toast.error('Gagal menerbitkan laporan')
     } finally {
       setSending(false)
     }
@@ -383,9 +373,13 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor, 
               <Printer className="mr-1 h-4 w-4" />
               Cetak / Unduh
             </Button>
-            <Button variant="outline" disabled title="Segera hadir">
-              <Mail className="mr-1 h-4 w-4" />
-              Kirim Email
+            <Button
+              onClick={handlePublish}
+              disabled={reportLines.length === 0 || sending}
+              title="Terbitkan laporan ringkasan ke landing page investor"
+            >
+              <Send className="mr-1 h-4 w-4" />
+              Terbitkan ke Investor
             </Button>
           </div>
         </div>

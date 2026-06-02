@@ -9,7 +9,12 @@ import { formatCurrencyCompact } from '@/lib/utils'
 import { Search, Eye, Users, Wallet } from 'lucide-react'
 import type { InvestorAllocation, InvestorSummary } from '@/types'
 
-export default function AdminInvestors() {
+interface AdminInvestorsProps {
+  /** Base path for the per-investor detail route. Defaults to the admin area. */
+  detailBase?: string
+}
+
+export default function AdminInvestors({ detailBase = '/admin/investors' }: AdminInvestorsProps = {}) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -155,7 +160,7 @@ export default function AdminInvestors() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/admin/investors/${s.user.uid}`)}
+                          onClick={() => navigate(`${detailBase}/${s.user.uid}`)}
                         >
                           <Eye className="mr-1 h-3 w-3" />
                           Detail

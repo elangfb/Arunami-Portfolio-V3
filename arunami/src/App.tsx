@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { AuthProvider } from '@/components/shared/AuthProvider'
 import { AuthGuard } from '@/components/shared/AuthGuard'
 import { useAuthStore } from '@/store/authStore'
+import { roleHome } from '@/lib/roles'
 
 // Pages
 import LoginPage from '@/pages/LoginPage'
@@ -39,6 +40,11 @@ import InvestorReportPage from '@/pages/investor/portfolio/InvestorReportPage'
 import InvestorManagementPage from '@/pages/investor/portfolio/InvestorManagementPage'
 import InvestorNotesPage from '@/pages/investor/portfolio/InvestorNotesPage'
 
+// Investor Relation
+import InvestorRelationLayout from '@/pages/investor-relation/InvestorRelationLayout'
+import IRInvestors from '@/pages/investor-relation/IRInvestors'
+import IRInvestorDetail from '@/pages/investor-relation/IRInvestorDetail'
+
 function RootRedirect() {
   const { user, loading } = useAuthStore()
   if (loading) return (
@@ -47,7 +53,7 @@ function RootRedirect() {
     </div>
   )
   if (!user) return <Navigate to="/login" replace />
-  return <Navigate to={`/${user.role}`} replace />
+  return <Navigate to={roleHome(user.role)} replace />
 }
 
 export default function App() {
@@ -105,6 +111,19 @@ export default function App() {
             <Route path="notes" element={<NotesPage />} />
             <Route path="publishing" element={<PublishingPage />} />
             <Route path="settings/profit-sharing" element={<ProfitSharingPage />} />
+          </Route>
+
+          {/* Investor Relation routes */}
+          <Route
+            path="/investor-relation"
+            element={
+              <AuthGuard allowedRoles={['admin', 'investor_relation']}>
+                <InvestorRelationLayout />
+              </AuthGuard>
+            }
+          >
+            <Route index element={<IRInvestors />} />
+            <Route path="investors/:uid" element={<IRInvestorDetail />} />
           </Route>
 
           {/* Investor routes */}

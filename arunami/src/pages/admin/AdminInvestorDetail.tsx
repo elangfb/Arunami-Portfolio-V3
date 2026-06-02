@@ -30,7 +30,12 @@ interface PortfolioEnriched {
   periodLabel: string
 }
 
-export default function AdminInvestorDetail() {
+interface AdminInvestorDetailProps {
+  /** Where the back button and not-found redirect go. Defaults to the admin area. */
+  backPath?: string
+}
+
+export default function AdminInvestorDetail({ backPath = '/admin/investors' }: AdminInvestorDetailProps = {}) {
   const { uid } = useParams<{ uid: string }>()
   const navigate = useNavigate()
 
@@ -57,7 +62,7 @@ export default function AdminInvestorDetail() {
 
     if (!user) {
       toast.error('Investor tidak ditemukan')
-      navigate('/admin/investors')
+      navigate(backPath)
       return
     }
 
@@ -142,6 +147,7 @@ export default function AdminInvestorDetail() {
     clipboard: 'Clipboard',
     download: 'Cetak/Unduh',
     email: 'Email',
+    publish: 'Terbit ke Investor',
   }
 
   const filteredComms = communications.filter(comm => {
@@ -154,7 +160,7 @@ export default function AdminInvestorDetail() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/investors')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

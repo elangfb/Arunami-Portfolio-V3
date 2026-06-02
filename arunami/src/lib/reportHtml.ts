@@ -52,6 +52,88 @@ function highlightRow(label: string, desc: string, val: string): string {
   </tr>`
 }
 
+// ─── Accumulated (all-projects) investor report ──────────────────────────────
+
+export interface AccumulatedReportLine {
+  portfolioName: string
+  portfolioCode: string
+  invested: number
+  netProfit: number
+  earnings: number
+  monthlyROI: number
+}
+
+/**
+ * Build the full HTML document for an investor's accumulated report — a single
+ * statement spanning every selected portfolio for a period. Used both for
+ * print-to-PDF and for the artifact Investor Relations publishes to the
+ * investor's landing page. Returns a self-contained document so it renders
+ * identically via `window.print()` or an `<iframe srcDoc>`.
+ */
+export function buildAccumulatedReportHtml(args: {
+  investorName: string
+  periodLabel: string
+  lines: AccumulatedReportLine[]
+  generatedAt?: string
+}): string {
+  const { investorName, periodLabel, lines } = args
+  const totalEarnings = lines.reduce((s, l) => s + l.earnings, 0)
+  const totalInvested = lines.reduce((s, l) => s + l.invested, 0)
+  const generatedAt = args.generatedAt ?? new Date().toLocaleString('id-ID')
+
+  return `<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Laporan Investor — ${investorName} — ${periodLabel}</title>
+<style>${baseStyles}</style>
+</head>
+<body>
+  <h1>Laporan Investor</h1>
+  <p><strong>${investorName}</strong> — Ringkasan Semua Proyek · Periode ${periodLabel}</p>
+
+  <div class="kpi">
+    <div><span>Total Investasi</span><strong>${formatCurrencyExact(totalInvested)}</strong></div>
+    <div><span>Total Earning</span><strong>${formatCurrencyExact(totalEarnings)}</strong></div>
+    <div><span>Jumlah Proyek</span><strong>${lines.length}</strong></div>
+  </div>
+
+  <h2>Rincian per Proyek</h2>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Portofolio</th>
+        <th style="text-align:right">Investasi</th>
+        <th style="text-align:right">Net Profit</th>
+        <th style="text-align:right">Earning</th>
+        <th style="text-align:right">ROI</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${lines.map(l => `
+        <tr>
+          <td>${l.portfolioName}<div style="font-size:11px;color:#666">${l.portfolioCode}</div></td>
+          <td style="text-align:right">${formatCurrencyExact(l.invested)}</td>
+          <td style="text-align:right">${formatCurrencyExact(l.netProfit)}</td>
+          <td style="text-align:right">${formatCurrencyExact(l.earnings)}</td>
+          <td style="text-align:right">${formatPercent(l.monthlyROI)}</td>
+        </tr>
+      `).join('')}
+      <tr style="background:#f5faf7;font-weight:bold">
+        <td>Total</td>
+        <td style="text-align:right">${formatCurrencyExact(totalInvested)}</td>
+        <td></td>
+        <td style="text-align:right;color:#1e5f3f">${formatCurrencyExact(totalEarnings)}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">Diterbitkan oleh Tim Arunami — ${generatedAt}</div>
+</body>
+</html>`
+}
+
 // ─── Three-column comparison row (current / previous / projection) ───────
 
 export interface ThreeColRow {
