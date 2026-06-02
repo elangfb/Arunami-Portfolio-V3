@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getUser, getAllocationsForInvestor, getPortfolioConfigOrDefault, getFinancialData,
-  getCommunicationsForInvestor, getPortfolio,
+  getCommunicationsForInvestor, getPortfolio, getPublishedInvestorReports,
 } from '@/lib/firestore'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
-import { formatPeriod } from '@/lib/dateUtils'
+import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,7 +24,8 @@ interface PortfolioEnriched {
   financial: FinancialDataType | null
   config: PortfolioConfig | null
   portfolio: Portfolio | null
-  earnings: number
+  earnings: number        // latest published period
+  totalEarnings: number   // cumulative across all published periods
   monthlyROI: number
   netProfit: number
   periodLabel: string
@@ -54,10 +55,11 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
   const loadData = async () => {
     if (!uid) return
 
-    const [user, allocations, comms] = await Promise.all([
+    const [user, allocations, comms, publishedReports] = await Promise.all([
       getUser(uid),
       getAllocationsForInvestor(uid),
       getCommunicationsForInvestor(uid),
+      getPublishedInvestorReports(uid),
     ])
 
     if (!user) {
@@ -69,6 +71,17 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
     setInvestor(user)
     setCommunications(comms)
 
+    // Published per-project report periods, keyed by portfolio. Earnings are
+    // summed only over these so the totals match what the investor actually
+    // sees on their own returns page (accumulated reports are excluded).
+    const publishedByPortfolio = new Map<string, Set<string>>()
+    for (const r of publishedReports) {
+      if (r.scope === 'accumulated') continue
+      const set = publishedByPortfolio.get(r.portfolioId) ?? new Set<string>()
+      set.add(r.period)
+      publishedByPortfolio.set(r.portfolioId, set)
+    }
+
     // Enrich each allocation with financial data
     const enriched = await Promise.all(
       allocations.map(async (allocation) => {
@@ -79,34 +92,44 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
         ])
 
         let earnings = 0
+        let totalEarnings = 0
         let monthlyROI = 0
         let netProfit = 0
-        let periodLabel = 'Bulan Ini'
+        let periodLabel = '—'
 
-        if (financial && config?.investorConfig && ptf) {
-          const latestActual = [...financial.profitData].reverse().find(r => r.aktual > 0)
-          const latestRevenue = [...financial.revenueData].reverse().find(r => r.aktual > 0)
-          const latestActualPeriod = latestActual?.month ?? financial.profitData.at(-1)?.month
-          netProfit = latestActual?.aktual ?? financial.profitData.at(-1)?.aktual ?? 0
-          if (latestActualPeriod) periodLabel = formatPeriod(latestActualPeriod)
+        const publishedSet = publishedByPortfolio.get(allocation.portfolioId) ?? new Set<string>()
 
-          const result = calculateDistribution({
-            reportData: {
-              period: latestActualPeriod ?? '',
-              revenue: latestRevenue?.aktual ?? 0,
-              netProfit,
-              grossProfit: 0,
-            },
-            config: config.investorConfig,
-            allocation,
-            portfolio: ptf,
-            isArunamiTeam: user?.isArunamiTeam,
-          })
-          earnings = result.perInvestorAmount
-          monthlyROI = result.roiPercent
+        if (financial && config?.investorConfig && ptf && publishedSet.size > 0) {
+          const earningFor = (period: string, revenue: number, profit: number) =>
+            calculateDistribution({
+              reportData: { period, revenue, netProfit: profit, grossProfit: 0 },
+              config: config.investorConfig!,
+              allocation,
+              portfolio: ptf,
+              isArunamiTeam: user?.isArunamiTeam,
+            })
+
+          // Cumulative earnings across every published period.
+          for (const pt of financial.profitData) {
+            if (!publishedSet.has(pt.month)) continue
+            const rev = financial.revenueData.find(r => r.month === pt.month)?.aktual ?? 0
+            totalEarnings += earningFor(pt.month, rev, pt.aktual).perInvestorAmount
+          }
+
+          // Latest published period → "Earning Terakhir" + monthly ROI.
+          const latestPeriod = [...publishedSet].sort(comparePeriods).at(-1)
+          if (latestPeriod) {
+            const latestProfit = financial.profitData.find(p => p.month === latestPeriod)
+            const latestRevenue = financial.revenueData.find(r => r.month === latestPeriod)
+            netProfit = latestProfit?.aktual ?? 0
+            periodLabel = formatPeriod(latestPeriod)
+            const result = earningFor(latestPeriod, latestRevenue?.aktual ?? 0, netProfit)
+            earnings = result.perInvestorAmount
+            monthlyROI = result.roiPercent
+          }
         }
 
-        return { allocation, financial, config, portfolio: ptf, earnings, monthlyROI, netProfit, periodLabel }
+        return { allocation, financial, config, portfolio: ptf, earnings, totalEarnings, monthlyROI, netProfit, periodLabel }
       }),
     )
 
@@ -117,7 +140,8 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
   useEffect(() => { loadData() }, [uid])
 
   const totalInvested = portfolios.reduce((s, p) => s + p.allocation.investedAmount, 0)
-  const totalEarnings = portfolios.reduce((s, p) => s + p.earnings, 0)
+  const totalEarnings = portfolios.reduce((s, p) => s + p.totalEarnings, 0)      // cumulative, all published periods
+  const totalLatestEarnings = portfolios.reduce((s, p) => s + p.earnings, 0)     // latest published period only
   const portfolioCount = portfolios.length
   const avgROI = portfolios.length > 0
     ? portfolios.reduce((s, p) => s + p.monthlyROI, 0) / portfolios.length
@@ -254,6 +278,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
                     <th className="text-right py-2.5 px-3 font-medium">Kepemilikan</th>
                     <th className="text-right py-2.5 px-3 font-medium">Investasi</th>
                     <th className="text-right py-2.5 px-3 font-medium">Earning Terakhir</th>
+                    <th className="text-right py-2.5 px-3 font-medium">Total Earning</th>
                     <th className="text-right py-2.5 px-3 font-medium">ROI Bulanan</th>
                   </tr>
                 </thead>
@@ -275,8 +300,11 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
                         <td className="py-2.5 px-3 text-right">
                           {formatCurrencyCompact(p.allocation.investedAmount)}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-medium">
+                        <td className="py-2.5 px-3 text-right">
                           {formatCurrencyExact(p.earnings)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-medium">
+                          {formatCurrencyExact(p.totalEarnings)}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           {formatPercent(p.monthlyROI)}
@@ -290,6 +318,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors' }: A
                     <td className="py-2.5 px-3">Total</td>
                     <td></td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(totalInvested)}</td>
+                    <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalLatestEarnings)}</td>
                     <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalEarnings)}</td>
                     <td className="py-2.5 px-3 text-right">{formatPercent(avgROI)}</td>
                   </tr>
