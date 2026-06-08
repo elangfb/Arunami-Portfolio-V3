@@ -345,6 +345,31 @@ export async function getAllocationsForInvestor(investorUid: string): Promise<In
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorAllocation)
 }
 
+export interface InvestorPortfolioData {
+  allocation: InvestorAllocation
+  financial: FinancialData | null
+  config: PortfolioConfig | null
+  portfolio: Portfolio | null
+}
+
+/**
+ * Each of an investor's allocations enriched with the portfolio's config,
+ * financial data and portfolio doc — the shape the report generator consumes.
+ */
+export async function getInvestorPortfolioData(investorUid: string): Promise<InvestorPortfolioData[]> {
+  const allocations = await getAllocationsForInvestor(investorUid)
+  return Promise.all(
+    allocations.map(async (allocation) => {
+      const [config, financial, portfolio] = await Promise.all([
+        getPortfolioConfigOrDefault(allocation.portfolioId),
+        getFinancialData(allocation.portfolioId),
+        getPortfolio(allocation.portfolioId),
+      ])
+      return { allocation, financial, config, portfolio }
+    }),
+  )
+}
+
 /** Recalculates assignedInvestors on the portfolio doc and flushes stale slotsSummary field. */
 async function refreshPortfolioInvestors(portfolioId: string) {
   const allocations = await getAllocationsForPortfolio(portfolioId)
