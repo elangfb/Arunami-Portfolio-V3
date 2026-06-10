@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  getAllUsers, getAllAllocations, getInvestorPortfolioData, getPublishedInvestorReports,
+  getAllUsers, getAllAllocations, getInvestorReportSources, getPublishedInvestorReports,
 } from '@/lib/firestore'
-import type { InvestorPortfolioData } from '@/lib/firestore'
+import type { InvestorReportSource } from '@/lib/firestore'
 import { comparePeriods } from '@/lib/dateUtils'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,7 +33,7 @@ export default function IRReporting() {
 
   // Selected investor
   const [investor, setInvestor] = useState<AppUser | null>(null)
-  const [portfolioData, setPortfolioData] = useState<InvestorPortfolioData[]>([])
+  const [portfolioData, setPortfolioData] = useState<InvestorReportSource[]>([])
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
   const [investorLoading, setInvestorLoading] = useState(false)
 
@@ -69,7 +69,7 @@ export default function IRReporting() {
     setInvestorLoading(true)
     try {
       const [data, published] = await Promise.all([
-        getInvestorPortfolioData(user.uid),
+        getInvestorReportSources(user.uid),
         getPublishedInvestorReports(user.uid),
       ])
       setPortfolioData(data)

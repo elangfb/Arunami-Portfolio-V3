@@ -1,9 +1,9 @@
-import { useState, useRef, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { saveCommunication, publishAccumulatedReport } from '@/lib/firestore'
-import type { InvestorPortfolioData } from '@/lib/firestore'
-import { calculateDistribution } from '@/lib/distributionStrategies'
-import { buildAccumulatedReportHtml } from '@/lib/reportHtml'
+import type { InvestorReportSource } from '@/lib/firestore'
+import { buildInvestorReportSections, assembleAccumulatedReportHtml } from '@/lib/reportHtml'
+import type { AccumulatedReportLine } from '@/lib/reportHtml'
 import { formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { formatPeriod, buildQuarterKey, quarterToMonths, comparePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
@@ -12,32 +12,13 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { ClipboardCopy, Printer, Send } from 'lucide-react'
-import type { AppUser, FinancialData } from '@/types'
-
-type PortfolioData = InvestorPortfolioData
+import type { AppUser } from '@/types'
 
 interface Props {
   investor: AppUser
-  portfolioData: PortfolioData[]
+  portfolioData: InvestorReportSource[]
   /** Called after a report is successfully copied, printed, or published. */
   onDone?: () => void
-}
-
-interface ReportLine {
-  portfolioName: string
-  portfolioCode: string
-  invested: number
-  netProfit: number
-  earnings: number
-  monthlyROI: number
-}
-
-/** A month has reportable data if revenue or profit has a non-zero actual. */
-function monthHasData(financial: FinancialData | null, month: string): boolean {
-  if (!financial) return false
-  const rev = financial.revenueData.find(d => d.month === month)?.aktual ?? 0
-  const profit = financial.profitData.find(d => d.month === month)?.aktual ?? 0
-  return rev !== 0 || profit !== 0
 }
 
 /** Quarter key (e.g. "2026-Q2") that a "YYYY-MM" month falls into. */
@@ -54,16 +35,12 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
     new Set(portfolioData.map(p => p.allocation.portfolioId)),
   )
   const [sending, setSending] = useState(false)
-  const reportRef = useRef<HTMLDivElement>(null)
 
-  // Every month (across the investor's portfolios) that has actual data.
+  // Months that have an uploaded P&L across the investor's portfolios.
   const monthsWithData = useMemo(() => {
     const set = new Set<string>()
     for (const p of portfolioData) {
-      if (!p.financial) continue
-      for (const d of [...p.financial.revenueData, ...p.financial.profitData]) {
-        if (d.aktual !== 0) set.add(d.month)
-      }
+      for (const r of p.pnlReports) if (r.period) set.add(r.period)
     }
     return [...set].sort((a, b) => comparePeriods(b, a)) // newest first
   }, [portfolioData])
@@ -81,7 +58,6 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
     ? selectedPeriod
     : (availablePeriods[0] ?? '')
   const periodLabel = periodKey ? formatPeriod(periodKey) : '—'
-  const monthsInPeriod = reportType === 'quarterly' ? 3 : 1
   const constituentMonths = !periodKey
     ? []
     : reportType === 'quarterly'
@@ -97,59 +73,49 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
     })
   }
 
-  // Only portfolios that actually have data in the selected period — a project
-  // with no report for the month would otherwise show a misleading "0".
+  // Only portfolios that actually have a P&L in the selected period.
   const portfoliosInPeriod = portfolioData.filter(p =>
-    constituentMonths.some(m => monthHasData(p.financial, m)),
+    p.portfolio && p.pnlReports.some(r => constituentMonths.includes(r.period)),
   )
 
-  const reportLines: ReportLine[] = portfoliosInPeriod
-    .filter(p => selectedPortfolios.has(p.allocation.portfolioId))
-    .map(({ allocation, financial, config, portfolio: ptf }) => {
-      let netProfit = 0
-      let earnings = 0
-      let monthlyROI = 0
+  // Detailed per-portfolio sections (the heavy build) for the selected period & portfolios.
+  const sections = useMemo(() => {
+    const months = !periodKey
+      ? []
+      : reportType === 'quarterly' ? quarterToMonths(periodKey) : [periodKey]
+    return portfolioData
+      .filter(p =>
+        p.portfolio &&
+        selectedPortfolios.has(p.allocation.portfolioId) &&
+        p.pnlReports.some(r => months.includes(r.period)),
+      )
+      .map(p => buildInvestorReportSections({
+        portfolio: p.portfolio!,
+        config: p.config ?? undefined,
+        allocation: p.allocation,
+        investorSharePercent: p.investorSharePercent,
+        isArunamiTeam: investor.isArunamiTeam,
+        period: periodKey,
+        pnlReports: p.pnlReports,
+        projectionReports: p.projReports,
+        managementReports: p.mgmtReports,
+        notes: p.notes,
+      }))
+  }, [portfolioData, periodKey, reportType, selectedPortfolios, investor])
 
-      if (financial && config?.investorConfig && ptf) {
-        const monthlyProfits = constituentMonths.map(
-          m => financial.profitData.find(d => d.month === m)?.aktual ?? 0,
-        )
-        const monthlyRevenue = constituentMonths.map(
-          m => financial.revenueData.find(d => d.month === m)?.aktual ?? 0,
-        )
-        netProfit = monthlyProfits.reduce((s, v) => s + v, 0)
-        const revenue = monthlyRevenue.reduce((s, v) => s + v, 0)
+  const lines = sections.map(s => s.line).filter((l): l is AccumulatedReportLine => l != null)
+  const totalEarnings = lines.reduce((s, l) => s + l.earnings, 0)
+  const totalInvested = lines.reduce((s, l) => s + l.invested, 0)
 
-        const result = calculateDistribution({
-          reportData: {
-            period: periodKey,
-            revenue,
-            netProfit,
-            grossProfit: 0,
-          },
-          config: config.investorConfig,
-          allocation,
-          portfolio: ptf,
-          isArunamiTeam: investor.isArunamiTeam,
-          monthsInPeriod,
-          scheduleMonths: constituentMonths,
-        })
-        earnings = result.perInvestorAmount
-        monthlyROI = result.roiPercent
-      }
+  const reportHtml = useMemo(
+    () => assembleAccumulatedReportHtml({ investorName: investor.displayName, periodLabel, sections }),
+    [investor, periodLabel, sections],
+  )
 
-      return {
-        portfolioName: allocation.portfolioName,
-        portfolioCode: allocation.portfolioCode,
-        invested: allocation.investedAmount,
-        netProfit,
-        earnings,
-        monthlyROI,
-      }
-    })
-
-  const totalEarnings = reportLines.reduce((s, l) => s + l.earnings, 0)
-  const totalInvested = reportLines.reduce((s, l) => s + l.invested, 0)
+  const reportPortfolioIds = () =>
+    lines
+      .map(l => portfolioData.find(p => p.allocation.portfolioCode === l.portfolioCode)?.allocation.portfolioId)
+      .filter((id): id is string => Boolean(id))
 
   const buildPlainText = () => {
     let text = `LAPORAN INVESTOR - ${periodLabel}\n`
@@ -157,7 +123,7 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
     text += `Yth. ${investor.displayName},\n\n`
     text += `Berikut adalah ringkasan investasi Anda untuk periode ${periodLabel}:\n\n`
 
-    for (const line of reportLines) {
+    for (const line of lines) {
       text += `📊 ${line.portfolioName} (${line.portfolioCode})\n`
       text += `   Investasi: ${formatCurrencyExact(line.invested)}\n`
       text += `   Net Profit: ${formatCurrencyExact(line.netProfit)}\n`
@@ -173,9 +139,6 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
 
     return text
   }
-
-  const reportPortfolioIds = () =>
-    reportLines.map(l => portfolioData.find(p => p.allocation.portfolioCode === l.portfolioCode)!.allocation.portfolioId)
 
   const handleCopy = async () => {
     setSending(true)
@@ -208,9 +171,7 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         return
       }
 
-      printWindow.document.write(
-        buildAccumulatedReportHtml({ investorName: investor.displayName, periodLabel, lines: reportLines }),
-      )
+      printWindow.document.write(reportHtml)
       printWindow.document.close()
       printWindow.print()
 
@@ -234,17 +195,12 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
   const handlePublish = async () => {
     setSending(true)
     try {
-      const html = buildAccumulatedReportHtml({
-        investorName: investor.displayName,
-        periodLabel,
-        lines: reportLines,
-      })
       await publishAccumulatedReport({
         investorUid: investor.uid,
         investorName: investor.displayName,
         period: periodKey,
         reportType,
-        htmlContent: html,
+        htmlContent: reportHtml,
         publishedBy: admin!.uid,
       })
       await saveCommunication({
@@ -298,7 +254,7 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
 
       {availablePeriods.length === 0 && (
         <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-          Belum ada data finansial aktual untuk investor ini, sehingga laporan belum dapat dibuat.
+          Belum ada data P&amp;L untuk investor ini, sehingga laporan belum dapat dibuat.
         </p>
       )}
 
@@ -324,50 +280,24 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         </div>
       )}
 
-      {/* Preview */}
-      <div ref={reportRef} className="rounded-lg border p-4 space-y-3">
+      {/* Preview — full detailed report (per-portfolio pages + summary at the end) */}
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="font-semibold text-sm">Preview Laporan</p>
           <Badge variant="outline">{periodLabel}</Badge>
         </div>
 
-        {reportLines.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            Pilih minimal satu portofolio
+        {sections.length === 0 ? (
+          <p className="rounded-lg border py-12 text-center text-sm text-muted-foreground">
+            Pilih minimal satu portofolio dengan data untuk periode ini
           </p>
         ) : (
-          <div className="rounded-lg border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left py-2 px-3 font-medium">Portofolio</th>
-                  <th className="text-right py-2 px-3 font-medium">Net Profit</th>
-                  <th className="text-right py-2 px-3 font-medium">Earning</th>
-                  <th className="text-right py-2 px-3 font-medium">ROI</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {reportLines.map(line => (
-                  <tr key={line.portfolioCode}>
-                    <td className="py-2 px-3">
-                      <p className="font-medium">{line.portfolioName}</p>
-                      <p className="text-xs text-muted-foreground">{line.portfolioCode}</p>
-                    </td>
-                    <td className="py-2 px-3 text-right">{formatCurrencyExact(line.netProfit)}</td>
-                    <td className="py-2 px-3 text-right font-medium">{formatCurrencyExact(line.earnings)}</td>
-                    <td className="py-2 px-3 text-right">{formatPercent(line.monthlyROI)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-muted/30 font-medium">
-                  <td className="py-2 px-3" colSpan={2}>Total</td>
-                  <td className="py-2 px-3 text-right">{formatCurrencyExact(totalEarnings)}</td>
-                  <td className="py-2 px-3 text-right"></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <iframe
+            title="Preview Laporan Investor"
+            srcDoc={reportHtml}
+            sandbox=""
+            className="w-full min-h-[600px] rounded-lg border bg-white"
+          />
         )}
       </div>
 
@@ -376,7 +306,7 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         <Button
           variant="outline"
           onClick={handleCopy}
-          disabled={reportLines.length === 0 || sending}
+          disabled={sections.length === 0 || sending}
         >
           <ClipboardCopy className="mr-1 h-4 w-4" />
           Salin ke Clipboard
@@ -384,14 +314,14 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         <Button
           variant="outline"
           onClick={handlePrint}
-          disabled={reportLines.length === 0 || sending}
+          disabled={sections.length === 0 || sending}
         >
           <Printer className="mr-1 h-4 w-4" />
           Cetak / Unduh
         </Button>
         <Button
           onClick={handlePublish}
-          disabled={reportLines.length === 0 || sending}
+          disabled={sections.length === 0 || sending}
           title="Terbitkan laporan ringkasan ke landing page investor"
         >
           <Send className="mr-1 h-4 w-4" />

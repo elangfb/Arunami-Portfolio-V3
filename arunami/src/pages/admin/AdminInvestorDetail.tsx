@@ -420,12 +420,6 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
           open={reportOpen}
           onOpenChange={setReportOpen}
           investor={investor}
-          portfolioData={portfolios.map(p => ({
-            allocation: p.allocation,
-            financial: p.financial,
-            config: p.config,
-            portfolio: p.portfolio,
-          }))}
         />
       )}
     </div>

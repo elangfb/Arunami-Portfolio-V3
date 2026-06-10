@@ -345,27 +345,46 @@ export async function getAllocationsForInvestor(investorUid: string): Promise<In
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorAllocation)
 }
 
-export interface InvestorPortfolioData {
+export interface InvestorReportSource {
   allocation: InvestorAllocation
-  financial: FinancialData | null
   config: PortfolioConfig | null
   portfolio: Portfolio | null
+  pnlReports: PnLExtractedData[]
+  projReports: ProjectionExtractedData[]
+  mgmtReports: ManagementReport[]
+  notes: Note[]
+  /** Global investor-pool share of Net Profit, in percent. */
+  investorSharePercent: number
 }
 
 /**
- * Each of an investor's allocations enriched with the portfolio's config,
- * financial data and portfolio doc — the shape the report generator consumes.
+ * Each of an investor's allocations enriched with everything the detailed
+ * report builder needs: config, portfolio doc, P&L/projection extracted data,
+ * management reports and notes. Used by the personalized report generator.
  */
-export async function getInvestorPortfolioData(investorUid: string): Promise<InvestorPortfolioData[]> {
+export async function getInvestorReportSources(investorUid: string): Promise<InvestorReportSource[]> {
   const allocations = await getAllocationsForInvestor(investorUid)
   return Promise.all(
     allocations.map(async (allocation) => {
-      const [config, financial, portfolio] = await Promise.all([
-        getPortfolioConfigOrDefault(allocation.portfolioId),
-        getFinancialData(allocation.portfolioId),
-        getPortfolio(allocation.portfolioId),
+      const pid = allocation.portfolioId
+      const [config, portfolio, pnls, projs, mgmts, notes] = await Promise.all([
+        getPortfolioConfigOrDefault(pid),
+        getPortfolio(pid),
+        getReports(pid, 'pnl'),
+        getReports(pid, 'projection'),
+        getManagementReports(pid),
+        getNotes(pid),
       ])
-      return { allocation, financial, config, portfolio }
+      return {
+        allocation,
+        config,
+        portfolio,
+        pnlReports: pnls.map(r => r.extractedData as PnLExtractedData),
+        projReports: projs.map(r => r.extractedData as ProjectionExtractedData),
+        mgmtReports: mgmts,
+        notes,
+        investorSharePercent: config.investorConfig?.investorSharePercent ?? 0,
+      }
     }),
   )
 }
