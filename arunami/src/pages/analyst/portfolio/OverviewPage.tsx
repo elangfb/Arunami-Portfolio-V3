@@ -102,6 +102,16 @@ export default function OverviewPage() {
   const prevTx = prevPeriod ? data.transactionData.find(t => t.month === prevPeriod) : undefined
   const prevTotalTx = prevTx ? Object.values(prevTx.categories).reduce((s, v) => s + v, 0) : 0
 
+  // Charts: show actuals plus only 3 months of projection ahead, rather than
+  // the full multi-year projection horizon (which dwarfs the actuals).
+  const trimToThreeMonthsAhead = <T extends { month: string }>(rows: T[]): T[] => {
+    if (!latestPeriod) return rows
+    const idx = rows.findIndex(r => r.month === latestPeriod)
+    return idx === -1 ? rows : rows.slice(0, idx + 1 + 3)
+  }
+  const revenueChartData = trimToThreeMonthsAhead(data.revenueData)
+  const profitChartData = trimToThreeMonthsAhead(data.profitData)
+
   // Total Investment ROI: net-for-investor / total investment
   const cfg = data.investorConfig
   const investorShare = lastProfit * (cfg.investorSharePercent / 100)
@@ -212,7 +222,7 @@ export default function OverviewPage() {
         <CardHeader><CardTitle className="text-sm">Revenue — Proyeksi vs Aktual</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={data.revenueData}>
+            <BarChart data={revenueChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
               <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />
@@ -230,7 +240,7 @@ export default function OverviewPage() {
         <CardHeader><CardTitle className="text-sm">Profit — Proyeksi vs Aktual</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data.profitData}>
+            <BarChart data={profitChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={formatPeriod} />
               <YAxis tickFormatter={v => formatCurrencyCompact(v as number)} tick={{ fontSize: 11 }} />

@@ -35,12 +35,27 @@ export default function RevenuePage() {
   const publishedSet = availablePeriods && availablePeriods.length > 0
     ? new Set(availablePeriods)
     : null
-  const filteredRevenue = publishedSet
+  let filteredRevenue = publishedSet
     ? data.revenueData.filter(r => publishedSet.has(r.month))
     : data.revenueData
-  const filteredProfit = publishedSet
+  let filteredProfit = publishedSet
     ? data.profitData.filter(p => publishedSet.has(p.month))
     : data.profitData
+
+  // Analyst route (no published gate): cap the projection horizon to 3 months
+  // past the latest actual, so the multi-year projection doesn't dwarf the
+  // actuals in the charts and Tabel Varians. Revenue/Profit are parallel
+  // arrays indexed by the same months, so they share one cutoff to stay aligned.
+  if (!publishedSet) {
+    const PROJECTION_MONTHS_AHEAD = 3
+    let lastActualIdx = -1
+    filteredRevenue.forEach((r, i) => { if (r.aktual !== 0) lastActualIdx = i })
+    if (lastActualIdx !== -1) {
+      const end = lastActualIdx + 1 + PROJECTION_MONTHS_AHEAD
+      filteredRevenue = filteredRevenue.slice(0, end)
+      filteredProfit = filteredProfit.slice(0, end)
+    }
+  }
   void selectedPeriod // currently used only to trigger re-render; KPIs gated above
 
   // Variance table
