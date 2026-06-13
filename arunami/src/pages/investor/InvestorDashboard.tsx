@@ -6,13 +6,11 @@ import { auth } from '@/lib/firebase'
 import { getInvestorPortfolios, getAllocationsForInvestor, getPublishedInvestorReports } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
-import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { ownershipFraction } from '@/lib/distributionStrategies'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TrendingUp, LogOut, Briefcase, FileText, Layers, Printer } from 'lucide-react'
+import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight } from 'lucide-react'
 import type { Portfolio, InvestorAllocation, InvestorReportDoc } from '@/types'
 
 export default function InvestorDashboard() {
@@ -22,7 +20,6 @@ export default function InvestorDashboard() {
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
   const [loading, setLoading] = useState(true)
-  const [accPeriod, setAccPeriod] = useState('')  // '' = follow latest published period
 
   useEffect(() => {
     if (user) {
@@ -39,36 +36,18 @@ export default function InvestorDashboard() {
     }
   }, [user])
 
-  // Accumulated (all-projects) reports, newest first.
-  const accumulatedReports = useMemo(
-    () =>
-      reports
-        .filter(r => r.scope === 'accumulated')
-        .sort((a, b) => comparePeriods(b.period, a.period)),
+  // Whether the investor has any all-projects report (accumulated or all-time)
+  // worth surfacing on the dedicated "My Report" page.
+  const hasAllProjectReports = useMemo(
+    () => reports.some(r => r.scope === 'accumulated' || r.scope === 'all_time'),
     [reports],
   )
 
   // Portfolios that have a published per-project report → show a quick link.
   const portfolioReportIds = useMemo(
-    () => new Set(reports.filter(r => r.scope !== 'accumulated').map(r => r.portfolioId)),
+    () => new Set(reports.filter(r => r.scope !== 'accumulated' && r.scope !== 'all_time').map(r => r.portfolioId)),
     [reports],
   )
-
-  // Default to the latest period until the investor explicitly picks one.
-  const effectivePeriod = accPeriod || accumulatedReports[0]?.period || ''
-  const selectedAccReport = accumulatedReports.find(r => r.period === effectivePeriod) ?? null
-
-  const handlePrintAccumulated = () => {
-    if (!selectedAccReport) return
-    const w = window.open('', '_blank')
-    if (!w) {
-      toast.error('Popup diblokir. Izinkan popup untuk mengunduh.')
-      return
-    }
-    w.document.write(selectedAccReport.htmlContent)
-    w.document.close()
-    w.print()
-  }
 
   const handleLogout = async () => {
     await signOut(auth); setUser(null)
@@ -96,46 +75,25 @@ export default function InvestorDashboard() {
       </header>
 
       <main className="p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Accumulated (all-projects) report */}
-        {accumulatedReports.length > 0 && (
-          <Card className="border-[#1e5f3f]/30">
-            <CardHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
+        {/* All-projects reports live on the dedicated "My Report" page. */}
+        {hasAllProjectReports && (
+          <Card
+            className="border-[#1e5f3f]/30 cursor-pointer transition-shadow hover:shadow-md"
+            onClick={() => navigate('/investor/reports')}
+          >
+            <CardContent className="flex items-center justify-between gap-4 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1e5f3f]/10">
                   <Layers className="h-5 w-5 text-[#1e5f3f]" />
-                  <CardTitle className="text-base">Laporan Semua Proyek</CardTitle>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Select value={effectivePeriod} onValueChange={setAccPeriod}>
-                    <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {accumulatedReports.map(r => (
-                        <SelectItem key={r.id} value={r.period}>{formatPeriod(r.period)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button size="sm" onClick={handlePrintAccumulated} disabled={!selectedAccReport}>
-                    <Printer className="mr-1 h-4 w-4" />Unduh / Cetak
-                  </Button>
+                <div>
+                  <p className="font-semibold">Laporan Saya</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ringkasan kinerja seluruh proyek — sepanjang waktu & per periode
+                  </p>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Ringkasan kinerja seluruh proyek Anda untuk setiap periode, diterbitkan oleh Tim Arunami.
-              </p>
-            </CardHeader>
-            <CardContent>
-              {selectedAccReport ? (
-                <iframe
-                  title={`Accumulated report ${selectedAccReport.id}`}
-                  srcDoc={selectedAccReport.htmlContent}
-                  sandbox=""
-                  className="w-full min-h-120 rounded-md border bg-white"
-                />
-              ) : (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Pilih periode untuk melihat laporan.
-                </p>
-              )}
+              <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
             </CardContent>
           </Card>
         )}

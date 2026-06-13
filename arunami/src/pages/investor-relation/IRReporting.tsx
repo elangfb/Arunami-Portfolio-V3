@@ -245,6 +245,7 @@ export default function IRReporting() {
           <InvestorReportForm
             investor={investor}
             portfolioData={portfolioData}
+            publishedReports={reports}
             onDone={async () => {
               await refreshReports()
               setView('investor')

@@ -14,7 +14,7 @@ import type {
   InvestorReportDoc, EquityChangeEntry,
   InvestorConfigUnion, ConfigChangeKind, ReturnModelType,
 } from '@/types'
-import { ACCUMULATED_PORTFOLIO_ID } from '@/types'
+import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 
 // ─── Users ────────────────────────────────────────────────────────────────
@@ -806,6 +806,60 @@ export async function unpublishAccumulatedReport(params: {
   period: string
 }): Promise<void> {
   const id = accumulatedReportId(params.investorUid, params.period)
+  await updateDoc(doc(db, 'investorReports', id), {
+    status: 'draft' as const,
+    publishedAt: deleteField(),
+    publishedBy: deleteField(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+// ─── All-time (lifetime, all-projects) investor report ───────────────────────
+//
+// A single doc per investor (id `alltime_${uid}`) in the same `investorReports`
+// collection, with scope = 'all_time' and period = ALL_TIME_PERIOD. Regenerating
+// overwrites it. `getPublishedInvestorReports` already returns it; callers must
+// filter the ALL_TIME_PERIOD sentinel out before sorting by period.
+
+function allTimeReportId(investorUid: string): string {
+  return `alltime_${investorUid}`
+}
+
+export async function publishAllTimeReport(params: {
+  investorUid: string
+  investorName: string
+  htmlContent: string
+  publishedBy: string
+  coverageFirst?: string
+  coverageLatest?: string
+}): Promise<string> {
+  const id = allTimeReportId(params.investorUid)
+  await setDoc(
+    doc(db, 'investorReports', id),
+    {
+      portfolioId: ACCUMULATED_PORTFOLIO_ID,
+      portfolioName: 'Semua Proyek (All-Time)',
+      investorUid: params.investorUid,
+      investorName: params.investorName,
+      period: ALL_TIME_PERIOD,
+      scope: 'all_time' as const,
+      status: 'published' as const,
+      htmlContent: params.htmlContent,
+      coverageFirst: params.coverageFirst ?? null,
+      coverageLatest: params.coverageLatest ?? null,
+      publishedAt: serverTimestamp(),
+      publishedBy: params.publishedBy,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+  return id
+}
+
+export async function unpublishAllTimeReport(params: {
+  investorUid: string
+}): Promise<void> {
+  const id = allTimeReportId(params.investorUid)
   await updateDoc(doc(db, 'investorReports', id), {
     status: 'draft' as const,
     publishedAt: deleteField(),

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { saveCommunication, publishAccumulatedReport } from '@/lib/firestore'
+import { saveCommunication, publishAccumulatedReport, publishAllTimeReport } from '@/lib/firestore'
 import type { InvestorReportSource } from '@/lib/firestore'
-import { buildInvestorReportSections, assembleAccumulatedReportHtml } from '@/lib/reportHtml'
+import { buildInvestorReportSections, assembleAccumulatedReportHtml, assembleAllTimeReportHtml } from '@/lib/reportHtml'
 import type { AccumulatedReportLine } from '@/lib/reportHtml'
+import { computeAllTimeReport } from '@/lib/allTimeReport'
 import { formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { formatPeriod, buildQuarterKey, quarterToMonths, comparePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
@@ -12,11 +13,13 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { ClipboardCopy, Printer, Send } from 'lucide-react'
-import type { AppUser } from '@/types'
+import type { AppUser, InvestorReportDoc } from '@/types'
 
 interface Props {
   investor: AppUser
   portfolioData: InvestorReportSource[]
+  /** The investor's published reports — drives which periods count toward all-time. */
+  publishedReports: InvestorReportDoc[]
   /** Called after a report is successfully copied, printed, or published. */
   onDone?: () => void
 }
@@ -27,9 +30,9 @@ function monthToQuarterKey(month: string): string {
   return buildQuarterKey(y, Math.floor((Number(mm) - 1) / 3) + 1)
 }
 
-export default function InvestorReportForm({ investor, portfolioData, onDone }: Props) {
+export default function InvestorReportForm({ investor, portfolioData, publishedReports, onDone }: Props) {
   const { user: admin } = useAuthStore()
-  const [reportType, setReportType] = useState<'monthly' | 'quarterly'>('monthly')
+  const [reportType, setReportType] = useState<'monthly' | 'quarterly' | 'alltime'>('monthly')
   const [selectedPeriod, setSelectedPeriod] = useState('')  // '' = follow latest available
   const [selectedPortfolios, setSelectedPortfolios] = useState<Set<string>>(
     new Set(portfolioData.map(p => p.allocation.portfolioId)),
@@ -107,17 +110,62 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
   const totalEarnings = lines.reduce((s, l) => s + l.earnings, 0)
   const totalInvested = lines.reduce((s, l) => s + l.invested, 0)
 
-  const reportHtml = useMemo(
-    () => assembleAccumulatedReportHtml({ investorName: investor.displayName, periodLabel, sections }),
-    [investor, periodLabel, sections],
+  const isAllTime = reportType === 'alltime'
+
+  // Lifetime summary across all portfolios & all published periods.
+  const allTimeSummary = useMemo(
+    () => computeAllTimeReport({
+      investorName: investor.displayName,
+      sources: portfolioData,
+      publishedReports,
+      isArunamiTeam: investor.isArunamiTeam,
+    }),
+    [investor, portfolioData, publishedReports],
   )
 
+  const reportHtml = useMemo(
+    () => isAllTime
+      ? assembleAllTimeReportHtml(allTimeSummary)
+      : assembleAccumulatedReportHtml({ investorName: investor.displayName, periodLabel, sections }),
+    [isAllTime, allTimeSummary, investor, periodLabel, sections],
+  )
+
+  const hasContent = isAllTime ? allTimeSummary.lines.length > 0 : sections.length > 0
+
+  const codeToPortfolioId = (code: string) =>
+    portfolioData.find(p => p.allocation.portfolioCode === code)?.allocation.portfolioId
+
   const reportPortfolioIds = () =>
-    lines
-      .map(l => portfolioData.find(p => p.allocation.portfolioCode === l.portfolioCode)?.allocation.portfolioId)
+    (isAllTime ? allTimeSummary.lines : lines)
+      .map(l => codeToPortfolioId(l.portfolioCode))
       .filter((id): id is string => Boolean(id))
 
+  // Coverage label + communication metadata that differ for the all-time report.
+  const coverageLabel = allTimeSummary.coverage.firstMonth && allTimeSummary.coverage.latestMonth
+    ? `${formatPeriod(allTimeSummary.coverage.firstMonth)} – ${formatPeriod(allTimeSummary.coverage.latestMonth)}`
+    : '—'
+  const commSubject = isAllTime ? 'Laporan Sepanjang Waktu' : `Laporan ${periodLabel}`
+  const commPeriod = isAllTime ? 'ALL_TIME' : periodLabel
+
   const buildPlainText = () => {
+    if (isAllTime) {
+      const s = allTimeSummary
+      let text = `LAPORAN SEPANJANG WAKTU\n${'─'.repeat(40)}\n\n`
+      text += `Yth. ${investor.displayName},\n\n`
+      text += `Ringkasan kinerja seluruh investasi Anda (${coverageLabel}):\n\n`
+      for (const l of s.lines) {
+        text += `📊 ${l.portfolioName} (${l.portfolioCode})\n`
+        text += `   Investasi: ${formatCurrencyExact(l.invested)}\n`
+        text += `   Earning Kumulatif: ${formatCurrencyExact(l.cumulativeEarnings)}\n`
+        text += `   ROI All-Time: ${formatPercent(l.allTimeROI)}\n\n`
+      }
+      text += `${'─'.repeat(40)}\n`
+      text += `TOTAL EARNING: ${formatCurrencyExact(s.totalCumulativeEarnings)}\n`
+      text += `TOTAL INVESTASI: ${formatCurrencyExact(s.totalInvested)}\n\n`
+      text += `Terima kasih atas kepercayaan Anda.\n— Tim Arunami`
+      return text
+    }
+
     let text = `LAPORAN INVESTOR - ${periodLabel}\n`
     text += `${'─'.repeat(40)}\n\n`
     text += `Yth. ${investor.displayName},\n\n`
@@ -148,8 +196,8 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         investorUid: investor.uid,
         type: 'report',
         channel: 'clipboard',
-        subject: `Laporan ${periodLabel}`,
-        period: periodLabel,
+        subject: commSubject,
+        period: commPeriod,
         portfolioIds: reportPortfolioIds(),
         sentBy: admin!.uid,
       })
@@ -179,8 +227,8 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         investorUid: investor.uid,
         type: 'report',
         channel: 'download',
-        subject: `Laporan ${periodLabel}`,
-        period: periodLabel,
+        subject: commSubject,
+        period: commPeriod,
         portfolioIds: reportPortfolioIds(),
         sentBy: admin!.uid,
       })
@@ -195,20 +243,31 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
   const handlePublish = async () => {
     setSending(true)
     try {
-      await publishAccumulatedReport({
-        investorUid: investor.uid,
-        investorName: investor.displayName,
-        period: periodKey,
-        reportType,
-        htmlContent: reportHtml,
-        publishedBy: admin!.uid,
-      })
+      if (isAllTime) {
+        await publishAllTimeReport({
+          investorUid: investor.uid,
+          investorName: investor.displayName,
+          htmlContent: reportHtml,
+          publishedBy: admin!.uid,
+          coverageFirst: allTimeSummary.coverage.firstMonth ?? undefined,
+          coverageLatest: allTimeSummary.coverage.latestMonth ?? undefined,
+        })
+      } else {
+        await publishAccumulatedReport({
+          investorUid: investor.uid,
+          investorName: investor.displayName,
+          period: periodKey,
+          reportType: reportType as 'monthly' | 'quarterly',
+          htmlContent: reportHtml,
+          publishedBy: admin!.uid,
+        })
+      }
       await saveCommunication({
         investorUid: investor.uid,
         type: 'report',
         channel: 'publish',
-        subject: `Laporan Semua Proyek ${periodLabel}`,
-        period: periodLabel,
+        subject: isAllTime ? 'Laporan Sepanjang Waktu' : `Laporan Semua Proyek ${periodLabel}`,
+        period: commPeriod,
         portfolioIds: reportPortfolioIds(),
         sentBy: admin!.uid,
       })
@@ -227,39 +286,47 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label>Tipe Laporan</Label>
-          <Select value={reportType} onValueChange={v => setReportType(v as 'monthly' | 'quarterly')}>
+          <Select value={reportType} onValueChange={v => setReportType(v as 'monthly' | 'quarterly' | 'alltime')}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="monthly">Bulanan</SelectItem>
               <SelectItem value="quarterly">Kuartalan</SelectItem>
+              <SelectItem value="alltime">Sepanjang Waktu (All-Time)</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>Periode</Label>
-          <Select
-            value={periodKey}
-            onValueChange={setSelectedPeriod}
-            disabled={availablePeriods.length === 0}
-          >
-            <SelectTrigger><SelectValue placeholder="Belum ada data" /></SelectTrigger>
-            <SelectContent>
-              {availablePeriods.map(p => (
-                <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!isAllTime && (
+          <div className="space-y-2">
+            <Label>Periode</Label>
+            <Select
+              value={periodKey}
+              onValueChange={setSelectedPeriod}
+              disabled={availablePeriods.length === 0}
+            >
+              <SelectTrigger><SelectValue placeholder="Belum ada data" /></SelectTrigger>
+              <SelectContent>
+                {availablePeriods.map(p => (
+                  <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
-      {availablePeriods.length === 0 && (
+      {isAllTime ? (
+        <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+          Laporan sepanjang waktu mengakumulasi kinerja seluruh proyek dari semua periode
+          yang sudah diterbitkan ({coverageLabel}).
+        </p>
+      ) : availablePeriods.length === 0 && (
         <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
           Belum ada data P&amp;L untuk investor ini, sehingga laporan belum dapat dibuat.
         </p>
       )}
 
       {/* Portfolio Selection — only projects with data in the selected period */}
-      {portfoliosInPeriod.length > 0 && (
+      {!isAllTime && portfoliosInPeriod.length > 0 && (
         <div className="space-y-2">
           <Label>Portofolio</Label>
           <div className="flex flex-wrap gap-2">
@@ -284,10 +351,10 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="font-semibold text-sm">Preview Laporan</p>
-          <Badge variant="outline">{periodLabel}</Badge>
+          <Badge variant="outline">{isAllTime ? 'Sepanjang Waktu' : periodLabel}</Badge>
         </div>
 
-        {sections.length === 0 ? (
+        {!isAllTime && sections.length === 0 ? (
           <p className="rounded-lg border py-12 text-center text-sm text-muted-foreground">
             Pilih minimal satu portofolio dengan data untuk periode ini
           </p>
@@ -306,7 +373,7 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         <Button
           variant="outline"
           onClick={handleCopy}
-          disabled={sections.length === 0 || sending}
+          disabled={!hasContent || sending}
         >
           <ClipboardCopy className="mr-1 h-4 w-4" />
           Salin ke Clipboard
@@ -314,14 +381,14 @@ export default function InvestorReportForm({ investor, portfolioData, onDone }: 
         <Button
           variant="outline"
           onClick={handlePrint}
-          disabled={sections.length === 0 || sending}
+          disabled={!hasContent || sending}
         >
           <Printer className="mr-1 h-4 w-4" />
           Cetak / Unduh
         </Button>
         <Button
           onClick={handlePublish}
-          disabled={sections.length === 0 || sending}
+          disabled={!hasContent || sending}
           title="Terbitkan laporan ringkasan ke landing page investor"
         >
           <Send className="mr-1 h-4 w-4" />

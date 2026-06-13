@@ -7,6 +7,7 @@ import type {
   ManagementReport, Note, InvestorAllocation, InvestorConfigUnion,
   OpexItem, CustomSubItem,
 } from '@/types'
+import type { AllTimeReportSummary } from './allTimeReport'
 
 interface BuildArgs {
   portfolio: Portfolio
@@ -36,6 +37,17 @@ const baseStyles = `
   .kpi div { flex: 1 1 170px; background: #f5faf7; border: 1px solid #d6ead9; border-radius: 6px; padding: 10px 12px; }
   .kpi span { display: block; font-size: 11px; color: #555; }
   .kpi strong { display: block; font-size: 15px; color: #1e5f3f; margin-top: 2px; }
+  /* All-time report */
+  .alltime-hero { background: linear-gradient(135deg, #1e5f3f, #38a169); color: #fff; border-radius: 10px; padding: 22px 24px; margin-top: 12px; }
+  .alltime-hero h1 { color: #fff; font-size: 20px; margin: 0; }
+  .alltime-hero .range { font-size: 12px; opacity: .9; margin-top: 2px; }
+  .alltime-hero .kpi { margin-top: 16px; }
+  .alltime-hero .kpi div { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); }
+  .alltime-hero .kpi span { color: rgba(255,255,255,.85); }
+  .alltime-hero .kpi strong { color: #fff; font-size: 17px; }
+  table.data td.num, table.data th.num { text-align: right; }
+  table.data tr.total { background: #f5faf7; font-weight: bold; }
+  table.data tr.total td { color: #1e5f3f; }
 `
 
 function descRow(label: string, desc: string, val: string): string {
@@ -507,23 +519,32 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
   }
 }
 
-/** Standalone per-portfolio investor report (one project, one period). */
-export function buildInvestorReportHtml(args: BuildArgs): string {
-  const s = buildInvestorReportSections(args)
+/** Wrap report body HTML in the shared self-contained document shell + CSS. */
+export function renderReportDoc(args: { title: string; bodyHtml: string }): string {
   return `<!doctype html>
 <html lang="id">
 <head>
 <meta charset="utf-8" />
-<title>${s.portfolioName} — ${s.periodLabel}</title>
+<title>${args.title}</title>
 <style>${baseStyles}</style>
 </head>
 <body>
+${args.bodyHtml}
+</body>
+</html>`
+}
+
+/** Standalone per-portfolio investor report (one project, one period). */
+export function buildInvestorReportHtml(args: BuildArgs): string {
+  const s = buildInvestorReportSections(args)
+  return renderReportDoc({
+    title: `${s.portfolioName} — ${s.periodLabel}`,
+    bodyHtml: `
   <h1>${s.audience}</h1>
   <p><strong>${s.portfolioName}</strong>${s.brandName ? ` · ${s.brandName}` : ''} — Periode ${s.periodLabel}</p>
   ${s.content}
-  <div class="footer">Diterbitkan oleh Tim Arunami — ${new Date().toLocaleString('id-ID')}</div>
-</body>
-</html>`
+  <div class="footer">Diterbitkan oleh Tim Arunami — ${new Date().toLocaleString('id-ID')}</div>`,
+  })
 }
 
 /**
@@ -590,19 +611,113 @@ export function assembleAccumulatedReportHtml(args: {
       </table>
     </div>`
 
-  return `<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8" />
-<title>Laporan Investor — ${investorName} — ${periodLabel}</title>
-<style>${baseStyles}</style>
-</head>
-<body>
+  return renderReportDoc({
+    title: `Laporan Investor — ${investorName} — ${periodLabel}`,
+    bodyHtml: `
   <h1>Laporan Investor</h1>
   <p><strong>${investorName}</strong> — Ringkasan Semua Proyek · Periode ${periodLabel}</p>
   ${projectPages}
   ${summary}
-  <div class="footer">Diterbitkan oleh Tim Arunami — ${generatedAt}</div>
-</body>
-</html>`
+  <div class="footer">Diterbitkan oleh Tim Arunami — ${generatedAt}</div>`,
+  })
+}
+
+/**
+ * Assemble an investor's ALL-TIME report — a single-page lifetime summary across
+ * all portfolios and all published periods. Deliberately distinct from the
+ * per-period accumulated report: a hero KPI band, a cumulative per-portfolio
+ * table, and a period-by-period earnings trend. Self-contained for print / iframe.
+ */
+export function assembleAllTimeReportHtml(
+  summary: AllTimeReportSummary,
+  generatedAt?: string,
+): string {
+  const { investorName, lines, totalInvested, totalCumulativeEarnings, overallROI, coverage } = summary
+  const stamp = generatedAt ?? new Date().toLocaleString('id-ID')
+  const rangeLabel = coverage.firstMonth && coverage.latestMonth
+    ? `${formatPeriod(coverage.firstMonth)} – ${formatPeriod(coverage.latestMonth)}`
+    : 'Belum ada periode terbit'
+
+  const hero = `
+    <div class="alltime-hero">
+      <h1>Laporan Sepanjang Waktu</h1>
+      <div class="range">${investorName} · ${rangeLabel}</div>
+      <div class="kpi">
+        <div><span>Total Investasi</span><strong>${formatCurrencyExact(totalInvested)}</strong></div>
+        <div><span>Total Earning (All-Time)</span><strong>${formatCurrencyExact(totalCumulativeEarnings)}</strong></div>
+        <div><span>ROI Keseluruhan</span><strong>${formatPercent(overallROI)}</strong></div>
+        <div><span>Jumlah Proyek</span><strong>${lines.length}</strong></div>
+        <div><span>Bulan Tercatat</span><strong>${coverage.monthsCounted}</strong></div>
+      </div>
+    </div>`
+
+  const portfolioTable = `
+    <h2>Kinerja per Proyek (Akumulatif)</h2>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Portofolio</th>
+          <th class="num">Investasi</th>
+          <th class="num">Earning Kumulatif</th>
+          <th class="num">ROI All-Time</th>
+          <th class="num">Bulan</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lines.map(l => `
+          <tr>
+            <td>${l.portfolioName}<div style="font-size:11px;color:#666">${l.portfolioCode}</div></td>
+            <td class="num">${formatCurrencyExact(l.invested)}</td>
+            <td class="num">${formatCurrencyExact(l.cumulativeEarnings)}</td>
+            <td class="num">${formatPercent(l.allTimeROI)}</td>
+            <td class="num">${l.monthsCounted}</td>
+          </tr>
+        `).join('')}
+        <tr class="total">
+          <td>Total</td>
+          <td class="num">${formatCurrencyExact(totalInvested)}</td>
+          <td class="num">${formatCurrencyExact(totalCumulativeEarnings)}</td>
+          <td class="num">${formatPercent(overallROI)}</td>
+          <td class="num"></td>
+        </tr>
+      </tbody>
+    </table>`
+
+  // Trend: total earnings per month across all portfolios.
+  const monthTotals = new Map<string, number>()
+  for (const l of lines) {
+    for (const p of l.byPeriod) {
+      monthTotals.set(p.period, (monthTotals.get(p.period) ?? 0) + p.earnings)
+    }
+  }
+  const trendMonths = [...monthTotals.keys()].sort(comparePeriods)
+  const trendTable = trendMonths.length ? `
+    <h2>Tren Earning per Periode</h2>
+    <table class="data">
+      <thead>
+        <tr><th>Periode</th><th class="num">Total Earning</th></tr>
+      </thead>
+      <tbody>
+        ${trendMonths.map(m => `
+          <tr>
+            <td>${formatPeriod(m)}</td>
+            <td class="num">${formatCurrencyExact(monthTotals.get(m) ?? 0)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>` : ''
+
+  const emptyState = lines.length === 0
+    ? '<p style="margin-top:16px"><em>Belum ada laporan periodik yang diterbitkan, sehingga belum ada data sepanjang waktu.</em></p>'
+    : ''
+
+  return renderReportDoc({
+    title: `Laporan Sepanjang Waktu — ${investorName}`,
+    bodyHtml: `
+  ${hero}
+  ${emptyState}
+  ${lines.length ? portfolioTable : ''}
+  ${trendTable}
+  <div class="footer">Diterbitkan oleh Tim Arunami — ${stamp}</div>`,
+  })
 }

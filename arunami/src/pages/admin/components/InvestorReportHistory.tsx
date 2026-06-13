@@ -18,6 +18,25 @@ function formatReportDate(report: InvestorReportDoc) {
   return `${d.getDate()} ${MONTH_NAMES_ID[d.getMonth()]} ${d.getFullYear()}`
 }
 
+/** Period label — all-time reports show their coverage range instead of a single period. */
+function reportPeriodLabel(r: InvestorReportDoc): string {
+  if (r.scope === 'all_time') {
+    return r.coverageFirst && r.coverageLatest
+      ? `${formatPeriod(r.coverageFirst)} – ${formatPeriod(r.coverageLatest)}`
+      : 'Sepanjang Waktu'
+  }
+  return formatPeriod(r.period)
+}
+
+function reportTypeLabel(r: InvestorReportDoc): string {
+  if (r.scope === 'all_time') return 'All-Time'
+  return r.reportType === 'quarterly' ? 'Kuartalan' : 'Bulanan'
+}
+
+function reportScopeLabel(r: InvestorReportDoc): string {
+  return r.scope === 'accumulated' || r.scope === 'all_time' ? 'Semua Portofolio' : r.portfolioName
+}
+
 export default function InvestorReportHistory({ reports }: Props) {
   const [viewReport, setViewReport] = useState<InvestorReportDoc | null>(null)
 
@@ -47,13 +66,11 @@ export default function InvestorReportHistory({ reports }: Props) {
                 <tbody className="divide-y">
                   {reports.map(r => (
                     <tr key={r.id} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3 font-medium">{formatPeriod(r.period)}</td>
+                      <td className="py-2.5 px-3 font-medium">{reportPeriodLabel(r)}</td>
                       <td className="py-2.5 px-3">
-                        <Badge variant="outline">{r.reportType === 'quarterly' ? 'Kuartalan' : 'Bulanan'}</Badge>
+                        <Badge variant="outline">{reportTypeLabel(r)}</Badge>
                       </td>
-                      <td className="py-2.5 px-3">
-                        {r.scope === 'accumulated' ? 'Semua Portofolio' : r.portfolioName}
-                      </td>
+                      <td className="py-2.5 px-3">{reportScopeLabel(r)}</td>
                       <td className="py-2.5 px-3">{formatReportDate(r)}</td>
                       <td className="py-2.5 px-3 text-right">
                         <Button variant="ghost" size="sm" onClick={() => setViewReport(r)}>
@@ -75,7 +92,7 @@ export default function InvestorReportHistory({ reports }: Props) {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {viewReport && `${viewReport.scope === 'accumulated' ? 'Semua Portofolio' : viewReport.portfolioName} — ${formatPeriod(viewReport.period)}`}
+              {viewReport && `${reportScopeLabel(viewReport)} — ${reportPeriodLabel(viewReport)}`}
             </DialogTitle>
           </DialogHeader>
           {viewReport && (

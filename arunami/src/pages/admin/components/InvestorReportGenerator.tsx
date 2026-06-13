@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { getInvestorReportSources } from '@/lib/firestore'
+import { getInvestorReportSources, getPublishedInvestorReports } from '@/lib/firestore'
 import type { InvestorReportSource } from '@/lib/firestore'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import InvestorReportForm from './InvestorReportForm'
-import type { AppUser } from '@/types'
+import type { AppUser, InvestorReportDoc } from '@/types'
 
 interface Props {
   open: boolean
@@ -14,11 +14,18 @@ interface Props {
 /** Modal wrapper around the inline {@link InvestorReportForm}; loads its own report sources. */
 export default function InvestorReportGenerator({ open, onOpenChange, investor }: Props) {
   const [sources, setSources] = useState<InvestorReportSource[] | null>(null)
+  const [published, setPublished] = useState<InvestorReportDoc[]>([])
 
   useEffect(() => {
     if (!open) return
     setSources(null)
-    getInvestorReportSources(investor.uid).then(setSources).catch(() => setSources([]))
+    setPublished([])
+    Promise.all([
+      getInvestorReportSources(investor.uid),
+      getPublishedInvestorReports(investor.uid),
+    ])
+      .then(([s, p]) => { setSources(s); setPublished(p) })
+      .catch(() => setSources([]))
   }, [open, investor.uid])
 
   return (
@@ -36,6 +43,7 @@ export default function InvestorReportGenerator({ open, onOpenChange, investor }
             <InvestorReportForm
               investor={investor}
               portfolioData={sources}
+              publishedReports={published}
               onDone={() => onOpenChange(false)}
             />
           )}

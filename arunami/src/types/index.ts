@@ -361,10 +361,16 @@ export type InvestorReportType = 'monthly' | 'quarterly'
  * - 'accumulated'  → one report per (investor × period) spanning ALL portfolios,
  *                    published by Investor Relations. Stored with
  *                    portfolioId = '__accumulated__'.
+ * - 'all_time'     → a single lifetime report per investor spanning ALL portfolios
+ *                    and ALL published periods. Stored with portfolioId =
+ *                    '__accumulated__' and period = ALL_TIME_PERIOD.
  */
-export type InvestorReportScope = 'portfolio' | 'accumulated'
+export type InvestorReportScope = 'portfolio' | 'accumulated' | 'all_time'
 
 export const ACCUMULATED_PORTFOLIO_ID = '__accumulated__'
+
+/** Sentinel period for the single all-time report doc (never a real YYYY-MM). */
+export const ALL_TIME_PERIOD = 'ALL_TIME'
 
 export interface InvestorReportDoc {
   id: string
@@ -380,6 +386,9 @@ export interface InvestorReportDoc {
   publishedAt?: Timestamp
   publishedBy?: string
   updatedAt: Timestamp
+  /** Coverage range for all-time reports (earliest / latest counted month, YYYY-MM). */
+  coverageFirst?: string
+  coverageLatest?: string
 }
 
 // ─── AI Extraction with Classification ───────────────────────────────────

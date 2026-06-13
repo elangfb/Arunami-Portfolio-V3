@@ -33,6 +33,7 @@ import ProfitSharingPage from '@/pages/analyst/portfolio/ProfitSharingPage'
 
 // Investor
 import InvestorDashboard from '@/pages/investor/InvestorDashboard'
+import InvestorReportsPage from '@/pages/investor/InvestorReportsPage'
 import InvestorPortfolioLayout from '@/pages/investor/portfolio/InvestorPortfolioLayout'
 import InvestorOverviewPage from '@/pages/investor/portfolio/InvestorOverviewPage'
 import InvestorReturnsPage from '@/pages/investor/portfolio/InvestorReturnsPage'
@@ -134,6 +135,14 @@ export default function App() {
             element={
               <AuthGuard allowedRoles={['investor']}>
                 <InvestorDashboard />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/investor/reports"
+            element={
+              <AuthGuard allowedRoles={['investor']}>
+                <InvestorReportsPage />
               </AuthGuard>
             }
           />
