@@ -7,7 +7,8 @@ import { Bell, CheckCircle2, ExternalLink } from 'lucide-react'
 import { clearNotification } from '@/lib/firestore'
 import { toast } from 'sonner'
 import type { InvestorNotification } from '@/types'
-import { ALL_TIME_PERIOD, formatPeriod } from '@/lib/dateUtils'
+import { ALL_TIME_PERIOD } from '@/types'
+import { formatPeriod } from '@/lib/dateUtils'
 
 function periodLabel(n: InvestorNotification): string {
   if (n.period === ALL_TIME_PERIOD) return 'All-Time'

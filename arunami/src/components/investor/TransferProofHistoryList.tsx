@@ -7,7 +7,8 @@ import {
 } from '@/components/ui/dialog'
 import { FileImage, CheckCircle2, Inbox } from 'lucide-react'
 import type { InvestorNotification } from '@/types'
-import { ALL_TIME_PERIOD, formatPeriod } from '@/lib/dateUtils'
+import { ALL_TIME_PERIOD } from '@/types'
+import { formatPeriod } from '@/lib/dateUtils'
 import { formatCurrencyExact } from '@/lib/utils'
 
 function periodLabel(n: InvestorNotification): string {

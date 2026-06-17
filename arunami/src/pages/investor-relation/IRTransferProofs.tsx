@@ -10,7 +10,8 @@ import {
   deleteInvestorTransferProof,
 } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
-import { comparePeriods, formatPeriod, ALL_TIME_PERIOD } from '@/lib/dateUtils'
+import { comparePeriods, formatPeriod } from '@/lib/dateUtils'
+import { ALL_TIME_PERIOD } from '@/types'
 import { formatCurrencyCompact, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -290,8 +291,9 @@ function UploadProofDialog({
   const [preview, setPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const { register, handleSubmit, formState: { errors } } = useForm<ProofForm>({
-    resolver: zodResolver(proofSchema),
-    defaultValues: { amount: undefined as unknown as number, notes: '' },
+    // zod v4's Resolver generics + react-hook-form v7 don't fully line up
+    // when z.coerce is involved; cast keeps the form ergonomic.
+    resolver: zodResolver(proofSchema) as never,
   })
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
