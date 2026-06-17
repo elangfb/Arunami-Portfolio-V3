@@ -1,10 +1,11 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
-  updateDoc, deleteDoc, deleteField, query, where, serverTimestamp,
+  updateDoc, deleteDoc, deleteField, query, where, orderBy, serverTimestamp,
   writeBatch,
 } from 'firebase/firestore'
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { createUserWithEmailAndPassword, signOut } from 'firebase/auth'
-import { secondaryAuth, db } from './firebase'
+import { secondaryAuth, db, storage } from './firebase'
 import type {
   AppUser, Portfolio, FinancialData, PortfolioReport,
   ManagementReport, Note, TransferProof, InvestorAllocation,
@@ -13,6 +14,7 @@ import type {
   PortfolioConfig, InvestorCommunication,
   InvestorReportDoc, EquityChangeEntry,
   InvestorConfigUnion, ConfigChangeKind, ReturnModelType,
+  InvestorTransferProof, InvestorNotification,
 } from '@/types'
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -865,5 +867,170 @@ export async function unpublishAllTimeReport(params: {
     publishedAt: deleteField(),
     publishedBy: deleteField(),
     updatedAt: serverTimestamp(),
+  })
+}
+
+// ─── Bukti Transfer + Investor Notifications ─────────────────────────────
+//
+// IR uploads a screenshot → writes a doc in `investorTransferProofs` →
+// mirrors a doc into `investorNotifications` (cleared=false). Investor
+// dashboard shows a banner for uncleared ones; cleared ones remain
+// in the collection so the History tab can render the income trail.
+
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+function extOf(mime: string, name: string): string {
+  if (mime === 'image/png') return 'png'
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpg'
+  if (mime === 'image/webp') return 'webp'
+  const dot = name.lastIndexOf('.')
+  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : 'bin'
+}
+
+export interface CreateTransferProofInput {
+  investorUid: string
+  investorName: string
+  investorReport: InvestorReportDoc
+  amount: number
+  notes: string
+  file: File
+  uploadedBy: string
+  uploadedByName: string
+}
+
+export async function createInvestorTransferProof(
+  input: CreateTransferProofInput,
+): Promise<{ proofId: string; fileUrl: string }> {
+  if (!ALLOWED_IMAGE_TYPES.includes(input.file.type)) {
+    throw new Error('Tipe file tidak didukung. Gunakan PNG, JPG, atau WEBP.')
+  }
+  if (input.file.size > MAX_IMAGE_BYTES) {
+    throw new Error('Ukuran file melebihi 5 MB.')
+  }
+  if (!(input.amount > 0)) {
+    throw new Error('Nominal transfer harus lebih dari 0.')
+  }
+
+  const ext = extOf(input.file.type, input.file.name)
+  const safeReportId = input.investorReport.id.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const path = `transferProofs/${input.investorUid}/${safeReportId}/${Date.now()}.${ext}`
+  const ref = storageRef(storage, path)
+  await uploadBytes(ref, input.file, { contentType: input.file.type })
+  const fileUrl = await getDownloadURL(ref)
+
+  const proofId = `${input.investorReport.id}_${Date.now()}`
+  const proofData: Omit<InvestorTransferProof, 'id' | 'createdAt'> & {
+    createdAt: ReturnType<typeof serverTimestamp>
+  } = {
+    investorUid: input.investorUid,
+    investorName: input.investorName,
+    investorReportId: input.investorReport.id,
+    portfolioId: input.investorReport.portfolioId === '__accumulated__' ? null : input.investorReport.portfolioId,
+    portfolioName: input.investorReport.portfolioName,
+    period: input.investorReport.period,
+    amount: input.amount,
+    fileUrl,
+    fileName: input.file.name,
+    storagePath: path,
+    notes: input.notes.trim(),
+    uploadedBy: input.uploadedBy,
+    uploadedByName: input.uploadedByName,
+    createdAt: serverTimestamp(),
+  }
+
+  const message = buildProofMessage(input)
+
+  const batch = writeBatch(db)
+  const proofRef = doc(db, 'investorTransferProofs', proofId)
+  batch.set(proofRef, proofData)
+  const notifRef = doc(db, 'investorNotifications', `notif_${proofId}`)
+  batch.set(notifRef, {
+    investorUid: input.investorUid,
+    type: 'transfer_proof',
+    transferProofId: proofId,
+    investorReportId: input.investorReport.id,
+    portfolioName: input.investorReport.portfolioName,
+    period: input.investorReport.period,
+    amount: input.amount,
+    fileUrl,
+    message,
+    cleared: false,
+    createdAt: serverTimestamp(),
+  })
+  await batch.commit()
+
+  return { proofId, fileUrl }
+}
+
+function buildProofMessage(input: CreateTransferProofInput): string {
+  const formatted = `Rp ${input.amount.toLocaleString('id-ID')}`
+  const report = input.investorReport
+  const subject = report.scope === 'all_time'
+    ? 'laporan all-time'
+    : report.scope === 'accumulated'
+      ? 'laporan akumulasi'
+      : `laporan ${report.portfolioName}`
+  return `Bukti transfer ${formatted} untuk ${subject} telah dikirim.`
+}
+
+export async function getTransferProofsForInvestor(investorUid: string): Promise<InvestorTransferProof[]> {
+  const q = query(
+    collection(db, 'investorTransferProofs'),
+    where('investorUid', '==', investorUid),
+  )
+  const snap = await getDocs(q)
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as InvestorTransferProof)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+}
+
+export async function getAllTransferProofs(): Promise<InvestorTransferProof[]> {
+  const snap = await getDocs(collection(db, 'investorTransferProofs'))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as InvestorTransferProof)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+}
+
+export async function getTransferProofsForReport(investorReportId: string): Promise<InvestorTransferProof[]> {
+  const q = query(
+    collection(db, 'investorTransferProofs'),
+    where('investorReportId', '==', investorReportId),
+  )
+  const snap = await getDocs(q)
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as InvestorTransferProof)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+}
+
+export async function deleteInvestorTransferProof(proof: InvestorTransferProof): Promise<void> {
+  // Best-effort storage cleanup; ignore missing files.
+  try { await deleteObject(storageRef(storage, proof.storagePath)) } catch { /* noop */ }
+  const batch = writeBatch(db)
+  batch.delete(doc(db, 'investorTransferProofs', proof.id))
+  const notifSnap = await getDocs(query(
+    collection(db, 'investorNotifications'),
+    where('transferProofId', '==', proof.id),
+  ))
+  notifSnap.forEach(d => batch.delete(d.ref))
+  await batch.commit()
+}
+
+export async function getNotificationsForInvestor(
+  investorUid: string,
+): Promise<InvestorNotification[]> {
+  const q = query(
+    collection(db, 'investorNotifications'),
+    where('investorUid', '==', investorUid),
+    orderBy('createdAt', 'desc'),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorNotification)
+}
+
+export async function clearNotification(notificationId: string): Promise<void> {
+  await updateDoc(doc(db, 'investorNotifications', notificationId), {
+    cleared: true,
+    clearedAt: serverTimestamp(),
   })
 }

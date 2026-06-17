@@ -6,11 +6,12 @@ import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { ROLE_LABELS } from '@/lib/roles'
 import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
-import { TrendingUp, LogOut, UserCheck, Send } from 'lucide-react'
+import { TrendingUp, LogOut, UserCheck, Send, Receipt } from 'lucide-react'
 
 const navItems = [
   { to: '/investor-relation', label: 'Investor', icon: UserCheck, end: true },
   { to: '/investor-relation/reports', label: 'Review & Publishing', icon: Send, end: false },
+  { to: '/investor-relation/transfer-proofs', label: 'Bukti Transfer', icon: Receipt, end: false },
 ]
 
 export default function InvestorRelationLayout() {

@@ -10,7 +10,11 @@ import { ownershipFraction } from '@/lib/distributionStrategies'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight } from 'lucide-react'
+import TransferProofNotificationBanner from '@/components/investor/TransferProofNotificationBanner'
+import { useTransferProofNotifications } from '@/components/investor/useTransferProofNotifications'
+import TransferProofHistoryList from '@/components/investor/TransferProofHistoryList'
 import type { Portfolio, InvestorAllocation, InvestorReportDoc } from '@/types'
 
 export default function InvestorDashboard() {
@@ -20,6 +24,7 @@ export default function InvestorDashboard() {
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
   const [loading, setLoading] = useState(true)
+  const { notifications, reload: reloadNotifications } = useTransferProofNotifications(user?.uid)
 
   useEffect(() => {
     if (user) {
@@ -75,6 +80,12 @@ export default function InvestorDashboard() {
       </header>
 
       <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Bukti transfer alerts — only visible while uncleared ones exist. */}
+        <TransferProofNotificationBanner
+          notifications={notifications}
+          onChanged={reloadNotifications}
+        />
+
         {/* All-projects reports live on the dedicated "My Report" page. */}
         {hasAllProjectReports && (
           <Card
@@ -163,6 +174,18 @@ export default function InvestorDashboard() {
               )
             })}
           </div>
+        )}
+
+        {/* Income trail — full history of received transfer proofs. */}
+        {notifications.length > 0 && (
+          <Tabs defaultValue="history" className="mt-2">
+            <TabsList>
+              <TabsTrigger value="history">Riwayat Bukti Transfer</TabsTrigger>
+            </TabsList>
+            <TabsContent value="history">
+              <TransferProofHistoryList notifications={notifications} />
+            </TabsContent>
+          </Tabs>
         )}
       </main>
     </div>

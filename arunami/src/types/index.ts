@@ -585,6 +585,61 @@ export interface TransferProof {
   createdAt: Timestamp
 }
 
+// ─── Investor Transfer Proof (IR-published, links to a published report) ──
+//
+// Top-level collection: /investorTransferProofs/{id}
+// Created by Investor Relation when they send the investor a payout proof
+// screenshot. Each proof is tied to a specific published investorReports
+// doc (which may be per-portfolio, accumulated, or all_time).
+
+export interface InvestorTransferProof {
+  id: string
+  investorUid: string
+  investorName: string
+  /** Top-level investorReports doc id this proof is attached to. */
+  investorReportId: string
+  /** Denormalized for the IR/Investor list views; null for __accumulated__ reports. */
+  portfolioId: string | null
+  portfolioName: string
+  /** "YYYY-MM" or "YYYY-Qn" or "ALL_TIME". */
+  period: string
+  amount: number
+  fileUrl: string
+  fileName: string
+  storagePath: string
+  notes: string
+  uploadedBy: string
+  uploadedByName: string
+  createdAt: Timestamp
+}
+
+// ─── Investor Notification (in-app alert, manual clear) ───────────────────
+//
+// Top-level collection: /investorNotifications/{id}
+// Created whenever IR sends a transfer proof. The investor sees a banner
+// until they mark it read (cleared). Cleared notifications stay in the
+// collection so the History tab can show the income trail.
+
+export type InvestorNotificationType = 'transfer_proof'
+
+export interface InvestorNotification {
+  id: string
+  investorUid: string
+  type: InvestorNotificationType
+  /** Linked proof doc id (for transfer_proof type). */
+  transferProofId: string
+  /** Denormalized for display; avoids a join on the history tab. */
+  investorReportId: string
+  portfolioName: string
+  period: string
+  amount: number
+  fileUrl: string
+  message: string
+  cleared: boolean
+  clearedAt?: Timestamp
+  createdAt: Timestamp
+}
+
 // ─── Investor CRM ────────────────────────────────────────────────────────
 
 export type CommunicationType = 'report' | 'custom_message'

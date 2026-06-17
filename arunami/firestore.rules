@@ -191,5 +191,34 @@ service cloud.firestore {
       allow create, update: if isStaff() || isInvestorRelation();
       allow delete: if isAdmin();
     }
+
+    // ─── Bukti Transfer (IR sends payout screenshots to investors) ───────
+    // Top-level so IR + admin can list everything; investors only see their
+    // own via a constrained `where('investorUid','==', request.auth.uid)`.
+    match /investorTransferProofs/{proofId} {
+      allow read: if canViewInvestorDomain() ||
+        (isInvestor() && resource.data.investorUid == request.auth.uid);
+      allow list: if canViewInvestorDomain() ||
+        (isInvestor() && request.query.limit <= 200);
+      allow create, update: if isStaff() || isInvestorRelation();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Investor Notifications (in-app alerts) ──────────────────────────
+    // Investor clears via `cleared` flip on their own doc.
+    match /investorNotifications/{notifId} {
+      allow read: if canViewInvestorDomain() ||
+        (isInvestor() && resource.data.investorUid == request.auth.uid);
+      allow list: if canViewInvestorDomain() ||
+        (isInvestor() && request.query.limit <= 200);
+      allow create: if isStaff() || isInvestorRelation();
+      // Only the investor who owns the notification may flip `cleared`.
+      // Staff/IR update other fields (e.g. message correction) on their own.
+      allow update: if (isInvestor() && resource.data.investorUid == request.auth.uid &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['cleared', 'clearedAt']))
+                    || isStaff() || isInvestorRelation();
+      allow delete: if isAdmin();
+    }
   }
 }

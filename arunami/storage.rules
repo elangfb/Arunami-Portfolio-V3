@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isStaff() {
+      return isSignedIn() && (userDoc().role == 'admin' || userDoc().role == 'analyst');
+    }
+
+    function isInvestorRelation() {
+      return isSignedIn() && userDoc().role == 'investor_relation';
+    }
+
+    function isInvestor() {
+      return isSignedIn() && userDoc().role == 'investor';
+    }
+
+    // Bukti Transfer screenshots. Path: transferProofs/{investorUid}/{reportId}/{file}
+    // Staff/IR may write; the targeted investor may read their own.
+    match /transferProofs/{investorUid}/{reportId}/{fileName} {
+      allow read: if isStaff() || isInvestorRelation() ||
+        (isInvestor() && request.auth.uid == investorUid);
+      allow write: if (isStaff() || isInvestorRelation()) &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+  }
+}

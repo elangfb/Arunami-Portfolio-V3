@@ -46,6 +46,7 @@ import InvestorRelationLayout from '@/pages/investor-relation/InvestorRelationLa
 import IRInvestors from '@/pages/investor-relation/IRInvestors'
 import IRInvestorDetail from '@/pages/investor-relation/IRInvestorDetail'
 import IRReporting from '@/pages/investor-relation/IRReporting'
+import IRTransferProofs from '@/pages/investor-relation/IRTransferProofs'
 
 function RootRedirect() {
   const { user, loading } = useAuthStore()
@@ -126,6 +127,7 @@ export default function App() {
           >
             <Route index element={<IRInvestors />} />
             <Route path="reports" element={<IRReporting />} />
+            <Route path="transfer-proofs" element={<IRTransferProofs />} />
             <Route path="investors/:uid" element={<IRInvestorDetail />} />
           </Route>
 
