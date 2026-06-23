@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Local planning / progress tracking (not for the repo)
+GRACE_PERIOD_PLAN.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

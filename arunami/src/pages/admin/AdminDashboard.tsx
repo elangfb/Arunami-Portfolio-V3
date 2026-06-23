@@ -99,7 +99,14 @@ export default function AdminDashboard() {
                   <div key={p.id} className="flex items-center justify-between rounded-lg border p-3">
                     <div>
                       <p className="font-medium text-sm">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.code} · {p.stage}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.code} · {p.stage}
+                        {p.isGracePeriod && (
+                          <span className="ml-2 font-medium text-amber-600">
+                            · Grace{p.graceConfig?.returnMode === 'fixed_yield' ? ' (Yield)' : ''}
+                          </span>
+                        )}
+                      </p>
                     </div>
                     <span className="text-xs text-muted-foreground">{p.assignedInvestors.length} investor</span>
                   </div>

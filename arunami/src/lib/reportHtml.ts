@@ -5,7 +5,7 @@ import type { DistributionResult } from './distributionStrategies'
 import type {
   Portfolio, PortfolioConfig, PnLExtractedData, ProjectionExtractedData,
   ManagementReport, Note, InvestorAllocation, InvestorConfigUnion,
-  OpexItem, CustomSubItem,
+  OpexItem, CustomSubItem, ReturnModelType,
 } from '@/types'
 import type { AllTimeReportSummary } from './allTimeReport'
 
@@ -414,6 +414,14 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
     arunamiFeePercent: 0,
   }
 
+  // Grace period overrides the portfolio's post-grace model for this report:
+  // the distribution (if any) is the grace return, and the model used to render
+  // the KPI/distribution blocks is the grace return mode, not modelType.
+  const isGrace = portfolio.isGracePeriod === true
+  const graceMode = portfolio.graceConfig?.returnMode ?? 'none'
+  const effectiveModel: ReturnModelType =
+    isGrace && graceMode === 'fixed_yield' ? 'fixed_yield' : modelType
+
   // Calculate distribution using the strategy pattern
   let distributionResult: DistributionResult | null = null
   let investorKpiBlock = ''
@@ -437,18 +445,37 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
       scheduleMonths: constituentMonths,
     })
 
-    if (latestPnl || ['fixed_yield', 'fixed_schedule', 'annual_dividend'].includes(modelType)) {
-      investorKpiBlock = buildKpiBlock(distributionResult, allocation, modelType, monthsInPeriod)
+    const shouldShowDistribution = isGrace
+      ? graceMode === 'fixed_yield'
+      : !!latestPnl || ['fixed_yield', 'fixed_schedule', 'annual_dividend'].includes(modelType)
+
+    if (shouldShowDistribution) {
+      investorKpiBlock = buildKpiBlock(distributionResult, allocation, effectiveModel, monthsInPeriod)
       distributionSection = buildDistributionSection(
-        modelType, distributionResult, investorConfig, allocation, formatPeriod(period),
+        effectiveModel, distributionResult, investorConfig, allocation, formatPeriod(period),
       )
     }
   }
 
+  // Grace context banner (replaces the "no PnL" note, which is expected in grace).
+  const graceNoticeSection = isGrace ? `
+    <div style="border:1px solid #fcd34d;background:#fffbeb;border-radius:8px;padding:12px 16px;margin:12px 0">
+      <p style="margin:0;font-weight:600;color:#92400e">Proyek dalam Masa Grace Period</p>
+      <p style="margin:4px 0 0;font-size:13px;color:#b45309">
+        ${graceMode === 'fixed_yield'
+          ? 'Selama masa grace period, investor menerima fixed yield dari modal sebagaimana dirinci di bawah. Laporan PnL penuh akan tersedia setelah proyek mulai beroperasi.'
+          : 'Selama masa grace period belum ada distribusi bagi hasil. Laporan ini bersifat informatif mengenai perkembangan proyek.'}
+        ${portfolio.graceConfig?.expectedOperationalDate
+          ? ` Estimasi mulai operasional: ${portfolio.graceConfig.expectedOperationalDate}.`
+          : ''}
+      </p>
+    </div>
+  ` : ''
+
   // Three-column comparison table: current period / previous period / projection.
   // Replaces the legacy single-column "Laporan Keuangan" + "Struktur Biaya" sections.
   const periodNoun = isQuarterly ? 'Kuartal' : 'Bulan'
-  const pnlSection = latestPnl ? `
+  const pnlSection = isGrace ? '' : latestPnl ? `
     <h2>Laporan Keuangan — ${formatPeriod(latestPnl.period)}</h2>
     <table class="data">
       <tr>
@@ -497,7 +524,7 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
       .join('')}
   ` : ''
 
-  const content = `${investorKpiBlock}${summarySection}${pnlSection}${distributionSection}${issuesSection}${actionsSection}${mediaSection}${notesSection}`
+  const content = `${graceNoticeSection}${investorKpiBlock}${summarySection}${pnlSection}${distributionSection}${issuesSection}${actionsSection}${mediaSection}${notesSection}`
 
   const line: AccumulatedReportLine | null = (allocation && distributionResult) ? {
     portfolioName: portfolio.name,

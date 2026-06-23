@@ -148,7 +148,7 @@ export default function AnalystDashboard() {
                   <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                     <span>{p.assignedInvestors.length} investor</span>
                     {p.isGracePeriod
-                      ? <Badge variant="warning">Grace</Badge>
+                      ? <Badge variant="warning">Grace · {p.graceConfig?.returnMode === 'fixed_yield' ? 'Yield' : 'Tanpa payout'}</Badge>
                       : <span>—</span>}
                   </div>
                 </CardContent>
@@ -201,7 +201,7 @@ export default function AnalystDashboard() {
                       </td>
                       <td className="px-3 py-3 align-middle text-center">
                         {p.isGracePeriod
-                          ? <Badge variant="warning">Grace</Badge>
+                          ? <Badge variant="warning">Grace · {p.graceConfig?.returnMode === 'fixed_yield' ? 'Yield' : 'Tanpa payout'}</Badge>
                           : <span className="text-muted-foreground">—</span>}
                       </td>
                     </tr>

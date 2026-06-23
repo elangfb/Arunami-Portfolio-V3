@@ -93,7 +93,11 @@ export default function InvestorPortfolioLayout() {
     })()
   }, [id, user])
 
+  // Grace projects slim to just the report too: the operational pages have no
+  // PnL data yet, and the grace report already carries the management summary,
+  // notes, and any fixed-yield return.
   const isFixed = isFixedReturnModel(portfolioConfig?.returnModel)
+  const slimNav = isFixed || portfolio?.isGracePeriod === true
 
   const monthlyReports = useMemo(
     () => publishedReports.filter(r => (r.reportType ?? 'monthly') === 'monthly'),
@@ -130,19 +134,19 @@ export default function InvestorPortfolioLayout() {
     }
   }, [availablePeriods, selectedPeriod])
 
-  // For fixed-return projects, redirect away from any hidden operational page.
+  // For fixed-return AND grace projects, redirect away from hidden operational pages.
   useEffect(() => {
-    if (!configLoaded || !id || !isFixed) return
+    if (!configLoaded || !id || !slimNav) return
     const sub = location.pathname.split(`/investor/portfolios/${id}/`)[1] ?? ''
     const segment = sub.split('/')[0] ?? ''
     if (segment && !FIXED_RETURN_VISIBLE_ROUTES.has(segment)) {
       navigate(`/investor/portfolios/${id}/report`, { replace: true })
     }
-  }, [configLoaded, isFixed, id, location.pathname, navigate])
+  }, [configLoaded, slimNav, id, location.pathname, navigate])
 
   const filteredNavGroups = useMemo(
-    () => (isFixed ? navGroups.filter(g => g.label === 'Laporan') : navGroups),
-    [isFixed],
+    () => (slimNav ? navGroups.filter(g => g.label === 'Laporan') : navGroups),
+    [slimNav],
   )
 
   const handleLogout = async () => {

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { toast } from 'sonner'
 import {
-  getPortfolioConfig, getEquityHistory,
+  getPortfolioConfig, getEquityHistory, updatePortfolio,
 } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatPeriod, getNextReportingPeriod } from '@/lib/dateUtils'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle } from 'lucide-react'
@@ -64,6 +66,69 @@ function ModelSection({
   }
 }
 
+function GracePeriodCard({ portfolio, portfolioId }: { portfolio: Portfolio; portfolioId: string }) {
+  const [confirming, setConfirming] = useState(false)
+  const [ending, setEnding] = useState(false)
+  const mode = portfolio.graceConfig?.returnMode ?? 'none'
+
+  const endGrace = async () => {
+    setEnding(true)
+    try {
+      await updatePortfolio(portfolioId, { isGracePeriod: false })
+      toast.success('Grace period diakhiri. Portofolio kini aktif.')
+      // Reload so the layout re-fetches the portfolio and unlocks the
+      // PnL / analysis tabs that were hidden during grace.
+      window.location.reload()
+    } catch (e) {
+      console.error('Failed to end grace period', e)
+      toast.error('Gagal mengakhiri grace period.')
+      setEnding(false)
+    }
+  }
+
+  return (
+    <Card className="border-amber-300 bg-amber-50">
+      <CardContent className="space-y-3 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold text-amber-900">Portofolio dalam Grace Period</p>
+            <p className="text-sm text-amber-700">
+              Return selama grace:{' '}
+              {mode === 'fixed_yield'
+                ? `Fixed yield ${portfolio.graceConfig?.fixedYieldPercent ?? 0}% / bulan`
+                : 'Tidak ada payout (laporan informatif)'}
+              {portfolio.graceConfig?.expectedOperationalDate
+                ? ` · Estimasi operasional: ${portfolio.graceConfig.expectedOperationalDate}`
+                : ''}
+            </p>
+          </div>
+          <Badge variant="warning">Grace</Badge>
+        </div>
+        {!confirming ? (
+          <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
+            Akhiri Grace Period
+          </Button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-amber-800">
+              Setelah diakhiri: tab PnL &amp; analisis terbuka, dan distribusi mengikuti model
+              portofolio yang dikonfigurasi. Tindakan ini bisa diubah kembali oleh admin bila perlu.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="destructive" size="sm" disabled={ending} onClick={endGrace}>
+                {ending ? 'Memproses...' : 'Ya, akhiri grace period'}
+              </Button>
+              <Button variant="ghost" size="sm" disabled={ending} onClick={() => setConfirming(false)}>
+                Batal
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function ProfitSharingPage() {
   const { portfolio, portfolioId } = useOutletContext<Context>()
   const { user } = useAuthStore()
@@ -107,6 +172,10 @@ export default function ProfitSharingPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto text-black">
+      {portfolio?.isGracePeriod && portfolioId && (
+        <GracePeriodCard portfolio={portfolio} portfolioId={portfolioId} />
+      )}
+
       <div>
         <h2 className="text-xl font-bold text-black">Profit Sharing Management</h2>
         <p className="text-sm text-black mt-1">

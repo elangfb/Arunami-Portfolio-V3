@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useParams, useNavigate, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { NavLink, Outlet, useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
@@ -13,6 +13,13 @@ import {
   DollarSign, Users, ClipboardList, StickyNote, Send,
   ChevronLeft, LogOut, PieChart, Scale,
 } from 'lucide-react'
+
+// Tabs hidden while a portfolio is in grace period: the PnL/Projection uploads
+// and every page that derives purely from that financial data (which would be
+// empty until the first real PnL is uploaded after grace ends).
+const GRACE_HIDDEN_TABS = ['overview', 'revenue', 'costs', 'pnl', 'projections']
+// Where to land when grace hides the default 'overview' tab.
+const GRACE_LANDING_TAB = 'management'
 
 const navGroups = [
   {
@@ -55,12 +62,33 @@ const navGroups = [
 export default function AnalystPortfolioLayout() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, setUser } = useAuthStore()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
 
   useEffect(() => {
     if (id) getPortfolio(id).then(setPortfolio)
   }, [id])
+
+  const isGrace = portfolio?.isGracePeriod === true
+
+  // During grace, drop the PnL-related tabs (and any group left empty).
+  const visibleNavGroups = useMemo(() => {
+    if (!isGrace) return navGroups
+    return navGroups
+      .map(group => ({ ...group, items: group.items.filter(item => !GRACE_HIDDEN_TABS.includes(item.to)) }))
+      .filter(group => group.items.length > 0)
+  }, [isGrace])
+
+  // If grace hides the tab the user landed on (incl. the default 'overview'
+  // index redirect), bounce them to a visible tab instead of a blank page.
+  useEffect(() => {
+    if (!isGrace || !id) return
+    const sub = location.pathname.split(`/analyst/portfolios/${id}/`)[1]?.split('/')[0] ?? ''
+    if (sub === '' || GRACE_HIDDEN_TABS.includes(sub)) {
+      navigate(`/analyst/portfolios/${id}/${GRACE_LANDING_TAB}`, { replace: true })
+    }
+  }, [isGrace, id, location.pathname, navigate])
 
   const handleLogout = async () => {
     await signOut(auth); setUser(null)
@@ -87,7 +115,7 @@ export default function AnalystPortfolioLayout() {
 
       {/* Nav */}
       <div className="flex-1 overflow-y-auto py-4 space-y-4">
-        {navGroups.map(group => (
+        {visibleNavGroups.map(group => (
           <div key={group.label} className="px-3">
             <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6b7280]">{group.label}</p>
             <div className="space-y-0.5">

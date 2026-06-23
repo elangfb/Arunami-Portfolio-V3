@@ -418,10 +418,34 @@ export const DISTRIBUTION_STRATEGIES: Record<ReturnModelType, DistributionStrate
 }
 
 export function calculateDistribution(input: DistributionInput): DistributionResult {
+  // Grace period overrides the configured return model. A project that has not
+  // produced PnL yet pays only its grace return — a fixed yield on principal,
+  // or nothing — and never reaches a PnL-based strategy (which could otherwise
+  // publish a profit share before any profit exists).
+  if (input.portfolio.isGracePeriod) {
+    const grace = input.portfolio.graceConfig
+    if (grace?.returnMode === 'fixed_yield') {
+      const graceConfig: FixedYieldConfig = {
+        type: 'fixed_yield',
+        investorSharePercent: 0,
+        arunamiFeePercent: grace.arunamiFeePercent ?? 0,
+        fixedYieldPercent: grace.fixedYieldPercent ?? 0,
+        principalReference: grace.principalReference ?? 'invested_amount',
+      }
+      return fixedYieldStrategy.calculate({ ...input, config: graceConfig })
+    }
+    return emptyResult('Grace Period — Tanpa Payout')
+  }
+
   const strategy =
     DISTRIBUTION_STRATEGIES[input.config.type] ??
     DISTRIBUTION_STRATEGIES.net_profit_share
   return strategy.calculate(input)
+}
+
+/** True when a grace-period portfolio still pays investors (fixed yield). */
+export function gracePaysReturn(portfolio: Portfolio): boolean {
+  return portfolio.isGracePeriod && portfolio.graceConfig?.returnMode === 'fixed_yield'
 }
 
 /** Model metadata for UI (setup wizard model selector, etc.) */

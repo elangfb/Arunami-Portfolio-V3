@@ -117,8 +117,89 @@ export default function StepInvestorModel({ form }: Props) {
         </div>
 
         <ModelPicker form={form} />
+
+        <GracePeriodFields form={form} />
       </CardContent>
     </Card>
+  )
+}
+
+// ─── Grace Period ──────────────────────────────────────────────────────────
+
+function GracePeriodFields({ form }: { form: UseFormReturn<WizardFormData> }) {
+  const { register, watch, setValue } = form
+  const graceReturnMode = (watch('graceReturnMode') ?? 'none') as 'none' | 'fixed_yield'
+  const gracePrincipalRef = watch('gracePrincipalReference') ?? 'invested_amount'
+
+  return (
+    <div className="space-y-4 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+      <div>
+        <Label className="text-sm font-semibold text-amber-900">Masa Grace Period</Label>
+        <p className="text-xs text-amber-700">
+          Portofolio baru dimulai dalam grace period (belum ada PnL). Tentukan apa yang
+          diterima investor selama masa ini. Grace period diakhiri secara manual.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Return Selama Grace Period</Label>
+        <Select
+          value={graceReturnMode}
+          onValueChange={(v) => setValue('graceReturnMode', v as 'none' | 'fixed_yield')}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Tidak ada payout (laporan informatif saja)</SelectItem>
+            <SelectItem value="fixed_yield">Fixed yield dari modal (dibayar tiap bulan)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {graceReturnMode === 'fixed_yield' && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="graceFixedYieldPercent">Fixed Yield per Bulan (%) *</Label>
+            <Input
+              id="graceFixedYieldPercent"
+              type="number"
+              step="0.01"
+              placeholder="1.5"
+              {...register('graceFixedYieldPercent', { valueAsNumber: true })}
+            />
+            <p className="text-xs text-muted-foreground">Persentase dari modal per bulan selama grace.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Basis Perhitungan</Label>
+            <Select value={gracePrincipalRef} onValueChange={(v) => setValue('gracePrincipalReference', v as 'invested_amount' | 'investasi_awal')}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="invested_amount">Per Investor (Invested Amount)</SelectItem>
+                <SelectItem value="investasi_awal">Total Investasi Awal Portofolio</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="graceArunamiFeePercent">Arunami Fee (%)</Label>
+            <Input
+              id="graceArunamiFeePercent"
+              type="number"
+              placeholder="0"
+              {...register('graceArunamiFeePercent', { valueAsNumber: true })}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label htmlFor="graceExpectedOperationalDate">Estimasi Mulai Operasional (opsional)</Label>
+        <Input
+          id="graceExpectedOperationalDate"
+          placeholder="2026-12 atau Q4 2026"
+          {...register('graceExpectedOperationalDate')}
+        />
+        <p className="text-xs text-muted-foreground">Ditampilkan ke investor sebagai perkiraan kapan return mulai.</p>
+      </div>
+    </div>
   )
 }
 

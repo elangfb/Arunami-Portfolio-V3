@@ -11,7 +11,7 @@ import { INDUSTRY_PRESETS } from '@/lib/industryPresets'
 import type {
   IndustryType, ReturnModelType, ReportingFrequency,
   RevenueCategory, KpiMetric, InvestorConfigUnion,
-  ScheduledPayment, CustomVariable,
+  ScheduledPayment, CustomVariable, GraceConfig,
 } from '@/types'
 
 import StepIndicator from './StepIndicator'
@@ -99,6 +99,14 @@ const wizardSchema = z.object({
   customVariables: z.array(customVariableSchema).optional(),
   formula: z.string().optional(),
   distributionFrequency: z.enum(['bulanan', 'kuartalan', 'semesteran', 'custom']).optional(),
+
+  // Grace period — every new portfolio starts in grace until the first PnL.
+  // Configures what investors receive while no PnL exists.
+  graceReturnMode: z.enum(['none', 'fixed_yield']).default('none'),
+  graceFixedYieldPercent: optionalNumber(0),
+  gracePrincipalReference: z.enum(['invested_amount', 'investasi_awal']).optional(),
+  graceArunamiFeePercent: optionalNumber(0),
+  graceExpectedOperationalDate: z.string().optional(),
 })
 
 export type WizardFormData = z.infer<typeof wizardSchema>
@@ -225,6 +233,8 @@ export default function PortfolioSetupWizard() {
       scheduledPayments: [],
       customVariables: [],
       distributionFrequency: 'bulanan',
+      graceReturnMode: 'none',
+      gracePrincipalReference: 'invested_amount',
     },
     mode: 'onBlur',
   })
@@ -296,6 +306,23 @@ export default function PortfolioSetupWizard() {
     try {
       const data = form.getValues()
 
+      const graceConfig: GraceConfig = data.graceReturnMode === 'fixed_yield'
+        ? {
+            returnMode: 'fixed_yield',
+            fixedYieldPercent: data.graceFixedYieldPercent ?? 0,
+            principalReference: data.gracePrincipalReference ?? 'invested_amount',
+            arunamiFeePercent: data.graceArunamiFeePercent ?? 0,
+            ...(data.graceExpectedOperationalDate
+              ? { expectedOperationalDate: data.graceExpectedOperationalDate }
+              : {}),
+          }
+        : {
+            returnMode: 'none',
+            ...(data.graceExpectedOperationalDate
+              ? { expectedOperationalDate: data.graceExpectedOperationalDate }
+              : {}),
+          }
+
       const portfolioId = await createPortfolio({
         name: data.name,
         brandName: data.brandName,
@@ -306,6 +333,7 @@ export default function PortfolioSetupWizard() {
         description: data.description ?? '',
         industryType: data.industryType as IndustryType,
         isGracePeriod: true,
+        graceConfig,
         assignedInvestors: [],
         assignedAnalysts: [],
       })

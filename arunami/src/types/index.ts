@@ -176,6 +176,21 @@ export interface AppUser {
 
 // ─── Portfolio ─────────────────────────────────────────────────────────────
 
+/**
+ * What investors receive while a portfolio is in grace period (no PnL yet).
+ * `none`        → no payout this period (informational reports only).
+ * `fixed_yield` → guaranteed % of principal, paid every period (no PnL needed);
+ *                 reuses the fixed_yield distribution strategy.
+ */
+export interface GraceConfig {
+  returnMode: 'none' | 'fixed_yield'
+  fixedYieldPercent?: number
+  principalReference?: 'invested_amount' | 'investasi_awal'
+  arunamiFeePercent?: number
+  /** Display-only target (grace exit is manual, this is not a trigger). */
+  expectedOperationalDate?: string
+}
+
 export interface Portfolio {
   id: string
   name: string
@@ -187,6 +202,8 @@ export interface Portfolio {
   description: string
   industryType: IndustryType
   isGracePeriod: boolean
+  /** Present when isGracePeriod; defaults to { returnMode: 'none' } if omitted. */
+  graceConfig?: GraceConfig
   assignedInvestors: string[]
   assignedAnalysts: string[]
   createdAt: Timestamp

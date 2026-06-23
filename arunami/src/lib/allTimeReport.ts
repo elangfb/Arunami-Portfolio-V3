@@ -96,12 +96,16 @@ export function computeAllTimeReport(args: {
     // Months this portfolio has a P&L for.
     const pnlMonths = new Set(src.pnlReports.map(r => r.period).filter(Boolean))
 
-    // Published months relevant to this portfolio = accumulated ∪ its own,
-    // then restricted to months it actually has data for.
+    // Published months relevant to this portfolio = accumulated ∪ its own.
+    // Normally restricted to months that actually have a P&L — but a grace
+    // project has no P&L, so its published grace months count directly
+    // (otherwise a fixed-yield grace payout would be dropped from all-time).
+    const isGrace = portfolio.isGracePeriod === true
     const candidate = new Set<string>(accumulatedMonths)
     const own = portfolioMonths.get(allocation.portfolioId)
     if (own) for (const m of own) candidate.add(m)
-    const months = [...candidate].filter(m => pnlMonths.has(m)).sort(comparePeriods)
+    const months = (isGrace ? [...candidate] : [...candidate].filter(m => pnlMonths.has(m)))
+      .sort(comparePeriods)
     if (months.length === 0) continue
 
     const modelType = src.config?.investorConfig?.type ?? 'percentage_based'
@@ -114,7 +118,19 @@ export function computeAllTimeReport(args: {
     const byPeriod: AllTimePeriodLine[] = []
     let cumulativeEarnings = 0
 
-    if (modelType === 'annual_dividend') {
+    if (isGrace) {
+      // Grace distribution is the grace return (fixed yield or none), per month,
+      // independent of the post-grace model. calculateDistribution is grace-aware.
+      for (const m of months) {
+        const res = calculateDistribution({
+          reportData: null, config: investorConfig, allocation, portfolio, isArunamiTeam, monthsInPeriod: 1,
+        })
+        if (res.perInvestorAmount !== 0) {
+          cumulativeEarnings += res.perInvestorAmount
+          byPeriod.push({ period: m, netProfit: 0, earnings: res.perInvestorAmount, roi: res.roiPercent })
+        }
+      }
+    } else if (modelType === 'annual_dividend') {
       // The declared dividend is per-year; calling per month would multiply it.
       // Sum once per distinct year among the published months.
       const years = [...new Set(months.map(m => m.split('-')[0]))].sort()

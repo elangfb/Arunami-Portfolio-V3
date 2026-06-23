@@ -92,9 +92,16 @@ export default function PublishingPage() {
   useEffect(() => { refreshExisting() }, [portfolioId, selectedPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const availableMonths = useMemo(
-    () => [...new Set([...pnlReports, ...projReports].map(r => r.period))]
-      .sort((a, b) => comparePeriods(b, a)),
-    [pnlReports, projReports],
+    () => {
+      const periods = [...pnlReports, ...projReports].map(r => r.period)
+      // During grace there are no PnL/projection uploads, so the publishable
+      // periods come from the monthly Management Reports instead.
+      if (portfolio?.isGracePeriod) {
+        for (const m of mgmtReports) if (m.period) periods.push(m.period)
+      }
+      return [...new Set(periods)].sort((a, b) => comparePeriods(b, a))
+    },
+    [pnlReports, projReports, mgmtReports, portfolio?.isGracePeriod],
   )
 
   const availableQuarters = useMemo(
@@ -310,7 +317,9 @@ export default function PublishingPage() {
 
       {availablePeriods.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-muted-foreground">
-          Belum ada data P&amp;L atau proyeksi untuk dipublikasikan.
+          {portfolio?.isGracePeriod
+            ? 'Belum ada Management Report untuk dipublikasikan. Upload Management Report terlebih dahulu untuk menerbitkan laporan grace period.'
+            : 'Belum ada data P&L atau proyeksi untuk dipublikasikan.'}
         </CardContent></Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[280px_1fr]">

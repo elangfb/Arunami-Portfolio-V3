@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   getAllUsers, getAllAllocations, getPublishedInvestorReports,
   createInvestorTransferProof, getTransferProofsForReport,
-  deleteInvestorTransferProof, getAllTransferProofs,
+  deleteInvestorTransferProof, getAllTransferProofs, getAllPortfolios,
 } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { comparePeriods, formatPeriod } from '@/lib/dateUtils'
@@ -62,12 +62,20 @@ export default function IRTransferProofs() {
   const [investorLoading, setInvestorLoading] = useState(false)
 
   const [uploadTarget, setUploadTarget] = useState<InvestorReportDoc | null>(null)
+  // Portfolio-scoped grace reports with no payout ('none') are informational —
+  // there's no money transfer to prove, so the proof action is disabled for them.
+  const [graceNoPayoutPortfolios, setGraceNoPayoutPortfolios] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     ;(async () => {
-      const [users, allocations, proofs] = await Promise.all([
-        getAllUsers(), getAllAllocations(), getAllTransferProofs(),
+      const [users, allocations, proofs, portfolios] = await Promise.all([
+        getAllUsers(), getAllAllocations(), getAllTransferProofs(), getAllPortfolios(),
       ])
+      setGraceNoPayoutPortfolios(new Set(
+        portfolios
+          .filter(p => p.isGracePeriod && (p.graceConfig?.returnMode ?? 'none') === 'none')
+          .map(p => p.id),
+      ))
       const investors = users.filter(u => u.role === 'investor')
       const byInvestor = new Map<string, InvestorAllocation[]>()
       for (const a of allocations) {
@@ -306,6 +314,9 @@ export default function IRTransferProofs() {
                 <tbody className="divide-y">
                   {reports.map(r => {
                     const proofs = proofsByReport[r.id] ?? []
+                    const isGraceNoPayout =
+                      r.scope !== 'accumulated' && r.scope !== 'all_time' &&
+                      graceNoPayoutPortfolios.has(r.portfolioId)
                     return (
                       <tr key={r.id} className="hover:bg-muted/30 align-top">
                         <td className="py-2.5 px-3 font-medium">{periodLabel(r)}</td>
@@ -341,9 +352,15 @@ export default function IRTransferProofs() {
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <Button size="sm" onClick={() => setUploadTarget(r)}>
-                            <Upload className="mr-1.5 h-3.5 w-3.5" />Kirim Bukti
-                          </Button>
+                          {isGraceNoPayout ? (
+                            <span className="text-xs text-muted-foreground" title="Laporan grace period informatif — tidak ada payout">
+                              Tanpa payout (grace)
+                            </span>
+                          ) : (
+                            <Button size="sm" onClick={() => setUploadTarget(r)}>
+                              <Upload className="mr-1.5 h-3.5 w-3.5" />Kirim Bukti
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     )

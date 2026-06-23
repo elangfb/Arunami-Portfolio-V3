@@ -104,7 +104,26 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
 
         const publishedSet = publishedByPortfolio.get(allocation.portfolioId) ?? new Set<string>()
 
-        if (financial && config?.investorConfig && ptf && publishedSet.size > 0) {
+        if (ptf?.isGracePeriod && config?.investorConfig && publishedSet.size > 0) {
+          // Grace: earnings are the grace return (fixed yield or none) per
+          // published month — no PnL exists. calculateDistribution is grace-aware.
+          // The grace return per month is constant (fixed yield on principal, or
+          // nothing) — so cumulative = per-month × published months.
+          const result = calculateDistribution({
+            reportData: null,
+            config: config.investorConfig!,
+            allocation,
+            portfolio: ptf,
+            isArunamiTeam: user?.isArunamiTeam,
+          })
+          totalEarnings += result.perInvestorAmount * publishedSet.size
+          const latestPeriod = [...publishedSet].sort(comparePeriods).at(-1)
+          if (latestPeriod) {
+            earnings = result.perInvestorAmount
+            monthlyROI = result.roiPercent
+            periodLabel = formatPeriod(latestPeriod)
+          }
+        } else if (financial && config?.investorConfig && ptf && publishedSet.size > 0) {
           const earningFor = (period: string, revenue: number, profit: number) =>
             calculateDistribution({
               reportData: { period, revenue, netProfit: profit, grossProfit: 0 },
