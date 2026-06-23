@@ -37,6 +37,7 @@ import InvestorReportsPage from '@/pages/investor/InvestorReportsPage'
 import InvestorPortfolioLayout from '@/pages/investor/portfolio/InvestorPortfolioLayout'
 import InvestorOverviewPage from '@/pages/investor/portfolio/InvestorOverviewPage'
 import InvestorReturnsPage from '@/pages/investor/portfolio/InvestorReturnsPage'
+import InvestorBagiHasilResumePage from '@/pages/investor/portfolio/InvestorBagiHasilResumePage'
 import InvestorReportPage from '@/pages/investor/portfolio/InvestorReportPage'
 import InvestorManagementPage from '@/pages/investor/portfolio/InvestorManagementPage'
 import InvestorNotesPage from '@/pages/investor/portfolio/InvestorNotesPage'
@@ -161,6 +162,7 @@ export default function App() {
             <Route path="revenue" element={<RevenuePage />} />
             <Route path="costs" element={<CostsPage />} />
             <Route path="returns" element={<InvestorReturnsPage />} />
+            <Route path="resume" element={<InvestorBagiHasilResumePage />} />
             <Route path="management" element={<InvestorManagementPage />} />
             <Route path="notes" element={<InvestorNotesPage />} />
             <Route path="report" element={<InvestorReportPage />} />

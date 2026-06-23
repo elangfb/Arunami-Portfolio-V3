@@ -14,7 +14,7 @@ import type {
   PortfolioConfig, InvestorCommunication,
   InvestorReportDoc, EquityChangeEntry,
   InvestorConfigUnion, ConfigChangeKind, ReturnModelType,
-  InvestorTransferProof, InvestorNotification,
+  InvestorTransferProof, InvestorNotification, BagiHasilManualEntry,
 } from '@/types'
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -159,6 +159,14 @@ export async function savePortfolioConfig(portfolioId: string, config: Omit<Port
     ...config,
     createdAt: serverTimestamp(),
   })
+}
+
+/** Patch a few fields on the live config doc without rewriting the whole thing. */
+export async function updatePortfolioConfigFields(
+  portfolioId: string,
+  patch: Partial<PortfolioConfig>,
+) {
+  await updateDoc(doc(db, 'portfolios', portfolioId, 'config', 'current'), patch)
 }
 
 // ─── Equity History (Profit Sharing change trail) ───────────────────────
@@ -893,6 +901,8 @@ export interface CreateTransferProofInput {
   investorName: string
   investorReport: InvestorReportDoc
   amount: number
+  /** Optional return-of-principal sent with this payout (portfolios that use it). */
+  principalAmount?: number | null
   notes: string
   file: File
   uploadedBy: string
@@ -930,6 +940,7 @@ export async function createInvestorTransferProof(
     portfolioName: input.investorReport.portfolioName,
     period: input.investorReport.period,
     amount: input.amount,
+    principalAmount: input.principalAmount ?? null,
     fileUrl,
     fileName: input.file.name,
     storagePath: path,
@@ -1033,4 +1044,65 @@ export async function clearNotification(notificationId: string): Promise<void> {
     cleared: true,
     clearedAt: serverTimestamp(),
   })
+}
+
+// ─── Bagi Hasil Manual Entry (backfilled payout history) ──────────────────
+//
+// Top-level collection: /bagiHasilManualEntries/{id}. Team backfills payouts
+// that predate the app; ongoing payouts live in investorTransferProofs. The
+// Resume Bagi Hasil recap merges both. Queries filter by investorUid (+
+// optionally portfolioId) and sort in JS to avoid composite indexes.
+
+export interface CreateBagiHasilManualEntryInput {
+  portfolioId: string
+  portfolioName: string
+  investorUid: string
+  investorName: string
+  period: string
+  bagiHasilAmount: number
+  principalAmount: number | null
+  notes: string
+  createdBy: string
+  createdByName: string
+}
+
+export async function createBagiHasilManualEntry(
+  input: CreateBagiHasilManualEntryInput,
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'bagiHasilManualEntries'), {
+    ...input,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function updateBagiHasilManualEntry(
+  id: string,
+  patch: Partial<Pick<BagiHasilManualEntry, 'period' | 'bagiHasilAmount' | 'principalAmount' | 'notes'>>,
+): Promise<void> {
+  await updateDoc(doc(db, 'bagiHasilManualEntries', id), patch)
+}
+
+export async function deleteBagiHasilManualEntry(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'bagiHasilManualEntries', id))
+}
+
+export async function getBagiHasilManualEntriesForInvestor(
+  investorUid: string,
+): Promise<BagiHasilManualEntry[]> {
+  const snap = await getDocs(query(
+    collection(db, 'bagiHasilManualEntries'),
+    where('investorUid', '==', investorUid),
+  ))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as BagiHasilManualEntry)
+    .sort((a, b) => comparePeriods(b.period, a.period))
+}
+
+export async function getBagiHasilManualEntries(
+  portfolioId: string,
+  investorUid: string,
+): Promise<BagiHasilManualEntry[]> {
+  const all = await getBagiHasilManualEntriesForInvestor(investorUid)
+  return all.filter(e => e.portfolioId === portfolioId)
 }

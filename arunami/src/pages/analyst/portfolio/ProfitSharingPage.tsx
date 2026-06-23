@@ -14,6 +14,7 @@ import type {
   Portfolio, PortfolioConfig, EquityChangeEntry, ReturnModelType,
 } from '@/types'
 import HistorySection from './profit-sharing/HistorySection'
+import BagiHasilResumeSection from './profit-sharing/BagiHasilResumeSection'
 import NetProfitShareSection from './profit-sharing/NetProfitShareSection'
 import FixedYieldSection from './profit-sharing/FixedYieldSection'
 import RevenueShareSection from './profit-sharing/RevenueShareSection'
@@ -208,6 +209,14 @@ export default function ProfitSharingPage() {
           </p>
         </div>
       </div>
+
+      <BagiHasilResumeSection
+        portfolio={portfolio}
+        portfolioId={portfolioId ?? ''}
+        config={config}
+        currentUser={currentUser}
+        onChanged={load}
+      />
 
       <HistorySection history={history} />
     </div>

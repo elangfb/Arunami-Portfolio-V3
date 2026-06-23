@@ -160,6 +160,13 @@ export interface PortfolioConfig {
   investorConfig: InvestorConfigUnion
   reportingFrequency: ReportingFrequency
   kpiMetrics: KpiMetric[]
+  /**
+   * Whether this portfolio returns the investor's principal (pengembalian pokok)
+   * in addition to bagi hasil. When true, the Resume Bagi Hasil recap shows a
+   * dedicated principal column and the payout/manual-entry forms expose a
+   * principal field. Not every porto uses this, so it defaults to off.
+   */
+  returnsPrincipal?: boolean
   configEnrichedAt?: Timestamp
   createdAt: Timestamp
 }
@@ -621,12 +628,43 @@ export interface InvestorTransferProof {
   /** "YYYY-MM" or "YYYY-Qn" or "ALL_TIME". */
   period: string
   amount: number
+  /**
+   * Optional return-of-principal (pengembalian pokok) sent alongside this
+   * payout. Only set for portfolios with `returnsPrincipal`; null/absent
+   * otherwise. Surfaced as a second column in the Resume Bagi Hasil recap.
+   */
+  principalAmount?: number | null
   fileUrl: string
   fileName: string
   storagePath: string
   notes: string
   uploadedBy: string
   uploadedByName: string
+  createdAt: Timestamp
+}
+
+// ─── Bagi Hasil Manual Entry (backfilled payout history) ──────────────────
+//
+// Top-level collection: /bagiHasilManualEntries/{id}
+// Manually entered by the team to backfill bagi hasil (and optional principal
+// return) that was paid BEFORE the project was tracked in the app. Ongoing
+// payouts link to InvestorTransferProof instead; the Resume Bagi Hasil recap
+// merges both into one per-investor, per-portfolio timeline.
+
+export interface BagiHasilManualEntry {
+  id: string
+  portfolioId: string
+  portfolioName: string
+  investorUid: string
+  investorName: string
+  /** "YYYY-MM". */
+  period: string
+  bagiHasilAmount: number
+  /** Optional return-of-principal; null when this porto doesn't use it. */
+  principalAmount: number | null
+  notes: string
+  createdBy: string
+  createdByName: string
   createdAt: Timestamp
 }
 

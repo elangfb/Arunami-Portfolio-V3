@@ -220,5 +220,17 @@ service cloud.firestore {
                     || isStaff() || isInvestorRelation();
       allow delete: if isAdmin();
     }
+
+    // ─── Bagi Hasil Manual Entries (backfilled payout history) ───────────
+    // Team backfills historical bagi hasil / principal that predates the app;
+    // investors read only their own (constrained by investorUid). Mirrors the
+    // investorTransferProofs access model.
+    match /bagiHasilManualEntries/{entryId} {
+      allow read: if canViewInvestorDomain() ||
+        (isInvestor() && resource.data.investorUid == request.auth.uid);
+      allow list: if canViewInvestorDomain() ||
+        (isInvestor() && request.query.limit <= 200);
+      allow create, update, delete: if isStaff() || isInvestorRelation();
+    }
   }
 }

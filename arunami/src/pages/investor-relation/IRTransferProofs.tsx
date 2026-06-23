@@ -8,6 +8,7 @@ import {
   getAllUsers, getAllAllocations, getPublishedInvestorReports,
   createInvestorTransferProof, getTransferProofsForReport,
   deleteInvestorTransferProof, getAllTransferProofs, getAllPortfolios,
+  getPortfolioConfigOrDefault,
 } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { comparePeriods, formatPeriod } from '@/lib/dateUtils'
@@ -400,6 +401,16 @@ function UploadProofDialog({
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Portfolio-scoped reports may also return principal (pengembalian pokok).
+  const isPortfolioScoped = report.scope !== 'accumulated' && report.scope !== 'all_time'
+  const [returnsPrincipal, setReturnsPrincipal] = useState(false)
+  const [principal, setPrincipal] = useState('')
+  useEffect(() => {
+    if (!isPortfolioScoped || !report.portfolioId) return
+    getPortfolioConfigOrDefault(report.portfolioId)
+      .then(cfg => setReturnsPrincipal(!!cfg.returnsPrincipal))
+      .catch(() => setReturnsPrincipal(false))
+  }, [report.portfolioId, isPortfolioScoped])
   const { register, handleSubmit, formState: { errors } } = useForm<ProofForm>({
     // zod v4's Resolver generics + react-hook-form v7 don't fully line up
     // when z.coerce is involved; cast keeps the form ergonomic.
@@ -428,6 +439,7 @@ function UploadProofDialog({
         investorName: investor.displayName,
         investorReport: report,
         amount: data.amount,
+        principalAmount: returnsPrincipal && principal.trim() !== '' ? Number(principal) : null,
         notes: data.notes ?? '',
         file,
         uploadedBy: user.uid,
@@ -470,6 +482,21 @@ function UploadProofDialog({
             />
             {errors.amount && <p className="text-xs text-red-600">{errors.amount.message}</p>}
           </div>
+
+          {returnsPrincipal && (
+            <div className="space-y-1.5">
+              <Label htmlFor="principal">Pengembalian Pokok (Rp) — opsional</Label>
+              <Input
+                id="principal"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Kosongkan jika tidak ada"
+                value={principal}
+                onChange={e => setPrincipal(e.target.value)}
+              />
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="notes">Catatan (opsional)</Label>
