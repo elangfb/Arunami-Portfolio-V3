@@ -5,13 +5,13 @@ import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
 import { getInvestorPortfolios, getAllocationsForInvestor, getPublishedInvestorReports } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
-import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
+import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { ownershipFraction } from '@/lib/distributionStrategies'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight } from 'lucide-react'
+import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight, Wallet } from 'lucide-react'
 import TransferProofNotificationBanner from '@/components/investor/TransferProofNotificationBanner'
 import { useTransferProofNotifications } from '@/components/investor/useTransferProofNotifications'
 import TransferProofHistoryList from '@/components/investor/TransferProofHistoryList'
@@ -54,6 +54,11 @@ export default function InvestorDashboard() {
     [reports],
   )
 
+  // Bagi hasil recap — transfer-proof notifications are 1:1 with the payouts IR
+  // sends, so summing their amounts gives the total profit-sharing received.
+  const totalBagiHasil = useMemo(() => notifications.reduce((s, n) => s + n.amount, 0), [notifications])
+  const totalInvested = useMemo(() => allocations.reduce((s, a) => s + a.investedAmount, 0), [allocations])
+
   const handleLogout = async () => {
     await signOut(auth); setUser(null)
     navigate('/login', { replace: true })
@@ -85,6 +90,42 @@ export default function InvestorDashboard() {
           notifications={notifications}
           onChanged={reloadNotifications}
         />
+
+        {/* Total bagi hasil recap — all profit-sharing received, in one view. */}
+        {!loading && (allocations.length > 0 || notifications.length > 0) && (
+          <Card className="border-0 bg-[#1e5f3f] text-white">
+            <CardContent className="py-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
+                    <Wallet className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-white/80">Total Bagi Hasil Diterima</p>
+                    <p className="text-3xl font-bold tracking-tight">{formatCurrencyExact(totalBagiHasil)}</p>
+                    <p className="mt-0.5 text-xs text-white/70">
+                      {notifications.length > 0
+                        ? `Dari ${notifications.length} pembayaran`
+                        : 'Belum ada pembayaran bagi hasil'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-6 sm:border-l sm:border-white/20 sm:pl-6">
+                  <div>
+                    <p className="text-xs text-white/70">Total Investasi</p>
+                    <p className="text-lg font-semibold">{formatCurrencyCompact(totalInvested)}</p>
+                  </div>
+                  {totalInvested > 0 && (
+                    <div>
+                      <p className="text-xs text-white/70">Bagi Hasil / Investasi</p>
+                      <p className="text-lg font-semibold">{formatPercent((totalBagiHasil / totalInvested) * 100)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* All-projects reports live on the dedicated "My Report" page. */}
         {hasAllProjectReports && (

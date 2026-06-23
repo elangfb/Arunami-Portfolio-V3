@@ -7,12 +7,12 @@ import { toast } from 'sonner'
 import {
   getAllUsers, getAllAllocations, getPublishedInvestorReports,
   createInvestorTransferProof, getTransferProofsForReport,
-  deleteInvestorTransferProof,
+  deleteInvestorTransferProof, getAllTransferProofs,
 } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { comparePeriods, formatPeriod } from '@/lib/dateUtils'
 import { ALL_TIME_PERIOD } from '@/types'
-import { formatCurrencyCompact, cn } from '@/lib/utils'
+import { formatCurrencyCompact, formatCurrencyExact, formatPercent, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,7 +23,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  Search, ArrowLeft, ChevronRight, Upload, FileImage, X, Trash2, Bell, CheckCircle2,
+  Search, ArrowLeft, ChevronRight, Upload, FileImage, X, Trash2, Bell, CheckCircle2, Wallet,
 } from 'lucide-react'
 import type {
   AppUser, InvestorAllocation, InvestorReportDoc, InvestorTransferProof,
@@ -50,7 +50,10 @@ export default function IRTransferProofs() {
   const [view, setView] = useState<View>('home')
   const [search, setSearch] = useState('')
 
-  const [rows, setRows] = useState<{ user: AppUser; allocations: InvestorAllocation[]; totalInvested: number }[]>([])
+  const [rows, setRows] = useState<{
+    user: AppUser; allocations: InvestorAllocation[]; totalInvested: number
+    totalBagiHasil: number; payoutCount: number
+  }[]>([])
   const [loading, setLoading] = useState(true)
 
   const [investor, setInvestor] = useState<AppUser | null>(null)
@@ -62,16 +65,30 @@ export default function IRTransferProofs() {
 
   useEffect(() => {
     ;(async () => {
-      const [users, allocations] = await Promise.all([getAllUsers(), getAllAllocations()])
+      const [users, allocations, proofs] = await Promise.all([
+        getAllUsers(), getAllAllocations(), getAllTransferProofs(),
+      ])
       const investors = users.filter(u => u.role === 'investor')
       const byInvestor = new Map<string, InvestorAllocation[]>()
       for (const a of allocations) {
         const arr = byInvestor.get(a.investorUid) ?? []
         arr.push(a); byInvestor.set(a.investorUid, arr)
       }
+      // Sum every payout proof per investor → their total bagi hasil received.
+      const paidByInvestor = new Map<string, { total: number; count: number }>()
+      for (const p of proofs) {
+        const cur = paidByInvestor.get(p.investorUid) ?? { total: 0, count: 0 }
+        cur.total += p.amount; cur.count += 1
+        paidByInvestor.set(p.investorUid, cur)
+      }
       setRows(investors.map(user => {
         const allocs = byInvestor.get(user.uid) ?? []
-        return { user, allocations: allocs, totalInvested: allocs.reduce((s, a) => s + a.investedAmount, 0) }
+        const paid = paidByInvestor.get(user.uid) ?? { total: 0, count: 0 }
+        return {
+          user, allocations: allocs,
+          totalInvested: allocs.reduce((s, a) => s + a.investedAmount, 0),
+          totalBagiHasil: paid.total, payoutCount: paid.count,
+        }
       }))
       setLoading(false)
     })()
@@ -100,6 +117,16 @@ export default function IRTransferProofs() {
     return r.user.displayName.toLowerCase().includes(q) || r.user.email.toLowerCase().includes(q)
   })
 
+  // Org-wide recap for the investor list view.
+  const grandTotalBagiHasil = useMemo(() => rows.reduce((s, r) => s + r.totalBagiHasil, 0), [rows])
+  const totalProofsCount = useMemo(() => rows.reduce((s, r) => s + r.payoutCount, 0), [rows])
+  const paidInvestorCount = useMemo(() => rows.filter(r => r.totalBagiHasil > 0).length, [rows])
+
+  // Per-investor recap for the detail view.
+  const detailProofs = useMemo(() => Object.values(proofsByReport).flat(), [proofsByReport])
+  const detailTotalBagiHasil = detailProofs.reduce((s, p) => s + p.amount, 0)
+  const detailInvested = rows.find(r => r.user.uid === investor?.uid)?.totalInvested ?? 0
+
   if (view === 'home') {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
@@ -113,6 +140,25 @@ export default function IRTransferProofs() {
             <Input placeholder="Cari investor..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           </div>
         </div>
+
+        {/* Total bagi hasil recap — disbursed across all investors. */}
+        {!loading && rows.length > 0 && (
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[
+              ['Total Bagi Hasil Tersalurkan', formatCurrencyExact(grandTotalBagiHasil)],
+              ['Investor Dibayar', `${paidInvestorCount} / ${rows.length}`],
+              ['Total Bukti Transfer', `${totalProofsCount}`],
+            ].map(([label, value]) => (
+              <Card key={label}>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-lg font-bold">{value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
         <Card>
           <CardHeader><CardTitle className="text-base">Daftar Investor ({filtered.length})</CardTitle></CardHeader>
           <CardContent>
@@ -130,6 +176,7 @@ export default function IRTransferProofs() {
                       <th className="text-left py-2.5 px-3 font-medium">Investor</th>
                       <th className="text-left py-2.5 px-3 font-medium">Portofolio Aktif</th>
                       <th className="text-right py-2.5 px-3 font-medium">Total Investasi</th>
+                      <th className="text-right py-2.5 px-3 font-medium">Total Bagi Hasil</th>
                       <th className="text-right py-2.5 px-3 font-medium w-32">Aksi</th>
                     </tr>
                   </thead>
@@ -155,6 +202,16 @@ export default function IRTransferProofs() {
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right font-medium">{formatCurrencyCompact(r.totalInvested)}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          {r.totalBagiHasil > 0 ? (
+                            <>
+                              <span className="font-medium text-[#1e5f3f]">{formatCurrencyCompact(r.totalBagiHasil)}</span>
+                              <span className="block text-[11px] text-muted-foreground">{r.payoutCount}× transfer</span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3 text-right">
                           <Button size="sm" variant="outline" onClick={() => loadInvestor(r.user)}>
                             Pilih<ChevronRight className="ml-1 h-3 w-3" />
@@ -188,6 +245,42 @@ export default function IRTransferProofs() {
           <p className="text-sm text-muted-foreground">{investor.email}</p>
         </div>
       </div>
+
+      {/* Total bagi hasil recap — sent to this investor. */}
+      <Card className="border-0 bg-[#1e5f3f] text-white">
+        <CardContent className="py-5">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-white/80">Total Bagi Hasil Dikirim</p>
+                <p className="text-2xl font-bold tracking-tight">
+                  {investorLoading ? '…' : formatCurrencyExact(detailTotalBagiHasil)}
+                </p>
+                <p className="mt-0.5 text-xs text-white/70">
+                  {detailProofs.length > 0
+                    ? `${detailProofs.length} bukti transfer terkirim`
+                    : 'Belum ada bukti transfer'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-6 sm:border-l sm:border-white/20 sm:pl-6">
+              <div>
+                <p className="text-xs text-white/70">Total Investasi</p>
+                <p className="text-lg font-semibold">{formatCurrencyCompact(detailInvested)}</p>
+              </div>
+              {detailInvested > 0 && (
+                <div>
+                  <p className="text-xs text-white/70">Bagi Hasil / Investasi</p>
+                  <p className="text-lg font-semibold">{formatPercent((detailTotalBagiHasil / detailInvested) * 100)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
