@@ -201,7 +201,8 @@ service cloud.firestore {
       allow list: if canViewInvestorDomain() ||
         (isInvestor() && request.query.limit <= 200);
       allow create, update: if isStaff() || isInvestorRelation();
-      allow delete: if isAdmin();
+      // IR owns the bukti-transfer flow, so IR + staff may delete (DF-05).
+      allow delete: if isStaff() || isInvestorRelation();
     }
 
     // ─── Investor Notifications (in-app alerts) ──────────────────────────
@@ -218,7 +219,8 @@ service cloud.firestore {
                        request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['cleared', 'clearedAt']))
                     || isStaff() || isInvestorRelation();
-      allow delete: if isAdmin();
+      // Deleting a proof also deletes its mirrored notification (DF-05).
+      allow delete: if isStaff() || isInvestorRelation();
     }
 
     // ─── Bagi Hasil Manual Entries (backfilled payout history) ───────────
@@ -231,6 +233,16 @@ service cloud.firestore {
       allow list: if canViewInvestorDomain() ||
         (isInvestor() && request.query.limit <= 200);
       allow create, update, delete: if isStaff() || isInvestorRelation();
+    }
+
+    // ─── Admin Data Override audit log (immutable) ───────────────────────
+    // Every manual correction an admin makes via the override pages is recorded
+    // here with a before/after snapshot + reason. Admin-only and append-only:
+    // entries can never be edited or deleted so the trail stays trustworthy.
+    match /adminOverrides/{overrideId} {
+      allow read, list: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
     }
   }
 }

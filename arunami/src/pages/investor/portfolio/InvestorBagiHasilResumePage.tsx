@@ -48,8 +48,13 @@ export default function InvestorBagiHasilResumePage() {
         bagiHasil: m.bagiHasilAmount,
         principal: m.principalAmount,
         source: 'manual',
+        proofUrl: m.fileUrl ?? null,
       }))
-      const merged = [...linkedRows, ...manualRows].sort(
+      // DF-01: manual entry wins on a period collision — drop the automated proof
+      // row for any period that also has a manual entry so the total counts once.
+      const manualPeriods = new Set(manual.map(m => m.period))
+      const dedupedLinked = linkedRows.filter(r => !manualPeriods.has(r.period))
+      const merged = [...dedupedLinked, ...manualRows].sort(
         (a, b) => comparePeriods(b.period, a.period),
       )
       setRows(merged)
@@ -126,18 +131,22 @@ export default function InvestorBagiHasilResumePage() {
                       </td>
                     )}
                     <td className="py-2.5 text-right">
-                      {row.source === 'otomatis' ? (
+                      {row.proofUrl ? (
                         <a
-                          href={row.proofUrl ?? undefined}
+                          href={row.proofUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-[#1e5f3f] hover:underline"
                         >
                           <FileImage className="h-3.5 w-3.5" />
-                          <Badge variant="outline" className="border-[#1e5f3f]/30 text-[#1e5f3f] text-[10px]">Otomatis</Badge>
+                          <Badge variant="outline" className="border-[#1e5f3f]/30 text-[#1e5f3f] text-[10px]">
+                            {row.source === 'otomatis' ? 'Otomatis' : 'Manual'}
+                          </Badge>
                         </a>
                       ) : (
-                        <Badge variant="outline" className="text-[10px]">Manual</Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          {row.source === 'otomatis' ? 'Otomatis' : 'Manual'}
+                        </Badge>
                       )}
                     </td>
                   </tr>

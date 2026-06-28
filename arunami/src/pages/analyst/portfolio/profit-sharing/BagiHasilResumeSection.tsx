@@ -17,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, Coins } from 'lucide-react'
+import { Plus, Pencil, Trash2, Coins, FileImage } from 'lucide-react'
+import ProofDropzone from '@/components/investor/ProofDropzone'
 import type { Portfolio, PortfolioConfig, BagiHasilManualEntry } from '@/types'
 
 interface ResumeRow {
@@ -26,6 +27,7 @@ interface ResumeRow {
   bagiHasil: number
   principal: number | null
   source: 'manual' | 'otomatis'
+  proofUrl?: string | null
   entry?: BagiHasilManualEntry
 }
 
@@ -35,9 +37,15 @@ interface EditState {
   bagiHasilAmount: string
   principalAmount: string
   notes: string
+  file: File | null
+  existingStoragePath?: string
+  hasExistingFile: boolean
 }
 
-const emptyEdit: EditState = { id: null, period: '', bagiHasilAmount: '', principalAmount: '', notes: '' }
+const emptyEdit: EditState = {
+  id: null, period: '', bagiHasilAmount: '', principalAmount: '', notes: '',
+  file: null, hasExistingFile: false,
+}
 
 export default function BagiHasilResumeSection({
   portfolio, portfolioId, config, currentUser, onChanged,
@@ -90,6 +98,7 @@ export default function BagiHasilResumeSection({
           bagiHasil: p.amount,
           principal: p.principalAmount ?? null,
           source: 'otomatis' as const,
+          proofUrl: p.fileUrl,
         })),
     )
     setLoadingRows(false)
@@ -106,9 +115,14 @@ export default function BagiHasilResumeSection({
       bagiHasil: m.bagiHasilAmount,
       principal: m.principalAmount,
       source: 'manual',
+      proofUrl: m.fileUrl ?? null,
       entry: m,
     }))
-    return [...manualRows, ...linkedRows].sort((a, b) => comparePeriods(b.period, a.period))
+    // DF-01: manual entry wins on a period collision — drop the automated proof
+    // row for any period that also has a manual entry, so totals count once.
+    const manualPeriods = new Set(manualEntries.map(m => m.period))
+    const dedupedLinked = linkedRows.filter(r => !manualPeriods.has(r.period))
+    return [...manualRows, ...dedupedLinked].sort((a, b) => comparePeriods(b.period, a.period))
   }, [manualEntries, linkedRows])
 
   const togglePrincipal = async () => {
@@ -132,6 +146,9 @@ export default function BagiHasilResumeSection({
     bagiHasilAmount: String(m.bagiHasilAmount),
     principalAmount: m.principalAmount != null ? String(m.principalAmount) : '',
     notes: m.notes,
+    file: null,
+    existingStoragePath: m.storagePath,
+    hasExistingFile: !!m.fileUrl,
   })
 
   const saveEntry = async () => {
@@ -143,16 +160,24 @@ export default function BagiHasilResumeSection({
       ? Number(edit.principalAmount)
       : null
     if (principal != null && !(principal >= 0)) { toast.error('Nominal pengembalian pokok tidak valid.'); return }
+    // DF-01: new entries must carry a proof file; edits may keep the existing one.
+    if (!edit.id && !edit.file) { toast.error('Lampirkan file bukti transfer terlebih dahulu.'); return }
 
     setSaving(true)
     try {
       if (edit.id) {
-        await updateBagiHasilManualEntry(edit.id, {
-          period: edit.period,
-          bagiHasilAmount: bagiHasil,
-          principalAmount: principal,
-          notes: edit.notes.trim(),
-        })
+        await updateBagiHasilManualEntry(
+          edit.id,
+          {
+            period: edit.period,
+            bagiHasilAmount: bagiHasil,
+            principalAmount: principal,
+            notes: edit.notes.trim(),
+          },
+          edit.file
+            ? { file: edit.file, investorUid: selectedInvestor, oldStoragePath: edit.existingStoragePath }
+            : undefined,
+        )
       } else {
         await createBagiHasilManualEntry({
           portfolioId,
@@ -163,6 +188,7 @@ export default function BagiHasilResumeSection({
           bagiHasilAmount: bagiHasil,
           principalAmount: principal,
           notes: edit.notes.trim(),
+          file: edit.file!,
           createdBy: currentUser.uid,
           createdByName: currentUser.displayName,
         })
@@ -172,7 +198,7 @@ export default function BagiHasilResumeSection({
       toast.success('Riwayat bagi hasil tersimpan.')
     } catch (e) {
       console.error(e)
-      toast.error('Gagal menyimpan.')
+      toast.error(e instanceof Error ? e.message : 'Gagal menyimpan.')
     } finally {
       setSaving(false)
     }
@@ -181,7 +207,7 @@ export default function BagiHasilResumeSection({
   const removeEntry = async (m: BagiHasilManualEntry) => {
     if (!confirm(`Hapus riwayat ${formatPeriod(m.period)}?`)) return
     try {
-      await deleteBagiHasilManualEntry(m.id)
+      await deleteBagiHasilManualEntry(m.id, m.storagePath)
       await loadRows(selectedInvestor)
       toast.success('Riwayat dihapus.')
     } catch { toast.error('Gagal menghapus.') }
@@ -269,9 +295,19 @@ export default function BagiHasilResumeSection({
                         </td>
                       )}
                       <td className="py-2.5 px-3">
-                        <Badge variant="outline" className="text-[10px]">
-                          {row.source === 'manual' ? 'Manual' : 'Otomatis'}
-                        </Badge>
+                        {row.proofUrl ? (
+                          <a href={row.proofUrl} target="_blank" rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[#1e5f3f] hover:underline">
+                            <FileImage className="h-3.5 w-3.5" />
+                            <Badge variant="outline" className="text-[10px]">
+                              {row.source === 'manual' ? 'Manual' : 'Otomatis'}
+                            </Badge>
+                          </a>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">
+                            {row.source === 'manual' ? 'Manual' : 'Otomatis'}
+                          </Badge>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         {row.entry ? (
@@ -330,6 +366,14 @@ export default function BagiHasilResumeSection({
                 <Textarea id="bh-notes" rows={2} value={edit.notes}
                   onChange={e => setEdit({ ...edit, notes: e.target.value })} />
               </div>
+              <ProofDropzone
+                label={edit.id ? 'Bukti Transfer (ganti — opsional)' : 'Bukti Transfer'}
+                file={edit.file}
+                onFile={(f) => setEdit({ ...edit, file: f })}
+              />
+              {edit.id && edit.hasExistingFile && !edit.file && (
+                <p className="text-xs text-muted-foreground">Bukti transfer saat ini tetap dipakai jika tidak diganti.</p>
+              )}
             </div>
           )}
           <DialogFooter>

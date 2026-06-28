@@ -221,7 +221,7 @@ export default function IRReporting() {
         {investorLoading ? (
           <div className="h-64 animate-pulse rounded-lg bg-muted" />
         ) : (
-          <InvestorReportHistory reports={reports} />
+          <InvestorReportHistory reports={reports} onChanged={refreshReports} />
         )}
       </div>
     )

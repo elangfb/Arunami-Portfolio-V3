@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, FileText, Search } from 'lucide-react'
+import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, FileText, Search, Wrench } from 'lucide-react'
 import InvestorReportGenerator from './components/InvestorReportGenerator'
 import InvestorReportHistory from './components/InvestorReportHistory'
 import type {
@@ -37,9 +37,11 @@ interface AdminInvestorDetailProps {
   backPath?: string
   /** Show the report generator + report history on this page. Off where reporting lives in a dedicated menu. */
   showReporting?: boolean
+  /** Show the admin "Override Data" button. Admin-only; off in the IR view. */
+  showOverride?: boolean
 }
 
-export default function AdminInvestorDetail({ backPath = '/admin/investors', showReporting = true }: AdminInvestorDetailProps = {}) {
+export default function AdminInvestorDetail({ backPath = '/admin/investors', showReporting = true, showOverride = true }: AdminInvestorDetailProps = {}) {
   const { uid } = useParams<{ uid: string }>()
   const navigate = useNavigate()
 
@@ -221,12 +223,24 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
           </div>
           <p className="text-sm text-muted-foreground">{investor.email}</p>
         </div>
-        {showReporting && (
-          <Button onClick={() => setReportOpen(true)}>
-            <FileText className="mr-2 h-4 w-4" />
-            Buat Laporan
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {showOverride && (
+            <Button
+              variant="outline"
+              className="border-amber-500 text-amber-700 hover:bg-amber-50"
+              onClick={() => navigate(`/admin/investors/${investor.uid}/override`)}
+            >
+              <Wrench className="mr-2 h-4 w-4" />
+              Override Data
+            </Button>
+          )}
+          {showReporting && (
+            <Button onClick={() => setReportOpen(true)}>
+              <FileText className="mr-2 h-4 w-4" />
+              Buat Laporan
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -356,7 +370,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
       </Card>
 
       {/* Report History */}
-      {showReporting && <InvestorReportHistory reports={reports} />}
+      {showReporting && <InvestorReportHistory reports={reports} onChanged={loadData} />}
 
       {/* Communication History */}
       <Card>

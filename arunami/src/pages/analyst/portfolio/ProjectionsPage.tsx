@@ -495,8 +495,7 @@ export default function ProjectionsPage() {
     if (!portfolioId) return
     setDeleteId(id)
     try {
-      await deleteReport(portfolioId, id)
-      await syncFinancialData(portfolioId)
+      await deleteReport(portfolioId, id) // re-syncs financialData internally (DF-15)
       toast.success('Proyeksi berhasil dihapus')
       fetchReports()
     } catch {
@@ -510,8 +509,7 @@ export default function ProjectionsPage() {
     if (!portfolioId) return
     setIsResetting(true)
     try {
-      await deleteAllReports(portfolioId, 'projection')
-      await syncFinancialData(portfolioId)
+      await deleteAllReports(portfolioId, 'projection') // re-syncs financialData internally (DF-15)
       setReports([])
       setResetDialogOpen(false)
       toast.success('Semua data Proyeksi berhasil dihapus')

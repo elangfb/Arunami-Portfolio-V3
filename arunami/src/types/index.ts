@@ -177,6 +177,9 @@ export interface AppUser {
   displayName: string
   role: UserRole
   isArunamiTeam?: boolean
+  /** Soft-archive flag (DF-04). Archived users are hidden from active lists but kept for audit. */
+  archived?: boolean
+  archivedAt?: Timestamp
   createdBy: string
   createdAt: Timestamp
 }
@@ -213,6 +216,9 @@ export interface Portfolio {
   graceConfig?: GraceConfig
   assignedInvestors: string[]
   assignedAnalysts: string[]
+  /** Soft-archive flag (DF-04). Archived portfolios are hidden from active lists but kept for audit. */
+  archived?: boolean
+  archivedAt?: Timestamp
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -620,8 +626,12 @@ export interface InvestorTransferProof {
   id: string
   investorUid: string
   investorName: string
-  /** Top-level investorReports doc id this proof is attached to. */
-  investorReportId: string
+  /**
+   * Top-level investorReports doc id this proof is attached to, or `null` for a
+   * standalone proof sent before any report exists (e.g. a new portfolio with no
+   * analyst data yet, but a real bagi hasil was paid).
+   */
+  investorReportId: string | null
   /** Denormalized for the IR/Investor list views; null for __accumulated__ reports. */
   portfolioId: string | null
   portfolioName: string
@@ -663,6 +673,13 @@ export interface BagiHasilManualEntry {
   /** Optional return-of-principal; null when this porto doesn't use it. */
   principalAmount: number | null
   notes: string
+  /**
+   * Proof file (PDF/image) for the backfilled payout. Required for entries
+   * created after the DF-01 change; optional/absent on legacy rows.
+   */
+  fileUrl?: string
+  fileName?: string
+  storagePath?: string
   createdBy: string
   createdByName: string
   createdAt: Timestamp
@@ -683,12 +700,16 @@ export interface InvestorNotification {
   type: InvestorNotificationType
   /** Linked proof doc id (for transfer_proof type). */
   transferProofId: string
-  /** Denormalized for display; avoids a join on the history tab. */
-  investorReportId: string
+  /** Denormalized for display; avoids a join on the history tab. Null for standalone proofs. */
+  investorReportId: string | null
   portfolioName: string
   period: string
   amount: number
+  /** Optional return-of-principal mirrored from the proof (DF-13); null/absent otherwise. */
+  principalAmount?: number | null
   fileUrl: string
+  /** Original proof filename; lets display branch image vs PDF rendering. */
+  fileName?: string
   message: string
   cleared: boolean
   clearedAt?: Timestamp
@@ -752,4 +773,36 @@ export interface EquityChangeEntry {
   changeKind?: ConfigChangeKind
   fromValue?: string
   toValue?: string
+}
+
+// ─── Admin Data Override Audit Log ────────────────────────────────────────
+//
+// Top-level collection: /adminOverrides/{id}
+// Immutable trail of every correction an admin makes through the dedicated
+// override pages (portfolio & investor). Each save records a before/after JSON
+// snapshot of the section that changed plus a required reason note, so any
+// manual correction of analyst/IR input is traceable. Writes are admin-only and
+// can never be edited or deleted (see firestore.rules).
+
+export type AdminOverrideScope = 'portfolio' | 'investor'
+
+export interface AdminOverrideLog {
+  id: string
+  scope: AdminOverrideScope
+  /** Portfolio id or investor uid the override targets. */
+  targetId: string
+  /** Human label of the target at write time (portfolio name / investor name). */
+  targetLabel: string
+  /** Which section was overridden, e.g. 'master', 'config', 'allocation', 'pnl', 'projection', 'profile', 'payout'. */
+  section: string
+  /** Free-text description of what changed (e.g. "Revenue 2025-03"). */
+  summary: string
+  /** JSON-serializable snapshot of the affected fields before the change. */
+  before: Record<string, unknown>
+  /** JSON-serializable snapshot of the affected fields after the change. */
+  after: Record<string, unknown>
+  reasonNote: string
+  changedByUid: string
+  changedByName: string
+  changedAt: Timestamp
 }

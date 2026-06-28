@@ -5,6 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// ─── Transfer proof helpers ────────────────────────────────────────────────
+
+/**
+ * A transfer proof can be an image or a PDF. PDFs can't render in <img>, so
+ * display sites branch on this. Accepts a filename OR a (Firebase) download URL —
+ * the URL keeps the `.pdf` extension before the query string.
+ */
+export function isPdfProof(fileNameOrUrl: string | null | undefined): boolean {
+  if (!fileNameOrUrl) return false
+  return /\.pdf(\?|$|%3f)/i.test(fileNameOrUrl)
+}
+
 // ─── Currency formatting ───────────────────────────────────────────────────
 
 export function formatCurrencyCompact(value: number): string {

@@ -1,15 +1,22 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { formatPeriod } from '@/lib/dateUtils'
 import { MONTH_NAMES_ID } from '@/lib/utils'
+import { unpublishAccumulatedReport, unpublishAllTimeReport } from '@/lib/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Eye } from 'lucide-react'
+import { Eye, Undo2 } from 'lucide-react'
 import type { InvestorReportDoc } from '@/types'
 
 interface Props {
   reports: InvestorReportDoc[]
+  /**
+   * DF-07: when provided, accumulated/all-time reports get a "Tarik" (unpublish)
+   * action. Called after a successful unpublish so the parent can refresh.
+   */
+  onChanged?: () => void | Promise<void>
 }
 
 function formatReportDate(report: InvestorReportDoc) {
@@ -37,8 +44,32 @@ function reportScopeLabel(r: InvestorReportDoc): string {
   return r.scope === 'accumulated' || r.scope === 'all_time' ? 'Semua Portofolio' : r.portfolioName
 }
 
-export default function InvestorReportHistory({ reports }: Props) {
+export default function InvestorReportHistory({ reports, onChanged }: Props) {
   const [viewReport, setViewReport] = useState<InvestorReportDoc | null>(null)
+  const [unpublishing, setUnpublishing] = useState<string | null>(null)
+
+  // Only accumulated/all-time reports are unpublishable here; per-portfolio
+  // reports have their own unpublish in the analyst PublishingPage.
+  const canUnpublish = (r: InvestorReportDoc) =>
+    !!onChanged && (r.scope === 'accumulated' || r.scope === 'all_time')
+
+  const handleUnpublish = async (r: InvestorReportDoc) => {
+    if (!window.confirm(`Tarik laporan "${reportPeriodLabel(r)}" dari investor? Mereka tidak akan melihatnya lagi sampai dipublikasikan ulang.`)) return
+    setUnpublishing(r.id)
+    try {
+      if (r.scope === 'all_time') {
+        await unpublishAllTimeReport({ investorUid: r.investorUid })
+      } else {
+        await unpublishAccumulatedReport({ investorUid: r.investorUid, period: r.period })
+      }
+      toast.success('Laporan ditarik dari investor')
+      await onChanged?.()
+    } catch {
+      toast.error('Gagal menarik laporan')
+    } finally {
+      setUnpublishing(null)
+    }
+  }
 
   return (
     <>
@@ -73,10 +104,24 @@ export default function InvestorReportHistory({ reports }: Props) {
                       <td className="py-2.5 px-3">{reportScopeLabel(r)}</td>
                       <td className="py-2.5 px-3">{formatReportDate(r)}</td>
                       <td className="py-2.5 px-3 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => setViewReport(r)}>
-                          <Eye className="mr-1.5 h-3.5 w-3.5" />
-                          Lihat
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => setViewReport(r)}>
+                            <Eye className="mr-1.5 h-3.5 w-3.5" />
+                            Lihat
+                          </Button>
+                          {canUnpublish(r) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-amber-600 hover:text-amber-700"
+                              disabled={unpublishing === r.id}
+                              onClick={() => handleUnpublish(r)}
+                            >
+                              <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+                              {unpublishing === r.id ? 'Menarik…' : 'Tarik'}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

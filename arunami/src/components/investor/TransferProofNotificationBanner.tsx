@@ -3,12 +3,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Bell, CheckCircle2, ExternalLink } from 'lucide-react'
+import { Bell, CheckCircle2, ExternalLink, FileText } from 'lucide-react'
 import { clearNotification } from '@/lib/firestore'
 import { toast } from 'sonner'
 import type { InvestorNotification } from '@/types'
 import { ALL_TIME_PERIOD } from '@/types'
 import { formatPeriod } from '@/lib/dateUtils'
+import { isPdfProof } from '@/lib/utils'
 
 function periodLabel(n: InvestorNotification): string {
   if (n.period === ALL_TIME_PERIOD) return 'All-Time'
@@ -58,12 +59,22 @@ export default function TransferProofNotificationBanner({ notifications, onChang
             <ul className="mt-3 space-y-2">
               {uncleared.map(n => (
                 <li key={n.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5">
-                  <img
-                    src={n.fileUrl}
-                    alt=""
-                    className="h-12 w-12 rounded object-cover border border-slate-200 cursor-pointer hover:opacity-90"
-                    onClick={() => setPreviewing(n)}
-                  />
+                  {isPdfProof(n.fileName ?? n.fileUrl) ? (
+                    <button
+                      onClick={() => setPreviewing(n)}
+                      className="flex h-12 w-12 items-center justify-center rounded border border-slate-200 bg-slate-100 hover:opacity-90"
+                      aria-label="Lihat bukti"
+                    >
+                      <FileText className="h-5 w-5 text-[#2563eb]" />
+                    </button>
+                  ) : (
+                    <img
+                      src={n.fileUrl}
+                      alt=""
+                      className="h-12 w-12 rounded object-cover border border-slate-200 cursor-pointer hover:opacity-90"
+                      onClick={() => setPreviewing(n)}
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#0f172a] truncate">
                       {n.portfolioName} · {periodLabel(n)}
@@ -95,7 +106,11 @@ export default function TransferProofNotificationBanner({ notifications, onChang
           </DialogHeader>
           {previewing && (
             <div className="space-y-3">
-              <img src={previewing.fileUrl} alt="Bukti transfer" className="w-full max-h-[70vh] object-contain rounded-md border" />
+              {isPdfProof(previewing.fileName ?? previewing.fileUrl) ? (
+                <iframe src={previewing.fileUrl} title="Bukti transfer" className="w-full h-[70vh] rounded-md border" />
+              ) : (
+                <img src={previewing.fileUrl} alt="Bukti transfer" className="w-full max-h-[70vh] object-contain rounded-md border" />
+              )}
               <p className="text-sm text-slate-700">{previewing.message}</p>
             </div>
           )}

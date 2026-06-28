@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { getAllUsers, createUser, updateUser, deleteUser } from '@/lib/firestore'
+import { getAllUsers, createUser, updateUser, deleteUser, archiveUser, unarchiveUser } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { UserPlus, Pencil, Trash2, Search } from 'lucide-react'
+import { UserPlus, Pencil, Trash2, Search, Archive, ArchiveRestore } from 'lucide-react'
 import { ROLE_LABELS } from '@/lib/roles'
 import type { AppUser, UserRole } from '@/types'
 
@@ -47,6 +47,7 @@ export default function AdminUsers() {
   const [createIsTeam, setCreateIsTeam] = useState(false)
   const [editIsTeam, setEditIsTeam] = useState(false)
   const [search, setSearch] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
 
   const createForm = useForm<CreateFormData>({
     resolver: zodResolver(createSchema),
@@ -58,7 +59,8 @@ export default function AdminUsers() {
   })
 
   const fetchUsers = async () => {
-    const data = await getAllUsers()
+    // Fetch including archived; the toggle below controls visibility.
+    const data = await getAllUsers(true)
     setUsers(data)
     setLoading(false)
   }
@@ -67,8 +69,10 @@ export default function AdminUsers() {
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase()
-    return u.displayName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    const matchesSearch = u.displayName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    return matchesSearch && (showArchived || !u.archived)
   })
+  const archivedCount = users.filter(u => u.archived).length
 
   const onCreate = async (data: CreateFormData) => {
     try {
@@ -102,11 +106,32 @@ export default function AdminUsers() {
     }
   }
 
-  const onDelete = async (u: AppUser) => {
-    if (!window.confirm(`Hapus pengguna "${u.displayName}"? Tindakan ini tidak dapat dibatalkan.`)) return
+  const onArchive = async (u: AppUser) => {
+    if (!window.confirm(`Arsipkan pengguna "${u.displayName}"? Mereka disembunyikan dari daftar aktif tetapi datanya tetap tersimpan.`)) return
+    try {
+      await archiveUser(u.uid)
+      toast.success('Pengguna diarsipkan')
+      fetchUsers()
+    } catch {
+      toast.error('Gagal mengarsipkan pengguna')
+    }
+  }
+
+  const onUnarchive = async (u: AppUser) => {
+    try {
+      await unarchiveUser(u.uid)
+      toast.success('Pengguna dipulihkan')
+      fetchUsers()
+    } catch {
+      toast.error('Gagal memulihkan pengguna')
+    }
+  }
+
+  const onPermanentDelete = async (u: AppUser) => {
+    if (!window.confirm(`HAPUS PERMANEN "${u.displayName}"? Tindakan ini tidak dapat dibatalkan dan tidak menghapus data terkait (alokasi, laporan).`)) return
     try {
       await deleteUser(u.uid)
-      toast.success('Pengguna berhasil dihapus')
+      toast.success('Pengguna dihapus permanen')
       fetchUsers()
     } catch {
       toast.error('Gagal menghapus pengguna')
@@ -198,7 +223,20 @@ export default function AdminUsers() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Daftar Pengguna ({filtered.length})</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base">Daftar Pengguna ({filtered.length})</CardTitle>
+            {archivedCount > 0 && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Tampilkan arsip ({archivedCount})
+              </label>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -224,14 +262,30 @@ export default function AdminUsers() {
                   {u.isArunamiTeam && (
                     <Badge variant="outline" className="border-green-600 text-green-700 text-xs">Tim Arunami</Badge>
                   )}
+                  {u.archived && (
+                    <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">Diarsipkan</Badge>
+                  )}
                   {u.role !== 'admin' && (
                     <div className="flex gap-1 shrink-0">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(u)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(u)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {u.archived ? (
+                        <>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-700 hover:text-green-800" title="Pulihkan" onClick={() => onUnarchive(u)}>
+                            <ArchiveRestore className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" title="Hapus permanen" onClick={() => onPermanentDelete(u)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit" onClick={() => openEdit(u)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:text-amber-700" title="Arsipkan" onClick={() => onArchive(u)}>
+                            <Archive className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useDropzone } from 'react-dropzone'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import {
   getAllUsers, getAllAllocations, getPublishedInvestorReports,
-  createInvestorTransferProof, getTransferProofsForReport,
-  deleteInvestorTransferProof, getAllTransferProofs, getAllPortfolios,
-  getPortfolioConfigOrDefault,
+  createInvestorTransferProof, createStandaloneTransferProof, getTransferProofsForReport,
+  getTransferProofsForInvestor, deleteInvestorTransferProof, getAllTransferProofs,
+  getAllPortfolios, getPortfolioConfigOrDefault,
 } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { comparePeriods, formatPeriod } from '@/lib/dateUtils'
 import { ALL_TIME_PERIOD } from '@/types'
-import { formatCurrencyCompact, formatCurrencyExact, formatPercent, cn } from '@/lib/utils'
+import { formatCurrencyCompact, formatCurrencyExact, formatPercent, isPdfProof } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,8 +23,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  Search, ArrowLeft, ChevronRight, Upload, FileImage, X, Trash2, Bell, CheckCircle2, Wallet,
+  Search, ArrowLeft, ChevronRight, Upload, FileImage, FileText, FilePlus, Trash2, Bell, CheckCircle2, Wallet,
 } from 'lucide-react'
+import ProofDropzone from '@/components/investor/ProofDropzone'
 import type {
   AppUser, InvestorAllocation, InvestorReportDoc, InvestorTransferProof,
 } from '@/types'
@@ -37,9 +37,6 @@ const proofSchema = z.object({
   notes: z.string().max(280, 'Catatan maksimal 280 karakter').optional().or(z.literal('')),
 })
 type ProofForm = z.infer<typeof proofSchema>
-
-const ALLOWED_TYPES = { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg'], 'image/webp': ['.webp'] }
-const MAX_BYTES = 5 * 1024 * 1024
 
 function periodLabel(r: InvestorReportDoc): string {
   if (r.period === ALL_TIME_PERIOD) return 'All-Time'
@@ -63,6 +60,9 @@ export default function IRTransferProofs() {
   const [investorLoading, setInvestorLoading] = useState(false)
 
   const [uploadTarget, setUploadTarget] = useState<InvestorReportDoc | null>(null)
+  // Standalone proofs (no published report) for the current investor + the dialog toggle.
+  const [standaloneProofs, setStandaloneProofs] = useState<InvestorTransferProof[]>([])
+  const [standaloneOpen, setStandaloneOpen] = useState(false)
   // Portfolio-scoped grace reports with no payout ('none') are informational —
   // there's no money transfer to prove, so the proof action is disabled for them.
   const [graceNoPayoutPortfolios, setGraceNoPayoutPortfolios] = useState<Set<string>>(new Set())
@@ -106,12 +106,16 @@ export default function IRTransferProofs() {
   const loadInvestor = async (u: AppUser) => {
     setInvestor(u); setView('investor'); setInvestorLoading(true)
     try {
-      const published = await getPublishedInvestorReports(u.uid)
+      const [published, allProofs] = await Promise.all([
+        getPublishedInvestorReports(u.uid),
+        getTransferProofsForInvestor(u.uid),
+      ])
       const sorted = published.sort((a, b) => comparePeriods(b.period, a.period))
       setReports(sorted)
       const proofs: Record<string, InvestorTransferProof[]> = {}
       await Promise.all(sorted.map(async r => { proofs[r.id] = await getTransferProofsForReport(r.id) }))
       setProofsByReport(proofs)
+      setStandaloneProofs(allProofs.filter(p => p.investorReportId == null))
     } catch { toast.error('Gagal memuat data investor') }
     finally { setInvestorLoading(false) }
   }
@@ -119,6 +123,12 @@ export default function IRTransferProofs() {
   const refreshProofsFor = async (reportId: string) => {
     const proofs = await getTransferProofsForReport(reportId)
     setProofsByReport(prev => ({ ...prev, [reportId]: proofs }))
+  }
+
+  const refreshStandalone = async () => {
+    if (!investor) return
+    const all = await getTransferProofsForInvestor(investor.uid)
+    setStandaloneProofs(all.filter(p => p.investorReportId == null))
   }
 
   const filtered = rows.filter(r => {
@@ -131,10 +141,15 @@ export default function IRTransferProofs() {
   const totalProofsCount = useMemo(() => rows.reduce((s, r) => s + r.payoutCount, 0), [rows])
   const paidInvestorCount = useMemo(() => rows.filter(r => r.totalBagiHasil > 0).length, [rows])
 
-  // Per-investor recap for the detail view.
-  const detailProofs = useMemo(() => Object.values(proofsByReport).flat(), [proofsByReport])
+  // Per-investor recap for the detail view (report-linked + standalone proofs).
+  const detailProofs = useMemo(
+    () => [...Object.values(proofsByReport).flat(), ...standaloneProofs],
+    [proofsByReport, standaloneProofs],
+  )
   const detailTotalBagiHasil = detailProofs.reduce((s, p) => s + p.amount, 0)
-  const detailInvested = rows.find(r => r.user.uid === investor?.uid)?.totalInvested ?? 0
+  const detailRow = rows.find(r => r.user.uid === investor?.uid)
+  const detailInvested = detailRow?.totalInvested ?? 0
+  const detailAllocations = detailRow?.allocations ?? []
 
   if (view === 'home') {
     return (
@@ -293,8 +308,15 @@ export default function IRTransferProofs() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Laporan yang Dipublikasikan ({reports.length})</CardTitle>
-          <p className="text-xs text-muted-foreground">Pilih laporan, lalu kirim bukti transfer beserta notifikasinya.</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Laporan yang Dipublikasikan ({reports.length})</CardTitle>
+              <p className="text-xs text-muted-foreground">Pilih laporan, lalu kirim bukti transfer beserta notifikasinya.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setStandaloneOpen(true)}>
+              <FilePlus className="mr-1.5 h-3.5 w-3.5" />Kirim Bukti Tanpa Laporan
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {investorLoading ? (
@@ -373,6 +395,65 @@ export default function IRTransferProofs() {
         </CardContent>
       </Card>
 
+      {/* Standalone proofs — sent without a published report (porto tanpa data analis). */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Bukti Tanpa Laporan ({standaloneProofs.length})</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Bukti transfer untuk portofolio yang belum punya laporan dipublikasikan.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {investorLoading ? (
+            <div className="h-24 animate-pulse rounded-lg bg-muted" />
+          ) : standaloneProofs.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Belum ada bukti tanpa laporan.</p>
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left py-2.5 px-3 font-medium">Periode</th>
+                    <th className="text-left py-2.5 px-3 font-medium">Portofolio</th>
+                    <th className="text-left py-2.5 px-3 font-medium">Bukti</th>
+                    <th className="text-right py-2.5 px-3 font-medium">Nominal</th>
+                    <th className="text-right py-2.5 px-3 font-medium w-12"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {standaloneProofs.map(p => (
+                    <tr key={p.id} className="hover:bg-muted/30">
+                      <td className="py-2.5 px-3 font-medium">{formatPeriod(p.period)}</td>
+                      <td className="py-2.5 px-3 text-muted-foreground">{p.portfolioName}</td>
+                      <td className="py-2.5 px-3">
+                        <a href={p.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[#1e5f3f] hover:underline">
+                          {isPdfProof(p.fileName) ? <FileText className="h-3.5 w-3.5" /> : <FileImage className="h-3.5 w-3.5" />}
+                          <span className="truncate max-w-[12rem]">{p.fileName}</span>
+                        </a>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-medium">{formatCurrencyCompact(p.amount)}</td>
+                      <td className="py-2.5 px-3 text-right">
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Hapus bukti transfer ini? Notifikasi terkait juga akan dihapus.')) return
+                            try { await deleteInvestorTransferProof(p); await refreshStandalone(); toast.success('Bukti transfer dihapus') }
+                            catch { toast.error('Gagal menghapus') }
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                          title="Hapus"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {uploadTarget && investor && user && (
         <UploadProofDialog
           investor={investor}
@@ -381,6 +462,19 @@ export default function IRTransferProofs() {
           onUploaded={async () => {
             await refreshProofsFor(uploadTarget.id)
             setUploadTarget(null)
+            toast.success('Bukti transfer terkirim & notifikasi aktif')
+          }}
+        />
+      )}
+
+      {standaloneOpen && investor && user && (
+        <StandaloneProofDialog
+          investor={investor}
+          allocations={detailAllocations}
+          onClose={() => setStandaloneOpen(false)}
+          onUploaded={async () => {
+            await refreshStandalone()
+            setStandaloneOpen(false)
             toast.success('Bukti transfer terkirim & notifikasi aktif')
           }}
         />
@@ -399,7 +493,6 @@ function UploadProofDialog({
 }) {
   const { user } = useAuthStore()
   const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   // Portfolio-scoped reports may also return principal (pengembalian pokok).
   const isPortfolioScoped = report.scope !== 'accumulated' && report.scope !== 'all_time'
@@ -416,18 +509,6 @@ function UploadProofDialog({
     // when z.coerce is involved; cast keeps the form ergonomic.
     resolver: zodResolver(proofSchema) as never,
   })
-
-  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
-    accept: ALLOWED_TYPES, maxSize: MAX_BYTES, maxFiles: 1,
-    onDrop: (accepted) => {
-      const f = accepted[0] ?? null
-      setFile(f)
-      if (preview) URL.revokeObjectURL(preview)
-      setPreview(f ? URL.createObjectURL(f) : null)
-    },
-  })
-
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
 
   const onSubmit = async (data: ProofForm) => {
     if (!file) { toast.error('Pilih file bukti transfer terlebih dahulu'); return }
@@ -450,14 +531,6 @@ function UploadProofDialog({
       toast.error(e instanceof Error ? e.message : 'Gagal mengirim bukti transfer')
     } finally { setSubmitting(false) }
   }
-
-  const rejectionMessage = useMemo(() => {
-    if (fileRejections.length === 0) return null
-    const code = fileRejections[0].errors[0]?.code
-    if (code === 'file-too-large') return 'Ukuran file melebihi 5 MB.'
-    if (code === 'file-invalid-type') return 'Tipe file tidak didukung. Gunakan PNG, JPG, atau WEBP.'
-    return 'File tidak valid.'
-  }, [fileRejections])
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -504,37 +577,7 @@ function UploadProofDialog({
             {errors.notes && <p className="text-xs text-red-600">{errors.notes.message}</p>}
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Screenshot Bukti</Label>
-            <div
-              {...getRootProps()}
-              className={cn(
-                'flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors cursor-pointer',
-                isDragActive ? 'border-[#2563eb] bg-blue-50/40' : 'border-slate-300 hover:border-slate-400',
-              )}
-            >
-              <input {...getInputProps()} />
-              {preview ? (
-                <div className="space-y-2 w-full">
-                  <img src={preview} alt="preview" className="mx-auto max-h-48 rounded-md object-contain" />
-                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <FileImage className="h-3.5 w-3.5" />
-                    <span className="truncate max-w-[16rem]">{file?.name}</span>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setFile(null); if (preview) URL.revokeObjectURL(preview); setPreview(null) }} className="text-red-500 hover:text-red-700">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <Upload className="h-6 w-6 text-slate-400 mb-1" />
-                  <p className="text-sm text-slate-600">Tarik & lepas atau klik untuk pilih gambar</p>
-                  <p className="text-xs text-slate-400 mt-1">PNG, JPG, WEBP · maks 5 MB</p>
-                </>
-              )}
-            </div>
-            {rejectionMessage && <p className="text-xs text-red-600">{rejectionMessage}</p>}
-          </div>
+          <ProofDropzone file={file} onFile={setFile} />
 
           <div className="rounded-md bg-blue-50/60 border border-blue-100 p-3 text-xs text-slate-700 flex gap-2">
             <Bell className="h-4 w-4 text-[#2563eb] shrink-0 mt-0.5" />
@@ -544,6 +587,137 @@ function UploadProofDialog({
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Batal</Button>
             <Button type="submit" disabled={submitting || !file} className="bg-[#2563eb] hover:bg-[#1d4ed8]">
+              {submitting ? 'Mengirim…' : (<><CheckCircle2 className="mr-1.5 h-4 w-4" />Kirim & Notifikasi</>)}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Send a transfer proof for a portfolio with no published report yet (e.g. a new
+ * porto the analyst hasn't input data for, but a bagi hasil was already paid).
+ * IR picks one of the investor's allocated portfolios + period directly.
+ */
+function StandaloneProofDialog({
+  investor, allocations, onClose, onUploaded,
+}: {
+  investor: AppUser
+  allocations: InvestorAllocation[]
+  onClose: () => void
+  onUploaded: () => void | Promise<void>
+}) {
+  const { user } = useAuthStore()
+  const [file, setFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [portfolioId, setPortfolioId] = useState(allocations[0]?.portfolioId ?? '')
+  const [period, setPeriod] = useState('')
+  const [amount, setAmount] = useState('')
+  const [notes, setNotes] = useState('')
+  const [principal, setPrincipal] = useState('')
+
+  // Principal column only when the selected portfolio uses it.
+  const [returnsPrincipal, setReturnsPrincipal] = useState(false)
+  useEffect(() => {
+    if (!portfolioId) { setReturnsPrincipal(false); return }
+    getPortfolioConfigOrDefault(portfolioId)
+      .then(cfg => setReturnsPrincipal(!!cfg.returnsPrincipal))
+      .catch(() => setReturnsPrincipal(false))
+  }, [portfolioId])
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    const selected = allocations.find(a => a.portfolioId === portfolioId)
+    if (!selected) { toast.error('Pilih portofolio terlebih dahulu.'); return }
+    if (!/^\d{4}-\d{2}$/.test(period)) { toast.error('Pilih periode (bulan) yang valid.'); return }
+    const amt = Number(amount)
+    if (!(amt > 0)) { toast.error('Nominal transfer harus lebih dari 0.'); return }
+    if (!file) { toast.error('Pilih file bukti transfer terlebih dahulu.'); return }
+    setSubmitting(true)
+    try {
+      await createStandaloneTransferProof({
+        investorUid: investor.uid,
+        investorName: investor.displayName,
+        portfolioId: selected.portfolioId,
+        portfolioName: selected.portfolioName,
+        period,
+        amount: amt,
+        principalAmount: returnsPrincipal && principal.trim() !== '' ? Number(principal) : null,
+        notes,
+        file,
+        uploadedBy: user.uid,
+        uploadedByName: user.displayName,
+      })
+      await onUploaded()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim bukti transfer')
+    } finally { setSubmitting(false) }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Kirim Bukti Tanpa Laporan</DialogTitle>
+          <DialogDescription>
+            {investor.displayName} · untuk portofolio yang belum punya laporan dipublikasikan
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="sa-portfolio">Portofolio</Label>
+            {allocations.length === 0 ? (
+              <p className="text-xs text-red-600">Investor ini belum punya alokasi portofolio.</p>
+            ) : (
+              <select
+                id="sa-portfolio"
+                value={portfolioId}
+                onChange={e => setPortfolioId(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                {allocations.map(a => (
+                  <option key={a.portfolioId} value={a.portfolioId}>{a.portfolioName} ({a.portfolioCode})</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sa-period">Periode</Label>
+            <Input id="sa-period" type="month" value={period} onChange={e => setPeriod(e.target.value)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sa-amount">Nominal Transfer (Rp)</Label>
+            <Input id="sa-amount" type="number" min="1" step="1" placeholder="Contoh: 1500000" value={amount} onChange={e => setAmount(e.target.value)} />
+          </div>
+
+          {returnsPrincipal && (
+            <div className="space-y-1.5">
+              <Label htmlFor="sa-principal">Pengembalian Pokok (Rp) — opsional</Label>
+              <Input id="sa-principal" type="number" min="0" step="1" placeholder="Kosongkan jika tidak ada" value={principal} onChange={e => setPrincipal(e.target.value)} />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sa-notes">Catatan (opsional)</Label>
+            <Textarea id="sa-notes" rows={2} maxLength={280} placeholder="Misal: Bagi hasil April 2026" value={notes} onChange={e => setNotes(e.target.value)} />
+          </div>
+
+          <ProofDropzone file={file} onFile={setFile} />
+
+          <div className="rounded-md bg-blue-50/60 border border-blue-100 p-3 text-xs text-slate-700 flex gap-2">
+            <Bell className="h-4 w-4 text-[#2563eb] shrink-0 mt-0.5" />
+            <span>Setelah dikirim, investor akan melihat notifikasi di dashboard-nya sampai mereka menekan tombol "Tandai Dibaca".</span>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Batal</Button>
+            <Button type="submit" disabled={submitting || !file || allocations.length === 0} className="bg-[#2563eb] hover:bg-[#1d4ed8]">
               {submitting ? 'Mengirim…' : (<><CheckCircle2 className="mr-1.5 h-4 w-4" />Kirim & Notifikasi</>)}
             </Button>
           </DialogFooter>

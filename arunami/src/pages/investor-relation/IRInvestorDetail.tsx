@@ -4,5 +4,5 @@ import AdminInvestorDetail from '@/pages/admin/AdminInvestorDetail'
 // Investor Relations list. Reporting lives in the dedicated "Review & Publishing"
 // menu here, so it is hidden on this page.
 export default function IRInvestorDetail() {
-  return <AdminInvestorDetail backPath="/investor-relation" showReporting={false} />
+  return <AdminInvestorDetail backPath="/investor-relation" showReporting={false} showOverride={false} />
 }

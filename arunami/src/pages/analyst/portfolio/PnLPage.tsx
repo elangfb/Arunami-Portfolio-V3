@@ -650,8 +650,7 @@ export default function PnLPage() {
     if (!portfolioId) return
     setDeleteId(id)
     try {
-      await deleteReport(portfolioId, id)
-      await syncFinancialData(portfolioId)
+      await deleteReport(portfolioId, id) // re-syncs financialData internally (DF-15)
       toast.success('Laporan berhasil dihapus')
       fetchReports()
     } catch {
@@ -665,8 +664,7 @@ export default function PnLPage() {
     if (!portfolioId) return
     setIsResetting(true)
     try {
-      await deleteAllReports(portfolioId, 'pnl')
-      await syncFinancialData(portfolioId)
+      await deleteAllReports(portfolioId, 'pnl') // re-syncs financialData internally (DF-15)
       setReports([])
       setResetDialogOpen(false)
       toast.success('Semua data PnL berhasil dihapus')

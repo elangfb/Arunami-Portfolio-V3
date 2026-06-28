@@ -15,6 +15,8 @@ import AdminUsers from '@/pages/admin/AdminUsers'
 import AdminPortfolios from '@/pages/admin/AdminPortfolios'
 import AdminInvestors from '@/pages/admin/AdminInvestors'
 import AdminInvestorDetail from '@/pages/admin/AdminInvestorDetail'
+import AdminPortfolioOverride from '@/pages/admin/AdminPortfolioOverride'
+import AdminInvestorOverride from '@/pages/admin/AdminInvestorOverride'
 import PortfolioSetupWizard from '@/pages/admin/setup/PortfolioSetupWizard'
 
 // Analyst
@@ -83,8 +85,10 @@ export default function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="portfolios" element={<AdminPortfolios />} />
             <Route path="portfolios/new" element={<PortfolioSetupWizard />} />
+            <Route path="portfolios/:id/override" element={<AdminPortfolioOverride />} />
             <Route path="investors" element={<AdminInvestors />} />
             <Route path="investors/:uid" element={<AdminInvestorDetail />} />
+            <Route path="investors/:uid/override" element={<AdminInvestorOverride />} />
           </Route>
 
           {/* Analyst routes */}

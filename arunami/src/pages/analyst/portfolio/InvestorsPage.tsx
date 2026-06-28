@@ -117,12 +117,16 @@ export default function InvestorsPage() {
               </thead>
               <tbody className="divide-y">
                 {allocations.map(alloc => {
+                  // DF-08: resolve name/email live from users; fall back to the
+                  // denormalized allocation copy only if the user is missing.
+                  const investorUser = users.find(u => u.uid === alloc.investorUid)
+                  const displayName = investorUser?.displayName ?? alloc.investorName
+                  const displayEmail = investorUser?.email ?? alloc.investorEmail
                   let investorNet = 0
                   let investorMonthly = 0
                   let investorAnnual = 0
                   if (config?.investorConfig && portfolio) {
                     const latestRev = [...data.revenueData].reverse().find(r => r.aktual > 0)
-                    const investorUser = users.find(u => u.uid === alloc.investorUid)
                     const result = calculateDistribution({
                       reportData: { period: latestActualPeriod ?? '', revenue: latestRev?.aktual ?? 0, netProfit: lastProfit, grossProfit: 0 },
                       config: config.investorConfig,
@@ -138,13 +142,13 @@ export default function InvestorsPage() {
                     <tr key={alloc.id} className="hover:bg-muted/30">
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{alloc.investorName}</p>
-                          {users.find(u => u.uid === alloc.investorUid)?.isArunamiTeam && (
+                          <p className="font-medium">{displayName}</p>
+                          {investorUser?.isArunamiTeam && (
                             <Badge variant="outline" className="border-green-600 text-green-700 text-xs">Tim Arunami</Badge>
                           )}
                         </div>
-                        {alloc.investorEmail && (
-                          <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
+                        {displayEmail && (
+                          <p className="text-xs text-muted-foreground">{displayEmail}</p>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(alloc.investedAmount)}</td>

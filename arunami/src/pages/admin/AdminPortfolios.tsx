@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import {
   getAllPortfolios, getAllUsers, updatePortfolio, deletePortfolio,
+  archivePortfolio, unarchivePortfolio,
   getAllocationsForPortfolio, createAllocation, updateAllocation, deleteAllocation,
 } from '@/lib/firestore'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
-import { PlusCircle, Pencil, Trash2, UserPlus, Search, ChevronDown, X, Settings2 } from 'lucide-react'
+import { PlusCircle, Pencil, Trash2, UserPlus, Search, ChevronDown, X, Settings2, Archive, ArchiveRestore, Wrench } from 'lucide-react'
 import type { Portfolio, InvestorAllocation, AppUser } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import ChangeReturnModelDialog from '@/pages/analyst/portfolio/profit-sharing/ChangeReturnModelDialog'
@@ -61,6 +62,8 @@ export default function AdminPortfolios() {
   const [editAmount, setEditAmount] = useState('')
   const [editPercent, setEditPercent] = useState('')
 
+  const [showArchived, setShowArchived] = useState(false)
+
   // Search states
   const [portfolioSearch, setPortfolioSearch] = useState('')
   const [investorSearch, setInvestorSearch] = useState('')
@@ -84,7 +87,8 @@ export default function AdminPortfolios() {
   })
 
   const fetchData = async () => {
-    const [p, users] = await Promise.all([getAllPortfolios(), getAllUsers()])
+    // Portfolios incl. archived (toggle controls display); users default-filtered.
+    const [p, users] = await Promise.all([getAllPortfolios(true), getAllUsers()])
     setPortfolios(p)
     setInvestors(users.filter(u => u.role === 'investor'))
     setAnalysts(users.filter(u => u.role === 'analyst'))
@@ -179,11 +183,36 @@ export default function AdminPortfolios() {
     }
   }
 
-  const onDelete = async (p: Portfolio) => {
-    if (!window.confirm(`Hapus portofolio "${p.name}"? Tindakan ini tidak dapat dibatalkan.`)) return
+  const onArchive = async (p: Portfolio) => {
+    if (!window.confirm(`Arsipkan portofolio "${p.name}"? Disembunyikan dari daftar aktif & dashboard investor, tetapi semua datanya tetap tersimpan.`)) return
+    try {
+      await archivePortfolio(p.id)
+      toast.success('Portofolio diarsipkan')
+      if (expandedId === p.id) {
+        setExpandedId(null)
+        resetExpandedState()
+      }
+      fetchData()
+    } catch {
+      toast.error('Gagal mengarsipkan portofolio')
+    }
+  }
+
+  const onUnarchive = async (p: Portfolio) => {
+    try {
+      await unarchivePortfolio(p.id)
+      toast.success('Portofolio dipulihkan')
+      fetchData()
+    } catch {
+      toast.error('Gagal memulihkan portofolio')
+    }
+  }
+
+  const onPermanentDelete = async (p: Portfolio) => {
+    if (!window.confirm(`HAPUS PERMANEN portofolio "${p.name}"? Tidak dapat dibatalkan. Data turunan (laporan, alokasi) tidak ikut terhapus.`)) return
     try {
       await deletePortfolio(p.id)
-      toast.success('Portofolio berhasil dihapus')
+      toast.success('Portofolio dihapus permanen')
       if (expandedId === p.id) {
         setExpandedId(null)
         resetExpandedState()
@@ -200,8 +229,10 @@ export default function AdminPortfolios() {
 
   const filteredPortfolios = portfolios.filter(p => {
     const q = portfolioSearch.toLowerCase()
-    return p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.brandName ?? '').toLowerCase().includes(q)
+    const matchesSearch = p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.brandName ?? '').toLowerCase().includes(q)
+    return matchesSearch && (showArchived || !p.archived)
   })
+  const archivedPortfolioCount = portfolios.filter(p => p.archived).length
 
   const filteredAvailableInvestors = availableInvestors.filter(inv => {
     const q = investorSearch.toLowerCase()
@@ -245,8 +276,8 @@ export default function AdminPortfolios() {
       setNewAmount('')
       setNewPercent('')
       fetchData()
-    } catch {
-      toast.error('Gagal menambahkan investor')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Gagal menambahkan investor')
     }
   }
 
@@ -281,8 +312,8 @@ export default function AdminPortfolios() {
       setAllocations(allocs)
       cancelEditAllocation()
       fetchData()
-    } catch {
-      toast.error('Gagal memperbarui alokasi')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Gagal memperbarui alokasi')
     }
   }
 
@@ -325,6 +356,18 @@ export default function AdminPortfolios() {
         </div>
       </div>
 
+      {archivedPortfolioCount > 0 && (
+        <label className="mb-3 flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          Tampilkan portofolio diarsipkan ({archivedPortfolioCount})
+        </label>
+      )}
+
       {loading ? (
         <div className="h-64 animate-pulse rounded-lg bg-muted" />
       ) : filteredPortfolios.length === 0 ? (
@@ -361,7 +404,12 @@ export default function AdminPortfolios() {
                           />
                         </td>
                         <td className="px-3 py-3 align-middle">
-                          <div className="font-medium">{p.name}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{p.name}</span>
+                            {p.archived && (
+                              <Badge variant="outline" className="border-amber-500 text-amber-600 text-[10px]">Diarsipkan</Badge>
+                            )}
+                          </div>
                           {p.brandName && (
                             <div className="text-xs text-muted-foreground">{p.brandName}</div>
                           )}
@@ -382,33 +430,67 @@ export default function AdminPortfolios() {
                         </td>
                         <td className="px-3 py-3 align-middle text-right">
                           <div className="flex justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              title="Ubah Model Distribusi"
-                              onClick={e => { e.stopPropagation(); setModelTarget(p) }}
-                            >
-                              <Settings2 className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              title="Edit Portofolio"
-                              onClick={e => { e.stopPropagation(); openEdit(p) }}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              title="Hapus Portofolio"
-                              onClick={e => { e.stopPropagation(); onDelete(p) }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            {p.archived ? (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-green-700 hover:text-green-800"
+                                  title="Pulihkan Portofolio"
+                                  onClick={e => { e.stopPropagation(); onUnarchive(p) }}
+                                >
+                                  <ArchiveRestore className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  title="Hapus Permanen"
+                                  onClick={e => { e.stopPropagation(); onPermanentDelete(p) }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-amber-600 hover:text-amber-700"
+                                  title="Override Data (Koreksi Manual)"
+                                  onClick={e => { e.stopPropagation(); navigate(`/admin/portfolios/${p.id}/override`) }}
+                                >
+                                  <Wrench className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  title="Ubah Model Distribusi"
+                                  onClick={e => { e.stopPropagation(); setModelTarget(p) }}
+                                >
+                                  <Settings2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  title="Edit Portofolio"
+                                  onClick={e => { e.stopPropagation(); openEdit(p) }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-amber-600 hover:text-amber-700"
+                                  title="Arsipkan Portofolio"
+                                  onClick={e => { e.stopPropagation(); onArchive(p) }}
+                                >
+                                  <Archive className="h-3 w-3" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -451,17 +533,19 @@ export default function AdminPortfolios() {
                                           <tbody className="divide-y">
                                             {allocations.map(alloc => {
                                               const isEditing = editAllocId === alloc.id
+                                              // DF-08: resolve name/email live; fall back to denormalized copy.
+                                              const investorUser = investors.find(i => i.uid === alloc.investorUid)
                                               return (
                                                 <tr key={alloc.id} className="hover:bg-muted/30">
                                                   <td className="py-2.5 px-3">
                                                     <div className="flex items-center gap-2">
-                                                      <p className="font-medium">{alloc.investorName}</p>
-                                                      {investors.find(i => i.uid === alloc.investorUid)?.isArunamiTeam && (
+                                                      <p className="font-medium">{investorUser?.displayName ?? alloc.investorName}</p>
+                                                      {investorUser?.isArunamiTeam && (
                                                         <Badge variant="outline" className="border-green-600 text-green-700 text-xs">Tim Arunami</Badge>
                                                       )}
                                                     </div>
-                                                    {alloc.investorEmail && (
-                                                      <p className="text-xs text-muted-foreground">{alloc.investorEmail}</p>
+                                                    {(investorUser?.email ?? alloc.investorEmail) && (
+                                                      <p className="text-xs text-muted-foreground">{investorUser?.email ?? alloc.investorEmail}</p>
                                                     )}
                                                   </td>
                                                   <td className="py-2.5 px-3 text-right">

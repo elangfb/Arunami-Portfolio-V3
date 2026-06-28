@@ -5,11 +5,11 @@ import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
-import { FileImage, CheckCircle2, Inbox } from 'lucide-react'
+import { FileImage, FileText, CheckCircle2, Inbox } from 'lucide-react'
 import type { InvestorNotification } from '@/types'
 import { ALL_TIME_PERIOD } from '@/types'
 import { formatPeriod } from '@/lib/dateUtils'
-import { formatCurrencyExact } from '@/lib/utils'
+import { formatCurrencyExact, isPdfProof } from '@/lib/utils'
 
 function periodLabel(n: InvestorNotification): string {
   if (n.period === ALL_TIME_PERIOD) return 'All-Time'
@@ -42,7 +42,13 @@ export default function TransferProofHistoryList({ notifications }: { notificati
                     className="h-12 w-12 shrink-0 rounded border border-slate-200 overflow-hidden hover:opacity-90"
                     aria-label="Lihat bukti"
                   >
-                    <img src={n.fileUrl} alt="" className="h-full w-full object-cover" />
+                    {isPdfProof(n.fileName ?? n.fileUrl) ? (
+                      <span className="flex h-full w-full items-center justify-center bg-slate-100">
+                        <FileText className="h-5 w-5 text-[#2563eb]" />
+                      </span>
+                    ) : (
+                      <img src={n.fileUrl} alt="" className="h-full w-full object-cover" />
+                    )}
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#0f172a] truncate">
@@ -79,12 +85,18 @@ export default function TransferProofHistoryList({ notifications }: { notificati
           </DialogHeader>
           {previewing && (
             <div className="space-y-3">
-              <img src={previewing.fileUrl} alt="Bukti transfer" className="w-full max-h-[70vh] object-contain rounded-md border" />
+              {isPdfProof(previewing.fileName ?? previewing.fileUrl) ? (
+                <iframe src={previewing.fileUrl} title="Bukti transfer" className="w-full h-[70vh] rounded-md border" />
+              ) : (
+                <img src={previewing.fileUrl} alt="Bukti transfer" className="w-full max-h-[70vh] object-contain rounded-md border" />
+              )}
               <p className="text-sm text-slate-700">{previewing.message}</p>
               <div className="flex justify-end">
                 <Button asChild variant="outline">
                   <a href={previewing.fileUrl} target="_blank" rel="noreferrer">
-                    <FileImage className="mr-1.5 h-4 w-4" />Buka gambar asli
+                    {isPdfProof(previewing.fileName ?? previewing.fileUrl)
+                      ? <><FileText className="mr-1.5 h-4 w-4" />Buka PDF</>
+                      : <><FileImage className="mr-1.5 h-4 w-4" />Buka gambar asli</>}
                   </a>
                 </Button>
               </div>

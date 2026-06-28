@@ -1,6 +1,6 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
-  updateDoc, deleteDoc, deleteField, query, where, orderBy, serverTimestamp,
+  updateDoc, deleteDoc, deleteField, query, where, serverTimestamp,
   writeBatch,
 } from 'firebase/firestore'
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
@@ -15,6 +15,7 @@ import type {
   InvestorReportDoc, EquityChangeEntry,
   InvestorConfigUnion, ConfigChangeKind, ReturnModelType,
   InvestorTransferProof, InvestorNotification, BagiHasilManualEntry,
+  AdminOverrideScope, AdminOverrideLog,
 } from '@/types'
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -26,9 +27,27 @@ export async function getUser(uid: string): Promise<AppUser | null> {
   return snap.exists() ? { ...snap.data(), uid: snap.id } as AppUser : null
 }
 
-export async function getAllUsers(): Promise<AppUser[]> {
+export async function getAllUsers(includeArchived = false): Promise<AppUser[]> {
   const snap = await getDocs(collection(db, 'users'))
-  return snap.docs.map(d => ({ ...d.data(), uid: d.id }) as AppUser)
+  const users = snap.docs.map(d => ({ ...d.data(), uid: d.id }) as AppUser)
+  // DF-04: hide soft-archived users from active lists unless explicitly requested.
+  return includeArchived ? users : users.filter(u => !u.archived)
+}
+
+/** Soft-archive a user (DF-04). Keeps all data; drops them from active lists and
+ *  from every portfolio's assignedInvestors so they no longer get access/counted. */
+export async function archiveUser(uid: string) {
+  await updateDoc(doc(db, 'users', uid), { archived: true, archivedAt: serverTimestamp() })
+  const allocations = await getAllocationsForInvestor(uid)
+  const portfolioIds = [...new Set(allocations.map(a => a.portfolioId))]
+  await Promise.all(portfolioIds.map(pid => refreshPortfolioInvestors(pid)))
+}
+
+export async function unarchiveUser(uid: string) {
+  await updateDoc(doc(db, 'users', uid), { archived: false, archivedAt: deleteField() })
+  const allocations = await getAllocationsForInvestor(uid)
+  const portfolioIds = [...new Set(allocations.map(a => a.portfolioId))]
+  await Promise.all(portfolioIds.map(pid => refreshPortfolioInvestors(pid)))
 }
 
 export async function createUser(
@@ -59,15 +78,19 @@ export async function updateUser(uid: string, data: Partial<Pick<AppUser, 'displ
   await updateDoc(doc(db, 'users', uid), data)
 }
 
+/** Hard delete — permanent. Prefer archiveUser; this is for admin cleanup only
+ *  and does NOT cascade (see DF-04 roadmap for the cascade caveat). */
 export async function deleteUser(uid: string) {
   await deleteDoc(doc(db, 'users', uid))
 }
 
 // ─── Portfolios ───────────────────────────────────────────────────────────
 
-export async function getAllPortfolios(): Promise<Portfolio[]> {
+export async function getAllPortfolios(includeArchived = false): Promise<Portfolio[]> {
   const snap = await getDocs(collection(db, 'portfolios'))
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio)
+  const portfolios = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio)
+  // DF-04: hide soft-archived portfolios from active lists unless requested.
+  return includeArchived ? portfolios : portfolios.filter(p => !p.archived)
 }
 
 export async function getPortfolio(id: string): Promise<Portfolio | null> {
@@ -78,13 +101,15 @@ export async function getPortfolio(id: string): Promise<Portfolio | null> {
 export async function getInvestorPortfolios(uid: string): Promise<Portfolio[]> {
   const q = query(collection(db, 'portfolios'), where('assignedInvestors', 'array-contains', uid))
   const snap = await getDocs(q)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio)
+  // DF-04: archived portfolios drop off the investor's dashboard.
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio).filter(p => !p.archived)
 }
 
 export async function getAnalystPortfolios(uid: string): Promise<Portfolio[]> {
   const q = query(collection(db, 'portfolios'), where('assignedAnalysts', 'array-contains', uid))
   const snap = await getDocs(q)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio)
+  // DF-04: archived portfolios drop off the analyst's dashboard.
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Portfolio).filter(p => !p.archived)
 }
 
 export async function createPortfolio(data: Omit<Portfolio, 'id' | 'createdAt' | 'updatedAt'>) {
@@ -100,6 +125,22 @@ export async function updatePortfolio(id: string, data: Partial<Portfolio>) {
   await updateDoc(doc(db, 'portfolios', id), { ...data, updatedAt: serverTimestamp() })
 }
 
+/** Soft-archive a portfolio (DF-04). Hidden from active lists & dashboards;
+ *  all subcollections/data are preserved. */
+export async function archivePortfolio(id: string) {
+  await updateDoc(doc(db, 'portfolios', id), {
+    archived: true, archivedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  })
+}
+
+export async function unarchivePortfolio(id: string) {
+  await updateDoc(doc(db, 'portfolios', id), {
+    archived: false, archivedAt: deleteField(), updatedAt: serverTimestamp(),
+  })
+}
+
+/** Hard delete — permanent. Prefer archivePortfolio; this does NOT cascade to
+ *  subcollections (see DF-04 roadmap). Admin cleanup only. */
 export async function deletePortfolio(id: string) {
   await deleteDoc(doc(db, 'portfolios', id))
 }
@@ -257,8 +298,22 @@ export async function getReports(portfolioId: string, type: 'pnl' | 'projection'
 }
 
 export async function saveReport(portfolioId: string, report: Omit<PortfolioReport, 'id' | 'createdAt'>) {
+  const normalized = normalizePeriod(report.period)
+  // DF-02: upsert by (type, period). Re-uploading a period must REPLACE the
+  // existing report, not add a second doc — syncFinancialData keys by period in
+  // a Map, so a duplicate would silently drop one period's data. Only applies to
+  // pnl/projection (the only types written here); others fall through to insert.
+  if (report.type === 'pnl' || report.type === 'projection') {
+    const existing = await getReports(portfolioId, report.type)
+    const match = existing.find(r => normalizePeriod(r.period) === normalized)
+    if (match) {
+      await updateReport(portfolioId, match.id, { ...report, period: normalized })
+      return match.id
+    }
+  }
   const ref = await addDoc(collection(db, 'portfolios', portfolioId, 'reports'), {
     ...report,
+    period: normalized,
     createdAt: serverTimestamp(),
   })
   return ref.id
@@ -272,8 +327,12 @@ export async function updateReport(
   await updateDoc(doc(db, 'portfolios', portfolioId, 'reports', reportId), data)
 }
 
+// DF-15: deleteReport/deleteAllReports re-sync financialData themselves, so a
+// report can never be removed while the aggregated snapshot still reflects it
+// (previously every caller had to remember to call syncFinancialData).
 export async function deleteReport(portfolioId: string, reportId: string) {
   await deleteDoc(doc(db, 'portfolios', portfolioId, 'reports', reportId))
+  await syncFinancialData(portfolioId)
 }
 
 export async function deleteAllReports(portfolioId: string, type: 'pnl' | 'projection') {
@@ -286,6 +345,7 @@ export async function deleteAllReports(portfolioId: string, type: 'pnl' | 'proje
   const batch = writeBatch(db)
   snap.docs.forEach(d => batch.delete(d.ref))
   await batch.commit()
+  await syncFinancialData(portfolioId)
 }
 
 // ─── Management Reports ───────────────────────────────────────────────────
@@ -401,24 +461,68 @@ export async function getInvestorReportSources(investorUid: string): Promise<Inv
 
 /** Recalculates assignedInvestors on the portfolio doc and flushes stale slotsSummary field. */
 async function refreshPortfolioInvestors(portfolioId: string) {
-  const allocations = await getAllocationsForPortfolio(portfolioId)
+  const [allocations, users] = await Promise.all([
+    getAllocationsForPortfolio(portfolioId),
+    getAllUsers(true),
+  ])
+  // DF-04: keep archived investors out of assignedInvestors so they don't retain
+  // portfolio read access (security rules use this array) or get counted.
+  const archived = new Set(users.filter(u => u.archived).map(u => u.uid))
+  // DF-10: dedupe uids defensively so any legacy duplicate allocations can't
+  // inflate assignedInvestors (and the counts/queries that read it).
+  const activeUids = [...new Set(
+    allocations.map(a => a.investorUid).filter(uid => !archived.has(uid)),
+  )]
   await updateDoc(doc(db, 'portfolios', portfolioId), {
-    assignedInvestors: allocations.map(a => a.investorUid),
+    assignedInvestors: activeUids,
     slotsSummary: deleteField(),
     updatedAt: serverTimestamp(),
   })
 }
 
+// DF-03: a portfolio's allocations must not over-distribute (>100% ownership),
+// which would pay out more than the profit pool. Validated at the data layer so
+// no caller (or concurrent writer) can bypass it. Small epsilon for FP noise.
+const OWNERSHIP_EPSILON = 0.01
+
+function assertOwnershipWithinLimit(
+  newPercent: number | undefined,
+  allocations: InvestorAllocation[],
+  excludeAllocationId?: string,
+) {
+  if (newPercent == null) return
+  const othersSum = allocations
+    .filter(a => a.id !== excludeAllocationId)
+    .reduce((s, a) => s + (a.ownershipPercent ?? 0), 0)
+  if (othersSum + newPercent > 100 + OWNERSHIP_EPSILON) {
+    const remaining = Math.max(0, 100 - othersSum)
+    throw new Error(
+      `Total kepemilikan akan melebihi 100% (saat ini ${othersSum.toFixed(2)}% terpakai, tersisa ${remaining.toFixed(2)}%).`,
+    )
+  }
+}
+
 export async function createAllocation(
   data: Omit<InvestorAllocation, 'id' | 'joinedAt' | 'updatedAt'>,
 ) {
-  const allocRef = await addDoc(collection(db, 'investorAllocations'), {
+  const existing = await getAllocationsForPortfolio(data.portfolioId)
+  // DF-10: one allocation per (investor × portfolio). Guard at the data layer so
+  // no caller — or concurrent writer — can create a duplicate that double-counts
+  // invested amount, ownership %, and earnings.
+  if (existing.some(a => a.investorUid === data.investorUid)) {
+    throw new Error('Investor ini sudah memiliki alokasi di portofolio ini.')
+  }
+  assertOwnershipWithinLimit(data.ownershipPercent, existing)
+  // Deterministic id closes the create-create race: two concurrent creates for
+  // the same pair target one doc id instead of producing two docs.
+  const id = `${data.portfolioId}_${data.investorUid}`
+  await setDoc(doc(db, 'investorAllocations', id), {
     ...data,
     joinedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
   await refreshPortfolioInvestors(data.portfolioId)
-  return allocRef.id
+  return id
 }
 
 export async function updateAllocation(
@@ -426,6 +530,8 @@ export async function updateAllocation(
   data: Partial<Pick<InvestorAllocation, 'investedAmount' | 'ownershipPercent'>>,
   portfolioId: string,
 ) {
+  const existing = await getAllocationsForPortfolio(portfolioId)
+  assertOwnershipWithinLimit(data.ownershipPercent, existing, allocationId)
   await updateDoc(doc(db, 'investorAllocations', allocationId), {
     ...data,
     updatedAt: serverTimestamp(),
@@ -481,9 +587,14 @@ export async function syncFinancialData(portfolioId: string) {
   for (const r of pnlReports) r.period = normalizePeriod(r.period)
   for (const r of projReports) r.period = normalizePeriod(r.period)
 
-  // Sort reports by period for chronological order (YYYY-MM sorts correctly)
-  const sortByPeriod = (a: PortfolioReport, b: PortfolioReport) =>
-    comparePeriods(a.period, b.period)
+  // Sort reports by period for chronological order (YYYY-MM sorts correctly).
+  // DF-02: tiebreak equal periods by createdAt so the Map "last writer" is
+  // deterministic for any legacy duplicate-period docs (newest wins).
+  const sortByPeriod = (a: PortfolioReport, b: PortfolioReport) => {
+    const cmp = comparePeriods(a.period, b.period)
+    if (cmp !== 0) return cmp
+    return (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0)
+  }
   const sortedPnl = pnlReports.sort(sortByPeriod)
   const sortedProj = projReports.sort(sortByPeriod)
 
@@ -681,9 +792,11 @@ export async function publishInvestorReport(params: {
     publishedBy: params.publishedBy,
     updatedAt: serverTimestamp(),
   }
+  // DF-09: set(merge) instead of update() — tolerant of a missing mirror doc so
+  // one absent copy can't reject the whole batch and block the live one.
   const batch = writeBatch(db)
-  batch.update(doc(db, 'portfolios', params.portfolioId, 'investorReports', params.reportId), payload)
-  batch.update(doc(db, 'investorReports', params.reportId), payload)
+  batch.set(doc(db, 'portfolios', params.portfolioId, 'investorReports', params.reportId), payload, { merge: true })
+  batch.set(doc(db, 'investorReports', params.reportId), payload, { merge: true })
   await batch.commit()
 }
 
@@ -736,9 +849,10 @@ export async function unpublishInvestorReport(params: {
     publishedBy: deleteField(),
     updatedAt: serverTimestamp(),
   }
+  // DF-09: set(merge) so a missing mirror can't block unpublishing the live copy.
   const batch = writeBatch(db)
-  batch.update(doc(db, 'portfolios', params.portfolioId, 'investorReports', params.reportId), payload)
-  batch.update(doc(db, 'investorReports', params.reportId), payload)
+  batch.set(doc(db, 'portfolios', params.portfolioId, 'investorReports', params.reportId), payload, { merge: true })
+  batch.set(doc(db, 'investorReports', params.reportId), payload, { merge: true })
   await batch.commit()
 }
 
@@ -762,8 +876,9 @@ export async function unpublishAllInvestorReports(params: {
     updatedAt: serverTimestamp(),
   }
   for (const r of published) {
-    batch.update(doc(db, 'portfolios', params.portfolioId, 'investorReports', r.id), payload)
-    batch.update(doc(db, 'investorReports', r.id), payload)
+    // DF-09: set(merge) tolerant of a missing mirror doc.
+    batch.set(doc(db, 'portfolios', params.portfolioId, 'investorReports', r.id), payload, { merge: true })
+    batch.set(doc(db, 'investorReports', r.id), payload, { merge: true })
   }
   await batch.commit()
   return published.length
@@ -816,12 +931,13 @@ export async function unpublishAccumulatedReport(params: {
   period: string
 }): Promise<void> {
   const id = accumulatedReportId(params.investorUid, params.period)
-  await updateDoc(doc(db, 'investorReports', id), {
+  // DF-09: set(merge) so unpublish doesn't throw if the doc is unexpectedly absent.
+  await setDoc(doc(db, 'investorReports', id), {
     status: 'draft' as const,
     publishedAt: deleteField(),
     publishedBy: deleteField(),
     updatedAt: serverTimestamp(),
-  })
+  }, { merge: true })
 }
 
 // ─── All-time (lifetime, all-projects) investor report ───────────────────────
@@ -870,12 +986,13 @@ export async function unpublishAllTimeReport(params: {
   investorUid: string
 }): Promise<void> {
   const id = allTimeReportId(params.investorUid)
-  await updateDoc(doc(db, 'investorReports', id), {
+  // DF-09: set(merge) so unpublish doesn't throw if the doc is unexpectedly absent.
+  await setDoc(doc(db, 'investorReports', id), {
     status: 'draft' as const,
     publishedAt: deleteField(),
     publishedBy: deleteField(),
     updatedAt: serverTimestamp(),
-  })
+  }, { merge: true })
 }
 
 // ─── Bukti Transfer + Investor Notifications ─────────────────────────────
@@ -885,15 +1002,122 @@ export async function unpublishAllTimeReport(params: {
 // dashboard shows a banner for uncleared ones; cleared ones remain
 // in the collection so the History tab can render the income trail.
 
-const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const ALLOWED_PROOF_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']
+const MAX_PROOF_BYTES = 5 * 1024 * 1024
 
 function extOf(mime: string, name: string): string {
   if (mime === 'image/png') return 'png'
   if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpg'
   if (mime === 'image/webp') return 'webp'
+  if (mime === 'application/pdf') return 'pdf'
   const dot = name.lastIndexOf('.')
   return dot >= 0 ? name.slice(dot + 1).toLowerCase() : 'bin'
+}
+
+// Shared upload + batch-write for both report-linked and standalone proofs:
+// uploads the file to Storage, writes the `investorTransferProofs` doc, and
+// mirrors an `investorNotifications` doc so the investor gets a banner.
+interface ProofWriteParams {
+  investorUid: string
+  investorName: string
+  investorReportId: string | null
+  portfolioId: string | null
+  portfolioName: string
+  period: string
+  amount: number
+  principalAmount?: number | null
+  notes: string
+  file: File
+  uploadedBy: string
+  uploadedByName: string
+  message: string
+  /** Storage folder segment under the investor (e.g. the report id or "standalone"). */
+  pathSegment: string
+  docId: string
+}
+
+/**
+ * Validate + upload a proof file (PDF/image) to Storage under the investor's
+ * folder and return its download URL + storage path. Shared by transfer proofs
+ * and backfilled bagi-hasil manual entries. `pathSegment` separates the use
+ * (e.g. a report id, "standalone", or "manual").
+ */
+async function uploadProofToStorage(
+  investorUid: string,
+  pathSegment: string,
+  file: File,
+): Promise<{ fileUrl: string; storagePath: string }> {
+  if (!ALLOWED_PROOF_TYPES.includes(file.type)) {
+    throw new Error('Tipe file tidak didukung. Gunakan PNG, JPG, WEBP, atau PDF.')
+  }
+  if (file.size > MAX_PROOF_BYTES) {
+    throw new Error('Ukuran file melebihi 5 MB.')
+  }
+  const ext = extOf(file.type, file.name)
+  const path = `transferProofs/${investorUid}/${pathSegment}/${Date.now()}.${ext}`
+  const ref = storageRef(storage, path)
+  await uploadBytes(ref, file, { contentType: file.type })
+  const fileUrl = await getDownloadURL(ref)
+  return { fileUrl, storagePath: path }
+}
+
+async function writeTransferProof(
+  p: ProofWriteParams,
+): Promise<{ proofId: string; fileUrl: string }> {
+  if (!(p.amount > 0)) {
+    throw new Error('Nominal transfer harus lebih dari 0.')
+  }
+
+  const { fileUrl, storagePath: path } = await uploadProofToStorage(p.investorUid, p.pathSegment, p.file)
+
+  const proofData: Omit<InvestorTransferProof, 'id' | 'createdAt'> & {
+    createdAt: ReturnType<typeof serverTimestamp>
+  } = {
+    investorUid: p.investorUid,
+    investorName: p.investorName,
+    investorReportId: p.investorReportId,
+    portfolioId: p.portfolioId,
+    portfolioName: p.portfolioName,
+    period: p.period,
+    amount: p.amount,
+    principalAmount: p.principalAmount ?? null,
+    fileUrl,
+    fileName: p.file.name,
+    storagePath: path,
+    notes: p.notes.trim(),
+    uploadedBy: p.uploadedBy,
+    uploadedByName: p.uploadedByName,
+    createdAt: serverTimestamp(),
+  }
+
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'investorTransferProofs', p.docId), proofData)
+  batch.set(doc(db, 'investorNotifications', `notif_${p.docId}`), {
+    investorUid: p.investorUid,
+    type: 'transfer_proof',
+    transferProofId: p.docId,
+    investorReportId: p.investorReportId,
+    portfolioName: p.portfolioName,
+    period: p.period,
+    amount: p.amount,
+    // DF-13: mirror principal so the notification carries the full payout detail.
+    principalAmount: p.principalAmount ?? null,
+    fileUrl,
+    fileName: p.file.name,
+    message: p.message,
+    cleared: false,
+    createdAt: serverTimestamp(),
+  })
+  // DF-12: if the doc write fails, the file is already in Storage — best-effort
+  // delete it so we don't leak an orphan with no doc referencing it.
+  try {
+    await batch.commit()
+  } catch (e) {
+    try { await deleteObject(storageRef(storage, path)) } catch { /* noop */ }
+    throw e
+  }
+
+  return { proofId: p.docId, fileUrl }
 }
 
 export interface CreateTransferProofInput {
@@ -912,66 +1136,25 @@ export interface CreateTransferProofInput {
 export async function createInvestorTransferProof(
   input: CreateTransferProofInput,
 ): Promise<{ proofId: string; fileUrl: string }> {
-  if (!ALLOWED_IMAGE_TYPES.includes(input.file.type)) {
-    throw new Error('Tipe file tidak didukung. Gunakan PNG, JPG, atau WEBP.')
-  }
-  if (input.file.size > MAX_IMAGE_BYTES) {
-    throw new Error('Ukuran file melebihi 5 MB.')
-  }
-  if (!(input.amount > 0)) {
-    throw new Error('Nominal transfer harus lebih dari 0.')
-  }
-
-  const ext = extOf(input.file.type, input.file.name)
-  const safeReportId = input.investorReport.id.replace(/[^a-zA-Z0-9_-]/g, '_')
-  const path = `transferProofs/${input.investorUid}/${safeReportId}/${Date.now()}.${ext}`
-  const ref = storageRef(storage, path)
-  await uploadBytes(ref, input.file, { contentType: input.file.type })
-  const fileUrl = await getDownloadURL(ref)
-
-  const proofId = `${input.investorReport.id}_${Date.now()}`
-  const proofData: Omit<InvestorTransferProof, 'id' | 'createdAt'> & {
-    createdAt: ReturnType<typeof serverTimestamp>
-  } = {
+  const report = input.investorReport
+  const safeReportId = report.id.replace(/[^a-zA-Z0-9_-]/g, '_')
+  return writeTransferProof({
     investorUid: input.investorUid,
     investorName: input.investorName,
-    investorReportId: input.investorReport.id,
-    portfolioId: input.investorReport.portfolioId === '__accumulated__' ? null : input.investorReport.portfolioId,
-    portfolioName: input.investorReport.portfolioName,
-    period: input.investorReport.period,
+    investorReportId: report.id,
+    portfolioId: report.portfolioId === '__accumulated__' ? null : report.portfolioId,
+    portfolioName: report.portfolioName,
+    period: report.period,
     amount: input.amount,
-    principalAmount: input.principalAmount ?? null,
-    fileUrl,
-    fileName: input.file.name,
-    storagePath: path,
-    notes: input.notes.trim(),
+    principalAmount: input.principalAmount,
+    notes: input.notes,
+    file: input.file,
     uploadedBy: input.uploadedBy,
     uploadedByName: input.uploadedByName,
-    createdAt: serverTimestamp(),
-  }
-
-  const message = buildProofMessage(input)
-
-  const batch = writeBatch(db)
-  const proofRef = doc(db, 'investorTransferProofs', proofId)
-  batch.set(proofRef, proofData)
-  const notifRef = doc(db, 'investorNotifications', `notif_${proofId}`)
-  batch.set(notifRef, {
-    investorUid: input.investorUid,
-    type: 'transfer_proof',
-    transferProofId: proofId,
-    investorReportId: input.investorReport.id,
-    portfolioName: input.investorReport.portfolioName,
-    period: input.investorReport.period,
-    amount: input.amount,
-    fileUrl,
-    message,
-    cleared: false,
-    createdAt: serverTimestamp(),
+    message: buildProofMessage(input),
+    pathSegment: safeReportId,
+    docId: `${report.id}_${Date.now()}`,
   })
-  await batch.commit()
-
-  return { proofId, fileUrl }
 }
 
 function buildProofMessage(input: CreateTransferProofInput): string {
@@ -983,6 +1166,50 @@ function buildProofMessage(input: CreateTransferProofInput): string {
       ? 'laporan akumulasi'
       : `laporan ${report.portfolioName}`
   return `Bukti transfer ${formatted} untuk ${subject} telah dikirim.`
+}
+
+// ─── Standalone transfer proof (no published report) ──────────────────────
+//
+// IR sends a proof for a portfolio that has no analyst data / published report
+// yet, but a real bagi hasil was paid. Decoupled from investorReports:
+// investorReportId is null and portfolio + period come straight from IR's input.
+
+export interface CreateStandaloneProofInput {
+  investorUid: string
+  investorName: string
+  portfolioId: string
+  portfolioName: string
+  /** "YYYY-MM". */
+  period: string
+  amount: number
+  principalAmount?: number | null
+  notes: string
+  file: File
+  uploadedBy: string
+  uploadedByName: string
+}
+
+export async function createStandaloneTransferProof(
+  input: CreateStandaloneProofInput,
+): Promise<{ proofId: string; fileUrl: string }> {
+  const formatted = `Rp ${input.amount.toLocaleString('id-ID')}`
+  return writeTransferProof({
+    investorUid: input.investorUid,
+    investorName: input.investorName,
+    investorReportId: null,
+    portfolioId: input.portfolioId,
+    portfolioName: input.portfolioName,
+    period: input.period,
+    amount: input.amount,
+    principalAmount: input.principalAmount,
+    notes: input.notes,
+    file: input.file,
+    uploadedBy: input.uploadedBy,
+    uploadedByName: input.uploadedByName,
+    message: `Bukti transfer ${formatted} untuk laporan ${input.portfolioName} telah dikirim.`,
+    pathSegment: 'standalone',
+    docId: `standalone_${Date.now()}`,
+  })
 }
 
 export async function getTransferProofsForInvestor(investorUid: string): Promise<InvestorTransferProof[]> {
@@ -1015,8 +1242,9 @@ export async function getTransferProofsForReport(investorReportId: string): Prom
 }
 
 export async function deleteInvestorTransferProof(proof: InvestorTransferProof): Promise<void> {
-  // Best-effort storage cleanup; ignore missing files.
-  try { await deleteObject(storageRef(storage, proof.storagePath)) } catch { /* noop */ }
+  // DF-05: delete the Firestore docs FIRST. If this is rejected (e.g. by rules)
+  // it throws before we touch Storage, so we never orphan a live doc by
+  // destroying its file. Storage cleanup is best-effort afterwards.
   const batch = writeBatch(db)
   batch.delete(doc(db, 'investorTransferProofs', proof.id))
   const notifSnap = await getDocs(query(
@@ -1025,18 +1253,26 @@ export async function deleteInvestorTransferProof(proof: InvestorTransferProof):
   ))
   notifSnap.forEach(d => batch.delete(d.ref))
   await batch.commit()
+
+  // Best-effort storage cleanup; ignore missing files.
+  try { await deleteObject(storageRef(storage, proof.storagePath)) } catch { /* noop */ }
 }
 
 export async function getNotificationsForInvestor(
   investorUid: string,
 ): Promise<InvestorNotification[]> {
+  // DF-14: filter by investorUid only and sort in JS (matches the rest of this
+  // file). The previous where+orderBy needed a composite index; if it were
+  // missing, the query threw and the hook silently showed the investor Rp 0 with
+  // no payment history. A single-field where needs no composite index.
   const q = query(
     collection(db, 'investorNotifications'),
     where('investorUid', '==', investorUid),
-    orderBy('createdAt', 'desc'),
   )
   const snap = await getDocs(q)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorNotification)
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as InvestorNotification)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
 }
 
 export async function clearNotification(notificationId: string): Promise<void> {
@@ -1062,6 +1298,8 @@ export interface CreateBagiHasilManualEntryInput {
   bagiHasilAmount: number
   principalAmount: number | null
   notes: string
+  /** Proof file (PDF/image) for the backfilled payout — required (DF-01). */
+  file: File
   createdBy: string
   createdByName: string
 }
@@ -1069,22 +1307,62 @@ export interface CreateBagiHasilManualEntryInput {
 export async function createBagiHasilManualEntry(
   input: CreateBagiHasilManualEntryInput,
 ): Promise<string> {
-  const ref = await addDoc(collection(db, 'bagiHasilManualEntries'), {
-    ...input,
-    createdAt: serverTimestamp(),
-  })
-  return ref.id
+  const { file, ...rest } = input
+  const { fileUrl, storagePath } = await uploadProofToStorage(input.investorUid, 'manual', file)
+  // DF-12: clean up the just-uploaded file if the doc write fails.
+  try {
+    const ref = await addDoc(collection(db, 'bagiHasilManualEntries'), {
+      ...rest,
+      fileUrl,
+      fileName: file.name,
+      storagePath,
+      createdAt: serverTimestamp(),
+    })
+    return ref.id
+  } catch (e) {
+    try { await deleteObject(storageRef(storage, storagePath)) } catch { /* noop */ }
+    throw e
+  }
 }
 
 export async function updateBagiHasilManualEntry(
   id: string,
   patch: Partial<Pick<BagiHasilManualEntry, 'period' | 'bagiHasilAmount' | 'principalAmount' | 'notes'>>,
+  /** When provided, replaces the proof file. The previous file is deleted. */
+  opts?: { file?: File; investorUid: string; oldStoragePath?: string },
 ): Promise<void> {
-  await updateDoc(doc(db, 'bagiHasilManualEntries', id), patch)
+  let fileFields: Partial<Pick<BagiHasilManualEntry, 'fileUrl' | 'fileName' | 'storagePath'>> = {}
+  let newStoragePath: string | undefined
+  if (opts?.file) {
+    const { fileUrl, storagePath } = await uploadProofToStorage(opts.investorUid, 'manual', opts.file)
+    fileFields = { fileUrl, fileName: opts.file.name, storagePath }
+    newStoragePath = storagePath
+  }
+  try {
+    await updateDoc(doc(db, 'bagiHasilManualEntries', id), { ...patch, ...fileFields })
+  } catch (e) {
+    // DF-12: the doc update failed — delete the freshly-uploaded replacement so
+    // it doesn't orphan (the old file is still the live reference).
+    if (newStoragePath) {
+      try { await deleteObject(storageRef(storage, newStoragePath)) } catch { /* noop */ }
+    }
+    throw e
+  }
+  // Best-effort cleanup of the replaced file, after the doc no longer points at it.
+  if (opts?.file && opts.oldStoragePath) {
+    try { await deleteObject(storageRef(storage, opts.oldStoragePath)) } catch { /* noop */ }
+  }
 }
 
-export async function deleteBagiHasilManualEntry(id: string): Promise<void> {
+export async function deleteBagiHasilManualEntry(
+  id: string,
+  storagePath?: string,
+): Promise<void> {
   await deleteDoc(doc(db, 'bagiHasilManualEntries', id))
+  // Best-effort storage cleanup; ignore missing/legacy entries without a file.
+  if (storagePath) {
+    try { await deleteObject(storageRef(storage, storagePath)) } catch { /* noop */ }
+  }
 }
 
 export async function getBagiHasilManualEntriesForInvestor(
@@ -1105,4 +1383,49 @@ export async function getBagiHasilManualEntries(
 ): Promise<BagiHasilManualEntry[]> {
   const all = await getBagiHasilManualEntriesForInvestor(investorUid)
   return all.filter(e => e.portfolioId === portfolioId)
+}
+
+// ─── Admin Data Override Audit Log ────────────────────────────────────────
+
+export interface RecordAdminOverrideInput {
+  scope: AdminOverrideScope
+  targetId: string
+  targetLabel: string
+  section: string
+  summary: string
+  before: Record<string, unknown>
+  after: Record<string, unknown>
+  reasonNote: string
+  changedByUid: string
+  changedByName: string
+}
+
+/**
+ * Append an immutable entry to /adminOverrides recording a manual admin
+ * correction (who/what/when/why + before/after snapshot). Called by the admin
+ * override pages AFTER the underlying write succeeds, so a failed write never
+ * leaves a misleading log entry. Never throws into the caller's save path on its
+ * own — callers should await it and surface failures, but the data write is the
+ * source of truth.
+ */
+export async function recordAdminOverride(input: RecordAdminOverrideInput): Promise<string> {
+  const ref = await addDoc(collection(db, 'adminOverrides'), {
+    ...input,
+    changedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function getAdminOverridesForTarget(
+  scope: AdminOverrideScope,
+  targetId: string,
+): Promise<AdminOverrideLog[]> {
+  const snap = await getDocs(query(
+    collection(db, 'adminOverrides'),
+    where('scope', '==', scope),
+    where('targetId', '==', targetId),
+  ))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as AdminOverrideLog)
+    .sort((a, b) => (b.changedAt?.seconds ?? 0) - (a.changedAt?.seconds ?? 0))
 }

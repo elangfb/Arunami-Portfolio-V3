@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAllUsers, getAllAllocations } from '@/lib/firestore'
+import { getAllUsers, getAllAllocations, getAllPortfolios } from '@/lib/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,10 +19,16 @@ export default function AdminInvestors({ detailBase = '/admin/investors' }: Admi
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [summaries, setSummaries] = useState<InvestorSummary[]>([])
+  // DF-08: live portfolioId → code map so badges reflect renames, not the
+  // denormalized code stored on the allocation.
+  const [portfolioCodes, setPortfolioCodes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     ;(async () => {
-      const [users, allocations] = await Promise.all([getAllUsers(), getAllAllocations()])
+      const [users, allocations, portfolios] = await Promise.all([
+        getAllUsers(), getAllAllocations(), getAllPortfolios(true),
+      ])
+      setPortfolioCodes(Object.fromEntries(portfolios.map(p => [p.id, p.code])))
       const investors = users.filter(u => u.role === 'investor')
 
       const allocByInvestor = new Map<string, InvestorAllocation[]>()
@@ -147,7 +153,7 @@ export default function AdminInvestors({ detailBase = '/admin/investors' }: Admi
                           <div className="flex flex-wrap gap-1">
                             {s.allocations.map(a => (
                               <Badge key={a.id} variant="outline" className="text-xs">
-                                {a.portfolioCode}
+                                {portfolioCodes[a.portfolioId] ?? a.portfolioCode}
                               </Badge>
                             ))}
                           </div>

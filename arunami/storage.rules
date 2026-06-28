@@ -23,14 +23,16 @@ service firebase.storage {
       return isSignedIn() && userDoc().role == 'investor';
     }
 
-    // Bukti Transfer screenshots. Path: transferProofs/{investorUid}/{reportId}/{file}
+    // Bukti Transfer proofs (image or PDF). Path: transferProofs/{investorUid}/{reportId}/{file}
+    // The {reportId} segment is "standalone" for proofs not tied to a report.
     // Staff/IR may write; the targeted investor may read their own.
     match /transferProofs/{investorUid}/{reportId}/{fileName} {
       allow read: if isStaff() || isInvestorRelation() ||
         (isInvestor() && request.auth.uid == investorUid);
       allow write: if (isStaff() || isInvestorRelation()) &&
         request.resource.size < 5 * 1024 * 1024 &&
-        request.resource.contentType.matches('image/.*');
+        (request.resource.contentType.matches('image/.*') ||
+         request.resource.contentType == 'application/pdf');
     }
   }
 }

@@ -118,9 +118,12 @@ export function previousPeriod(period: string): string {
   return period
 }
 
-/** Sort comparator for period strings — handles both "YYYY-MM" and "YYYY-Qn" (chronological) */
+/** Sort comparator for period strings — handles both "YYYY-MM" and "YYYY-Qn" (chronological).
+ *  DF-11: a quarter ("2026-Q1") and its end-month ("2026-03") share a sort key; tiebreak by
+ *  the raw string so mixed monthly/quarterly lists order deterministically instead of arbitrarily. */
 export function comparePeriods(a: string, b: string): number {
-  return periodSortKey(a).localeCompare(periodSortKey(b))
+  const cmp = periodSortKey(a).localeCompare(periodSortKey(b))
+  return cmp !== 0 ? cmp : a.localeCompare(b)
 }
 
 /**
