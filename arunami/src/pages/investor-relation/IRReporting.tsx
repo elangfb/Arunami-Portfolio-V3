@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   getAllUsers, getAllAllocations, getInvestorReportSources, getPublishedInvestorReports,
@@ -6,6 +6,7 @@ import {
 import type { InvestorReportSource } from '@/lib/firestore'
 import { comparePeriods } from '@/lib/dateUtils'
 import { formatCurrencyCompact } from '@/lib/utils'
+import { makeBrandResolver } from '@/lib/portfolioName'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Search, FileText, ChevronRight } from 'lucide-react'
 import InvestorReportForm from '@/pages/admin/components/InvestorReportForm'
 import InvestorReportHistory from '@/pages/admin/components/InvestorReportHistory'
-import type { AppUser, InvestorAllocation, InvestorReportDoc } from '@/types'
+import type { AppUser, InvestorAllocation, InvestorReportDoc, Portfolio } from '@/types'
 
 type View = 'home' | 'investor' | 'generate'
 
@@ -36,6 +37,10 @@ export default function IRReporting() {
   const [portfolioData, setPortfolioData] = useState<InvestorReportSource[]>([])
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
   const [investorLoading, setInvestorLoading] = useState(false)
+  const resolveBrand = useMemo(
+    () => makeBrandResolver(portfolioData.map(p => p.portfolio).filter((x): x is Portfolio => !!x)),
+    [portfolioData],
+  )
 
   useEffect(() => {
     ;(async () => {
@@ -221,7 +226,7 @@ export default function IRReporting() {
         {investorLoading ? (
           <div className="h-64 animate-pulse rounded-lg bg-muted" />
         ) : (
-          <InvestorReportHistory reports={reports} onChanged={refreshReports} />
+          <InvestorReportHistory reports={reports} resolveBrand={resolveBrand} onChanged={refreshReports} />
         )}
       </div>
     )

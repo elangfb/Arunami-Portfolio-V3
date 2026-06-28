@@ -8,10 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Eye, Undo2 } from 'lucide-react'
+import type { BrandResolver } from '@/lib/portfolioName'
 import type { InvestorReportDoc } from '@/types'
 
 interface Props {
   reports: InvestorReportDoc[]
+  /** Resolves a portfolio's Brand Name for the Portofolio column; falls back to the PT name. */
+  resolveBrand?: BrandResolver
   /**
    * DF-07: when provided, accumulated/all-time reports get a "Tarik" (unpublish)
    * action. Called after a successful unpublish so the parent can refresh.
@@ -40,11 +43,12 @@ function reportTypeLabel(r: InvestorReportDoc): string {
   return r.reportType === 'quarterly' ? 'Kuartalan' : 'Bulanan'
 }
 
-function reportScopeLabel(r: InvestorReportDoc): string {
-  return r.scope === 'accumulated' || r.scope === 'all_time' ? 'Semua Portofolio' : r.portfolioName
+function reportScopeLabel(r: InvestorReportDoc, resolveBrand?: BrandResolver): string {
+  if (r.scope === 'accumulated' || r.scope === 'all_time') return 'Semua Portofolio'
+  return resolveBrand ? resolveBrand({ id: r.portfolioId, ptName: r.portfolioName }) : r.portfolioName
 }
 
-export default function InvestorReportHistory({ reports, onChanged }: Props) {
+export default function InvestorReportHistory({ reports, resolveBrand, onChanged }: Props) {
   const [viewReport, setViewReport] = useState<InvestorReportDoc | null>(null)
   const [unpublishing, setUnpublishing] = useState<string | null>(null)
 
@@ -101,7 +105,7 @@ export default function InvestorReportHistory({ reports, onChanged }: Props) {
                       <td className="py-2.5 px-3">
                         <Badge variant="outline">{reportTypeLabel(r)}</Badge>
                       </td>
-                      <td className="py-2.5 px-3">{reportScopeLabel(r)}</td>
+                      <td className="py-2.5 px-3">{reportScopeLabel(r, resolveBrand)}</td>
                       <td className="py-2.5 px-3">{formatReportDate(r)}</td>
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -137,7 +141,7 @@ export default function InvestorReportHistory({ reports, onChanged }: Props) {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {viewReport && `${reportScopeLabel(viewReport)} — ${reportPeriodLabel(viewReport)}`}
+              {viewReport && `${reportScopeLabel(viewReport, resolveBrand)} — ${reportPeriodLabel(viewReport)}`}
             </DialogTitle>
           </DialogHeader>
           {viewReport && (

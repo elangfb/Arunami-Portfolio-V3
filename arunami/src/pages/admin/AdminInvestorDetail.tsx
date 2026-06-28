@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -7,7 +7,7 @@ import {
 } from '@/lib/firestore'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
-import { brandOf } from '@/lib/portfolioName'
+import { brandOf, makeBrandResolver } from '@/lib/portfolioName'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -165,6 +165,11 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
   }
 
   useEffect(() => { loadData() }, [uid])
+
+  const resolveBrand = useMemo(
+    () => makeBrandResolver(portfolios.map(p => p.portfolio).filter((x): x is Portfolio => !!x)),
+    [portfolios],
+  )
 
   const totalInvested = portfolios.reduce((s, p) => s + p.allocation.investedAmount, 0)
   const totalEarnings = portfolios.reduce((s, p) => s + p.totalEarnings, 0)      // cumulative, all published periods
@@ -371,7 +376,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
       </Card>
 
       {/* Report History */}
-      {showReporting && <InvestorReportHistory reports={reports} onChanged={loadData} />}
+      {showReporting && <InvestorReportHistory reports={reports} resolveBrand={resolveBrand} onChanged={loadData} />}
 
       {/* Communication History */}
       <Card>
