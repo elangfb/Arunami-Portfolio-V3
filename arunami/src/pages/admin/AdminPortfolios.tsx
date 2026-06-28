@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
+import { brandOf } from '@/lib/portfolioName'
 import { PlusCircle, Pencil, Trash2, UserPlus, Search, ChevronDown, X, Settings2, Archive, ArchiveRestore, Wrench } from 'lucide-react'
 import type { Portfolio, InvestorAllocation, AppUser } from '@/types'
 import { useAuthStore } from '@/store/authStore'
@@ -405,13 +406,13 @@ export default function AdminPortfolios() {
                         </td>
                         <td className="px-3 py-3 align-middle">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{p.name}</span>
+                            <span className="font-medium">{brandOf(p)}</span>
                             {p.archived && (
                               <Badge variant="outline" className="border-amber-500 text-amber-600 text-[10px]">Diarsipkan</Badge>
                             )}
                           </div>
-                          {p.brandName && (
-                            <div className="text-xs text-muted-foreground">{p.brandName}</div>
+                          {brandOf(p) !== p.name && (
+                            <div className="text-xs text-muted-foreground">{p.name}</div>
                           )}
                         </td>
                         <td className="px-3 py-3 align-middle text-muted-foreground">{p.code}</td>

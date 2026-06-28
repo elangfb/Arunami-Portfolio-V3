@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import OverrideSection from '@/components/admin/OverrideSection'
 import { useAuthStore } from '@/store/authStore'
+import { brandOf } from '@/lib/portfolioName'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { formatPeriod } from '@/lib/dateUtils'
 import { ArrowLeft, AlertTriangle, Pencil, Trash2, UserPlus } from 'lucide-react'
@@ -143,9 +144,12 @@ export default function AdminPortfolioOverride() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">Override Data — {portfolio.name}</h1>
+            <h1 className="text-2xl font-bold">Override Data — {brandOf(portfolio)}</h1>
             <Badge variant="outline">{portfolio.code}</Badge>
           </div>
+          {brandOf(portfolio) !== portfolio.name && (
+            <p className="text-sm font-medium text-muted-foreground">{portfolio.name}</p>
+          )}
           <p className="text-sm text-muted-foreground">Koreksi data portofolio secara manual. Gunakan hanya untuk memperbaiki input yang salah.</p>
         </div>
       </div>

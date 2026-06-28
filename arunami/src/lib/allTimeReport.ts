@@ -28,6 +28,7 @@ export interface AllTimePeriodLine {
 
 export interface AllTimePortfolioLine {
   portfolioName: string
+  brandName?: string
   portfolioCode: string
   invested: number
   cumulativeEarnings: number
@@ -182,6 +183,7 @@ export function computeAllTimeReport(args: {
     const invested = allocation.investedAmount
     lines.push({
       portfolioName: portfolio.name,
+      brandName: portfolio.brandName,
       portfolioCode: allocation.portfolioCode,
       invested,
       cumulativeEarnings,

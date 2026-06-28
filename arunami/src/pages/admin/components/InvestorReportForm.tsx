@@ -6,6 +6,7 @@ import { buildInvestorReportSections, assembleAccumulatedReportHtml, assembleAll
 import type { AccumulatedReportLine } from '@/lib/reportHtml'
 import { computeAllTimeReport } from '@/lib/allTimeReport'
 import { formatCurrencyExact, formatPercent } from '@/lib/utils'
+import { makeBrandResolver } from '@/lib/portfolioName'
 import { formatPeriod, buildQuarterKey, quarterToMonths, comparePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { ClipboardCopy, Printer, Send } from 'lucide-react'
-import type { AppUser, InvestorReportDoc } from '@/types'
+import type { AppUser, InvestorReportDoc, Portfolio } from '@/types'
 
 interface Props {
   investor: AppUser
@@ -32,6 +33,10 @@ function monthToQuarterKey(month: string): string {
 
 export default function InvestorReportForm({ investor, portfolioData, publishedReports, onDone }: Props) {
   const { user: admin } = useAuthStore()
+  const resolveBrand = useMemo(
+    () => makeBrandResolver(portfolioData.map(p => p.portfolio).filter((x): x is Portfolio => !!x)),
+    [portfolioData],
+  )
   const [reportType, setReportType] = useState<'monthly' | 'quarterly' | 'alltime'>('monthly')
   const [selectedPeriod, setSelectedPeriod] = useState('')  // '' = follow latest available
   const [selectedPortfolios, setSelectedPortfolios] = useState<Set<string>>(
@@ -154,7 +159,7 @@ export default function InvestorReportForm({ investor, portfolioData, publishedR
       text += `Yth. ${investor.displayName},\n\n`
       text += `Ringkasan kinerja seluruh investasi Anda (${coverageLabel}):\n\n`
       for (const l of s.lines) {
-        text += `📊 ${l.portfolioName} (${l.portfolioCode})\n`
+        text += `📊 ${resolveBrand({ ptName: l.portfolioName })} (${l.portfolioCode})\n`
         text += `   Investasi: ${formatCurrencyExact(l.invested)}\n`
         text += `   Earning Kumulatif: ${formatCurrencyExact(l.cumulativeEarnings)}\n`
         text += `   ROI All-Time: ${formatPercent(l.allTimeROI)}\n\n`
@@ -172,7 +177,7 @@ export default function InvestorReportForm({ investor, portfolioData, publishedR
     text += `Berikut adalah ringkasan investasi Anda untuk periode ${periodLabel}:\n\n`
 
     for (const line of lines) {
-      text += `📊 ${line.portfolioName} (${line.portfolioCode})\n`
+      text += `📊 ${resolveBrand({ ptName: line.portfolioName })} (${line.portfolioCode})\n`
       text += `   Investasi: ${formatCurrencyExact(line.invested)}\n`
       text += `   Net Profit: ${formatCurrencyExact(line.netProfit)}\n`
       text += `   Earning Anda: ${formatCurrencyExact(line.earnings)}\n`

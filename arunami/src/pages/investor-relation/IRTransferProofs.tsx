@@ -26,8 +26,9 @@ import {
   Search, ArrowLeft, ChevronRight, Upload, FileImage, FileText, FilePlus, Trash2, Bell, CheckCircle2, Wallet,
 } from 'lucide-react'
 import ProofDropzone from '@/components/investor/ProofDropzone'
+import { makeBrandResolver, type BrandResolver } from '@/lib/portfolioName'
 import type {
-  AppUser, InvestorAllocation, InvestorReportDoc, InvestorTransferProof,
+  AppUser, InvestorAllocation, InvestorReportDoc, InvestorTransferProof, Portfolio,
 } from '@/types'
 
 type View = 'home' | 'investor'
@@ -66,12 +67,15 @@ export default function IRTransferProofs() {
   // Portfolio-scoped grace reports with no payout ('none') are informational —
   // there's no money transfer to prove, so the proof action is disabled for them.
   const [graceNoPayoutPortfolios, setGraceNoPayoutPortfolios] = useState<Set<string>>(new Set())
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([])
+  const resolveBrand = useMemo(() => makeBrandResolver(portfolios), [portfolios])
 
   useEffect(() => {
     ;(async () => {
       const [users, allocations, proofs, portfolios] = await Promise.all([
         getAllUsers(), getAllAllocations(), getAllTransferProofs(), getAllPortfolios(),
       ])
+      setPortfolios(portfolios)
       setGraceNoPayoutPortfolios(new Set(
         portfolios
           .filter(p => p.isGracePeriod && (p.graceConfig?.returnMode ?? 'none') === 'none')
@@ -344,7 +348,7 @@ export default function IRTransferProofs() {
                       <tr key={r.id} className="hover:bg-muted/30 align-top">
                         <td className="py-2.5 px-3 font-medium">{periodLabel(r)}</td>
                         <td className="py-2.5 px-3 text-muted-foreground">
-                          {r.scope === 'accumulated' ? 'Akumulasi' : r.scope === 'all_time' ? 'All-Time' : r.portfolioName}
+                          {r.scope === 'accumulated' ? 'Akumulasi' : r.scope === 'all_time' ? 'All-Time' : resolveBrand({ id: r.portfolioId, ptName: r.portfolioName })}
                         </td>
                         <td className="py-2.5 px-3">
                           {proofs.length === 0 ? (
@@ -424,7 +428,7 @@ export default function IRTransferProofs() {
                   {standaloneProofs.map(p => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="py-2.5 px-3 font-medium">{formatPeriod(p.period)}</td>
-                      <td className="py-2.5 px-3 text-muted-foreground">{p.portfolioName}</td>
+                      <td className="py-2.5 px-3 text-muted-foreground">{resolveBrand({ id: p.portfolioId, ptName: p.portfolioName })}</td>
                       <td className="py-2.5 px-3">
                         <a href={p.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[#1e5f3f] hover:underline">
                           {isPdfProof(p.fileName) ? <FileText className="h-3.5 w-3.5" /> : <FileImage className="h-3.5 w-3.5" />}
@@ -458,6 +462,7 @@ export default function IRTransferProofs() {
         <UploadProofDialog
           investor={investor}
           report={uploadTarget}
+          resolveBrand={resolveBrand}
           onClose={() => setUploadTarget(null)}
           onUploaded={async () => {
             await refreshProofsFor(uploadTarget.id)
@@ -471,6 +476,7 @@ export default function IRTransferProofs() {
         <StandaloneProofDialog
           investor={investor}
           allocations={detailAllocations}
+          resolveBrand={resolveBrand}
           onClose={() => setStandaloneOpen(false)}
           onUploaded={async () => {
             await refreshStandalone()
@@ -484,10 +490,11 @@ export default function IRTransferProofs() {
 }
 
 function UploadProofDialog({
-  investor, report, onClose, onUploaded,
+  investor, report, resolveBrand, onClose, onUploaded,
 }: {
   investor: AppUser
   report: InvestorReportDoc
+  resolveBrand: BrandResolver
   onClose: () => void
   onUploaded: (proofId: string) => void | Promise<void>
 }) {
@@ -538,7 +545,7 @@ function UploadProofDialog({
         <DialogHeader>
           <DialogTitle>Kirim Bukti Transfer</DialogTitle>
           <DialogDescription>
-            {investor.displayName} · {periodLabel(report)} · {report.scope === 'accumulated' ? 'Akumulasi' : report.scope === 'all_time' ? 'All-Time' : report.portfolioName}
+            {investor.displayName} · {periodLabel(report)} · {report.scope === 'accumulated' ? 'Akumulasi' : report.scope === 'all_time' ? 'All-Time' : resolveBrand({ id: report.portfolioId, ptName: report.portfolioName })}
           </DialogDescription>
         </DialogHeader>
 
@@ -602,10 +609,11 @@ function UploadProofDialog({
  * IR picks one of the investor's allocated portfolios + period directly.
  */
 function StandaloneProofDialog({
-  investor, allocations, onClose, onUploaded,
+  investor, allocations, resolveBrand, onClose, onUploaded,
 }: {
   investor: AppUser
   allocations: InvestorAllocation[]
+  resolveBrand: BrandResolver
   onClose: () => void
   onUploaded: () => void | Promise<void>
 }) {
@@ -680,7 +688,7 @@ function StandaloneProofDialog({
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
               >
                 {allocations.map(a => (
-                  <option key={a.portfolioId} value={a.portfolioId}>{a.portfolioName} ({a.portfolioCode})</option>
+                  <option key={a.portfolioId} value={a.portfolioId}>{resolveBrand({ id: a.portfolioId, ptName: a.portfolioName })} ({a.portfolioCode})</option>
                 ))}
               </select>
             )}

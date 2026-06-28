@@ -7,6 +7,7 @@ import {
 } from '@/lib/firestore'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
+import { brandOf } from '@/lib/portfolioName'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -331,7 +332,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
                     return (
                       <tr key={p.allocation.id} className="hover:bg-muted/30">
                         <td className="py-2.5 px-3">
-                          <p className="font-medium">{p.allocation.portfolioName}</p>
+                          <p className="font-medium">{p.portfolio ? brandOf(p.portfolio) : p.allocation.portfolioName}</p>
                           <p className="text-xs text-muted-foreground">{p.allocation.portfolioCode}</p>
                         </td>
                         <td className="py-2.5 px-3 text-right">

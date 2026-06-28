@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import OverrideSection from '@/components/admin/OverrideSection'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact } from '@/lib/utils'
+import { makeBrandResolver } from '@/lib/portfolioName'
 import { formatPeriod } from '@/lib/dateUtils'
 import { ArrowLeft, AlertTriangle, Pencil, Trash2, UserPlus } from 'lucide-react'
 import type {
@@ -117,7 +118,7 @@ export default function AdminInvestorOverride() {
 
       <AllocationsSection investor={investor} allocations={allocations} portfolios={portfolios} onSaved={loadAll} logOverride={logOverride} />
 
-      <PayoutsSection payouts={payouts} onSaved={loadAll} logOverride={logOverride} />
+      <PayoutsSection payouts={payouts} portfolios={portfolios} onSaved={loadAll} logOverride={logOverride} />
     </div>
   )
 }
@@ -189,6 +190,7 @@ function AllocationsSection({ investor, allocations, portfolios, onSaved, logOve
 
   const reasonValid = reason.trim().length > 0
   const available = portfolios.filter(p => !allocations.some(a => a.portfolioId === p.id))
+  const resolveBrand = useMemo(() => makeBrandResolver(portfolios), [portfolios])
 
   const requireReason = () => {
     if (!reasonValid) { toast.error('Isi alasan override terlebih dahulu.'); return false }
@@ -282,7 +284,7 @@ function AllocationsSection({ investor, allocations, portfolios, onSaved, logOve
                   return (
                     <tr key={a.id} className="hover:bg-muted/30">
                       <td className="py-2.5 px-3">
-                        <p className="font-medium">{a.portfolioName}</p>
+                        <p className="font-medium">{resolveBrand({ id: a.portfolioId, ptName: a.portfolioName })}</p>
                         <p className="text-xs text-muted-foreground">{a.portfolioCode}</p>
                       </td>
                       <td className="py-2.5 px-3 text-right">
@@ -345,7 +347,8 @@ function AllocationsSection({ investor, allocations, portfolios, onSaved, logOve
 
 // ─── Bagi hasil / payout entries ─────────────────────────────────────────────
 
-function PayoutsSection({ payouts, onSaved, logOverride }: { payouts: BagiHasilManualEntry[]; onSaved: () => Promise<void>; logOverride: LogFn }) {
+function PayoutsSection({ payouts, portfolios, onSaved, logOverride }: { payouts: BagiHasilManualEntry[]; portfolios: Portfolio[]; onSaved: () => Promise<void>; logOverride: LogFn }) {
+  const resolveBrand = useMemo(() => makeBrandResolver(portfolios), [portfolios])
   const [reason, setReason] = useState('')
   const [editId, setEditId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
@@ -424,7 +427,7 @@ function PayoutsSection({ payouts, onSaved, logOverride }: { payouts: BagiHasilM
                 <div key={e.id} className="rounded-md border p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium">{e.portfolioName} — {formatPeriod(e.period)}</p>
+                      <p className="text-sm font-medium">{resolveBrand({ id: e.portfolioId, ptName: e.portfolioName })} — {formatPeriod(e.period)}</p>
                       <p className="text-xs text-muted-foreground">
                         Bagi hasil {formatCurrencyCompact(e.bagiHasilAmount)}
                         {e.principalAmount != null && ` · Pokok ${formatCurrencyCompact(e.principalAmount)}`}

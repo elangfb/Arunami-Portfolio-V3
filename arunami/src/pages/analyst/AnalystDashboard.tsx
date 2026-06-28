@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase'
 import { getAnalystPortfolios } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact } from '@/lib/utils'
+import { brandOf } from '@/lib/portfolioName'
 import { INDUSTRY_PRESETS } from '@/lib/industryPresets'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -133,9 +134,9 @@ export default function AnalystDashboard() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate font-medium">{p.name}</div>
-                      {p.brandName && (
-                        <div className="truncate text-xs text-muted-foreground">{p.brandName}</div>
+                      <div className="truncate font-medium">{brandOf(p)}</div>
+                      {brandOf(p) !== p.name && (
+                        <div className="truncate text-xs text-muted-foreground">{p.name}</div>
                       )}
                       <div className="mt-0.5 text-xs text-muted-foreground">{p.code} · {p.stage}</div>
                     </div>
@@ -180,9 +181,9 @@ export default function AnalystDashboard() {
                       onClick={() => navigate(`/analyst/portfolios/${p.id}/overview`)}
                     >
                       <td className="px-3 py-3 align-middle">
-                        <div className="font-medium">{p.name}</div>
-                        {p.brandName && (
-                          <div className="text-xs text-muted-foreground">{p.brandName}</div>
+                        <div className="font-medium">{brandOf(p)}</div>
+                        {brandOf(p) !== p.name && (
+                          <div className="text-xs text-muted-foreground">{p.name}</div>
                         )}
                       </td>
                       <td className="px-3 py-3 align-middle text-muted-foreground">{p.code}</td>

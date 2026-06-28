@@ -68,6 +68,7 @@ function highlightRow(label: string, desc: string, val: string): string {
 
 export interface AccumulatedReportLine {
   portfolioName: string
+  brandName?: string
   portfolioCode: string
   invested: number
   netProfit: number
@@ -528,6 +529,7 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
 
   const line: AccumulatedReportLine | null = (allocation && distributionResult) ? {
     portfolioName: portfolio.name,
+    brandName: portfolio.brandName,
     portfolioCode: allocation.portfolioCode,
     invested: allocation.investedAmount,
     netProfit: latestPnl?.netProfit ?? distributionResult.breakdown.netProfit ?? 0,
@@ -564,11 +566,12 @@ ${args.bodyHtml}
 /** Standalone per-portfolio investor report (one project, one period). */
 export function buildInvestorReportHtml(args: BuildArgs): string {
   const s = buildInvestorReportSections(args)
+  const brand = s.brandName?.trim() || s.portfolioName
   return renderReportDoc({
-    title: `${s.portfolioName} — ${s.periodLabel}`,
+    title: `${brand} — ${s.periodLabel}`,
     bodyHtml: `
   <h1>${s.audience}</h1>
-  <p><strong>${s.portfolioName}</strong>${s.brandName ? ` · ${s.brandName}` : ''} — Periode ${s.periodLabel}</p>
+  <p><strong>${brand}</strong>${brand !== s.portfolioName ? ` · ${s.portfolioName}` : ''} — Periode ${s.periodLabel}</p>
   ${s.content}
   <div class="footer">Diterbitkan oleh Tim Arunami — ${new Date().toLocaleString('id-ID')}</div>`,
   })
@@ -591,12 +594,15 @@ export function assembleAccumulatedReportHtml(args: {
   const totalInvested = lines.reduce((s, l) => s + l.invested, 0)
   const generatedAt = args.generatedAt ?? new Date().toLocaleString('id-ID')
 
-  const projectPages = sections.map((s, i) => `
+  const projectPages = sections.map((s, i) => {
+    const brand = s.brandName?.trim() || s.portfolioName
+    return `
     <div${i > 0 ? ' style="page-break-before:always"' : ''}>
-      <h1 style="border-top:3px solid #1e5f3f;padding-top:16px${i > 0 ? '' : ';margin-top:24px'}">${s.portfolioName}</h1>
-      <p style="color:#666;font-size:12px;margin-top:2px">${s.brandName ? `${s.brandName} · ` : ''}Periode ${s.periodLabel}</p>
+      <h1 style="border-top:3px solid #1e5f3f;padding-top:16px${i > 0 ? '' : ';margin-top:24px'}">${brand}</h1>
+      <p style="color:#666;font-size:12px;margin-top:2px">${brand !== s.portfolioName ? `${s.portfolioName} · ` : ''}Periode ${s.periodLabel}</p>
       ${s.content}
-    </div>`).join('')
+    </div>`
+  }).join('')
 
   const summary = `
     <div style="page-break-before:always">
@@ -620,7 +626,7 @@ export function assembleAccumulatedReportHtml(args: {
         <tbody>
           ${lines.map(l => `
             <tr>
-              <td>${l.portfolioName}<div style="font-size:11px;color:#666">${l.portfolioCode}</div></td>
+              <td>${l.brandName?.trim() || l.portfolioName}<div style="font-size:11px;color:#666">${l.portfolioCode}</div></td>
               <td style="text-align:right">${formatCurrencyExact(l.invested)}</td>
               <td style="text-align:right">${formatCurrencyExact(l.netProfit)}</td>
               <td style="text-align:right">${formatCurrencyExact(l.earnings)}</td>
@@ -693,7 +699,7 @@ export function assembleAllTimeReportHtml(
       <tbody>
         ${lines.map(l => `
           <tr>
-            <td>${l.portfolioName}<div style="font-size:11px;color:#666">${l.portfolioCode}</div></td>
+            <td>${l.brandName?.trim() || l.portfolioName}<div style="font-size:11px;color:#666">${l.portfolioCode}</div></td>
             <td class="num">${formatCurrencyExact(l.invested)}</td>
             <td class="num">${formatCurrencyExact(l.cumulativeEarnings)}</td>
             <td class="num">${formatPercent(l.allTimeROI)}</td>

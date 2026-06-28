@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase'
 import { getInvestorPortfolios, getAllocationsForInvestor, getPublishedInvestorReports } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
+import { brandOf, makeBrandResolver } from '@/lib/portfolioName'
 import { ownershipFraction } from '@/lib/distributionStrategies'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ export default function InvestorDashboard() {
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
   const [loading, setLoading] = useState(true)
   const { notifications, reload: reloadNotifications } = useTransferProofNotifications(user?.uid)
+  const resolveBrand = useMemo(() => makeBrandResolver(portfolios), [portfolios])
 
   useEffect(() => {
     if (user) {
@@ -88,6 +90,7 @@ export default function InvestorDashboard() {
         {/* Bukti transfer alerts — only visible while uncleared ones exist. */}
         <TransferProofNotificationBanner
           notifications={notifications}
+          resolveBrand={resolveBrand}
           onChanged={reloadNotifications}
         />
 
@@ -180,8 +183,10 @@ export default function InvestorDashboard() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-base">{p.brandName || p.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-1">{p.name}</p>
+                        <CardTitle className="text-base">{brandOf(p)}</CardTitle>
+                        {brandOf(p) !== p.name && (
+                          <p className="text-xs text-muted-foreground mt-1">{p.name}</p>
+                        )}
                         <p className="text-xs text-muted-foreground">{p.code} · {p.stage}</p>
                       </div>
                       <span className="text-xs bg-[#1e5f3f]/10 text-[#1e5f3f] rounded-full px-2 py-0.5 font-medium">{p.periode}</span>
@@ -224,7 +229,7 @@ export default function InvestorDashboard() {
               <TabsTrigger value="history">Riwayat Bukti Transfer</TabsTrigger>
             </TabsList>
             <TabsContent value="history">
-              <TransferProofHistoryList notifications={notifications} />
+              <TransferProofHistoryList notifications={notifications} resolveBrand={resolveBrand} />
             </TabsContent>
           </Tabs>
         )}

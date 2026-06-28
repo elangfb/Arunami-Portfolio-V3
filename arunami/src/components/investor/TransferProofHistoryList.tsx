@@ -10,13 +10,14 @@ import type { InvestorNotification } from '@/types'
 import { ALL_TIME_PERIOD } from '@/types'
 import { formatPeriod } from '@/lib/dateUtils'
 import { formatCurrencyExact, isPdfProof } from '@/lib/utils'
+import type { BrandResolver } from '@/lib/portfolioName'
 
 function periodLabel(n: InvestorNotification): string {
   if (n.period === ALL_TIME_PERIOD) return 'All-Time'
   return formatPeriod(n.period)
 }
 
-export default function TransferProofHistoryList({ notifications }: { notifications: InvestorNotification[] }) {
+export default function TransferProofHistoryList({ notifications, resolveBrand }: { notifications: InvestorNotification[]; resolveBrand: BrandResolver }) {
   const [previewing, setPreviewing] = useState<InvestorNotification | null>(null)
   const sorted = [...notifications].sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
 
@@ -52,7 +53,7 @@ export default function TransferProofHistoryList({ notifications }: { notificati
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#0f172a] truncate">
-                      {n.portfolioName} · {periodLabel(n)}
+                      {resolveBrand({ ptName: n.portfolioName })} · {periodLabel(n)}
                     </p>
                     <p className="text-xs text-slate-500 truncate">{n.message}</p>
                   </div>
@@ -80,7 +81,7 @@ export default function TransferProofHistoryList({ notifications }: { notificati
           <DialogHeader>
             <DialogTitle>Bukti Transfer</DialogTitle>
             <DialogDescription>
-              {previewing && `${previewing.portfolioName} · ${periodLabel(previewing)}`}
+              {previewing && `${resolveBrand({ ptName: previewing.portfolioName })} · ${periodLabel(previewing)}`}
             </DialogDescription>
           </DialogHeader>
           {previewing && (

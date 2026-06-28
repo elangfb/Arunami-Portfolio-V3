@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase'
 import { getPortfolio } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
+import { brandOf } from '@/lib/portfolioName'
 import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
 import type { Portfolio } from '@/types'
 import {
@@ -103,7 +104,14 @@ export default function AnalystPortfolioLayout() {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38a169]">
           <TrendingUp className="h-5 w-5 text-white" />
         </div>
-        <span className="text-base font-bold text-white truncate">{portfolio?.name ?? 'ARUNAMI'}</span>
+        <div className="flex min-w-0 flex-col">
+          <span className="text-base font-bold text-white truncate leading-tight">
+            {portfolio ? brandOf(portfolio) : 'ARUNAMI'}
+          </span>
+          {portfolio?.name && brandOf(portfolio) !== portfolio.name && (
+            <span className="text-[10px] text-white/60 truncate leading-tight">{portfolio.name}</span>
+          )}
+        </div>
       </div>
 
       {/* Back */}
@@ -160,7 +168,7 @@ export default function AnalystPortfolioLayout() {
   )
 
   return (
-    <ResponsiveSidebarShell sidebar={sidebarContent} mobileTitle={portfolio?.name ?? 'ARUNAMI'}>
+    <ResponsiveSidebarShell sidebar={sidebarContent} mobileTitle={portfolio ? brandOf(portfolio) : 'ARUNAMI'}>
       <Outlet context={{ portfolio, portfolioId: id }} />
     </ResponsiveSidebarShell>
   )
