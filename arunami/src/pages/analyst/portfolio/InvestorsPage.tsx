@@ -8,6 +8,7 @@ import { calculateDistribution } from '@/lib/distributionStrategies'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { formatPeriod } from '@/lib/dateUtils'
 import type {
   FinancialData, TransferProof, Portfolio, InvestorAllocation, PortfolioConfig, AppUser,
@@ -23,6 +24,9 @@ export default function InvestorsPage() {
   const [config, setConfig] = useState<PortfolioConfig | null>(null)
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
+  // Dana sosial (social fund) — ad-hoc deduction, off by default.
+  const [socialEnabled, setSocialEnabled] = useState(false)
+  const [socialPct, setSocialPct] = useState('2.5')
 
   useEffect(() => {
     if (!portfolioId) return
@@ -44,6 +48,8 @@ export default function InvestorsPage() {
 
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
   if (!data) return <div className="p-8 text-muted-foreground">Data investor belum tersedia.</div>
+
+  const socialFundPercent = socialEnabled ? (Number(socialPct) || 0) : 0
 
   const latestActual = [...data.profitData].reverse().find(r => r.aktual > 0)
   const latestActualPeriod = latestActual?.month ?? data.profitData.at(-1)?.month
@@ -69,11 +75,30 @@ export default function InvestorsPage() {
       config: config.investorConfig,
       allocation: mockAlloc,
       portfolio,
+      socialFundPercent,
     })
     netForInvestor = summaryResult.perInvestorAmount
     monthlyROI = summaryResult.roiPercent
     annualROI = summaryResult.annualRoiPercent
   }
+
+  // Precompute per-investor results once so we can also total the social fund.
+  const latestRevForRows = [...data.revenueData].reverse().find(r => r.aktual > 0)
+  const rows = allocations.map(alloc => {
+    const investorUser = users.find(u => u.uid === alloc.investorUid)
+    const result = config?.investorConfig && portfolio
+      ? calculateDistribution({
+          reportData: { period: latestActualPeriod ?? '', revenue: latestRevForRows?.aktual ?? 0, netProfit: lastProfit, grossProfit: 0 },
+          config: config.investorConfig,
+          allocation: alloc,
+          portfolio,
+          isArunamiTeam: investorUser?.isArunamiTeam,
+          socialFundPercent,
+        })
+      : null
+    return { alloc, investorUser, result }
+  })
+  const socialTotal = rows.reduce((s, r) => s + (r.result?.socialFundAmount ?? 0), 0)
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -99,7 +124,36 @@ export default function InvestorsPage() {
       {/* Per-investor breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Per Investor</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-sm">Per Investor</CardTitle>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={socialEnabled}
+                  onChange={e => setSocialEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 accent-[#1e5f3f]"
+                />
+                Dana Sosial
+              </label>
+              {socialEnabled && (
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    value={socialPct}
+                    onChange={e => setSocialPct(e.target.value)}
+                    className="h-8 w-20 text-right"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {socialEnabled && socialTotal > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Total dana sosial terkumpul: <span className="font-medium">{formatCurrencyExact(socialTotal)}</span> (dipotong dari bagi hasil investor)
+            </p>
+          )}
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {allocations.length === 0 ? (
@@ -116,28 +170,14 @@ export default function InvestorsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {allocations.map(alloc => {
+                {rows.map(({ alloc, investorUser, result }) => {
                   // DF-08: resolve name/email live from users; fall back to the
                   // denormalized allocation copy only if the user is missing.
-                  const investorUser = users.find(u => u.uid === alloc.investorUid)
                   const displayName = investorUser?.displayName ?? alloc.investorName
                   const displayEmail = investorUser?.email ?? alloc.investorEmail
-                  let investorNet = 0
-                  let investorMonthly = 0
-                  let investorAnnual = 0
-                  if (config?.investorConfig && portfolio) {
-                    const latestRev = [...data.revenueData].reverse().find(r => r.aktual > 0)
-                    const result = calculateDistribution({
-                      reportData: { period: latestActualPeriod ?? '', revenue: latestRev?.aktual ?? 0, netProfit: lastProfit, grossProfit: 0 },
-                      config: config.investorConfig,
-                      allocation: alloc,
-                      portfolio,
-                      isArunamiTeam: investorUser?.isArunamiTeam,
-                    })
-                    investorNet = result.perInvestorAmount
-                    investorMonthly = result.roiPercent
-                    investorAnnual = result.annualRoiPercent
-                  }
+                  const investorNet = result?.perInvestorAmount ?? 0
+                  const investorMonthly = result?.roiPercent ?? 0
+                  const investorAnnual = result?.annualRoiPercent ?? 0
                   return (
                     <tr key={alloc.id} className="hover:bg-muted/30">
                       <td className="py-2.5 px-3">

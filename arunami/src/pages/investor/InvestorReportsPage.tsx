@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getPublishedInvestorReports } from '@/lib/firestore'
+import { getPublishedInvestorReports, markInvestorReportRead, markInvestorReportsRead } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TrendingUp, ArrowLeft, Printer, Infinity as InfinityIcon, CalendarRange } from 'lucide-react'
+import { TrendingUp, ArrowLeft, Printer, Infinity as InfinityIcon, CalendarRange, CheckCheck } from 'lucide-react'
 import type { InvestorReportDoc } from '@/types'
 
 type View = 'alltime' | 'periodik'
@@ -58,6 +59,38 @@ export default function InvestorReportsPage() {
   const effectivePeriod = accPeriod || accumulatedReports[0]?.period || ''
   const selectedAccReport = accumulatedReports.find(r => r.period === effectivePeriod) ?? null
 
+  // Reports surfaced on this page (all-projects: accumulated + all-time).
+  const shownReports = useMemo(
+    () => reports.filter(r => r.scope === 'accumulated' || r.scope === 'all_time'),
+    [reports],
+  )
+  const unreadCount = useMemo(() => shownReports.filter(r => !r.isRead).length, [shownReports])
+
+  // Optimistically flip a report to read locally, then persist.
+  function markReadLocal(id: string) {
+    setReports(prev => prev.map(r => (r.id === id ? { ...r, isRead: true } : r)))
+    markInvestorReportRead(id).catch(err => console.error('markInvestorReportRead failed', err))
+  }
+
+  async function markAllRead() {
+    const ids = shownReports.filter(r => !r.isRead).map(r => r.id)
+    if (ids.length === 0) return
+    setReports(prev => prev.map(r => (ids.includes(r.id) ? { ...r, isRead: true } : r)))
+    try {
+      await markInvestorReportsRead(ids)
+    } catch (err) {
+      console.error('markInvestorReportsRead failed', err)
+      toast.error('Gagal menandai laporan')
+    }
+  }
+
+  // Opening a report (rendered in the iframe) counts as reading it.
+  const displayedReport = view === 'alltime' ? allTimeReport : selectedAccReport
+  useEffect(() => {
+    if (displayedReport && !displayedReport.isRead) markReadLocal(displayedReport.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayedReport?.id])
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
@@ -75,9 +108,21 @@ export default function InvestorReportsPage() {
       </header>
 
       <main className="p-4 sm:p-6 lg:p-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Laporan Saya</h1>
-          <p className="text-muted-foreground">Ringkasan kinerja investasi Anda di seluruh proyek</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">Laporan Saya</h1>
+              {unreadCount > 0 && (
+                <Badge variant="warning">{unreadCount} belum dibaca</Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground">Ringkasan kinerja investasi Anda di seluruh proyek</p>
+          </div>
+          {unreadCount > 0 && (
+            <Button variant="outline" size="sm" onClick={markAllRead} className="shrink-0">
+              <CheckCheck className="mr-1 h-4 w-4" />Tandai semua dibaca
+            </Button>
+          )}
         </div>
 
         {/* View toggle */}

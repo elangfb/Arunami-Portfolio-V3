@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arunami — Admin Console</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #F3F4F6; color: #111827; overflow: hidden; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+button, input, select, textarea { font-family: inherit; }
+:focus-visible { outline: 2px solid #2563EB; outline-offset: 1px; }
+
+:root {
+  --navy: #0F2744; --navy-hover: rgba(255,255,255,0.07); --navy-active: rgba(255,255,255,0.13);
+  --navy-border: rgba(255,255,255,0.09); --navy-text: #C8D8EB; --navy-muted: #7A96B3;
+  --bg-page: #F3F4F6; --bg-card: #FFFFFF; --bg-secondary: #F9FAFB; --bg-tertiary: #F3F4F6;
+  --border: #E5E7EB; --border-light: #F3F4F6;
+  --text-primary: #111827; --text-secondary: #6B7280; --text-tertiary: #9CA3AF;
+  --text-success: #059669; --text-danger: #DC2626; --text-warning: #D97706; --text-info: #2563EB;
+  --bg-success: #ECFDF5; --bg-danger: #FEF2F2; --bg-warning: #FFFBEB; --bg-info: #EFF6FF;
+  --sidebar-w: 234px; --topbar-h: 52px; --content-max: 1140px;
+  --shadow-xs: 0 1px 2px rgba(16,24,40,0.04);
+  --shadow-sm: 0 1px 3px rgba(16,24,40,0.06), 0 1px 2px rgba(16,24,40,0.04);
+  --shadow-md: 0 4px 12px rgba(16,24,40,0.08);
+  --ring: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* SIDEBAR */
+.sidebar { width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; z-index: 10; }
+.sb-logo { padding: 18px 18px 14px; border-bottom: 1px solid var(--navy-border); flex-shrink: 0; display:flex; align-items:center; gap:10px; }
+.sb-logo-mark { width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,#1e5fa8,#0F2744); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid rgba(255,255,255,0.12); }
+.sb-logo-mark i { color:#9DC2E8; font-size:17px; }
+.sb-logo-name { font-size: 15px; font-weight: 600; color: #fff; letter-spacing: 0.01em; }
+.sb-logo-role { font-size: 11px; color: var(--navy-muted); margin-top: 1px; }
+.sb-nav { flex: 1; overflow-y: auto; padding: 6px 0 8px; }
+.sb-nav::-webkit-scrollbar { width: 3px; }
+.sb-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+.sb-section { font-size: 10px; font-weight: 600; color: var(--navy-muted); letter-spacing: 0.09em; text-transform: uppercase; padding: 12px 18px 4px; }
+.sb-item { display: flex; align-items: center; gap: 9px; padding: 7px 18px 7px 15px; cursor: pointer; color: var(--navy-text); font-size: 13px; transition: background 0.1s, color 0.1s; border-left: 3px solid transparent; }
+.sb-item:hover { background: var(--navy-hover); color: #fff; }
+.sb-item.active { background: var(--navy-active); color: #fff; border-left-color: #60A5FA; }
+.sb-item i { font-size: 16px; flex-shrink: 0; opacity: 0.8; }
+.sb-item.active i { opacity: 1; }
+.sb-item-label { flex: 1; }
+.sb-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 99px; line-height: 1.5; }
+.sb-badge-n { background: rgba(217,119,6,0.3); color: #FCD34D; }
+.sb-badge-a { background: rgba(220,38,38,0.3); color: #FCA5A5; }
+.sb-divider { height: 1px; background: var(--navy-border); margin: 5px 18px; }
+.sb-user { padding: 11px 14px; border-top: 1px solid var(--navy-border); display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.sb-avatar { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.sb-user-info { flex: 1; min-width: 0; }
+.sb-user-name { font-size: 12px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-user-role { font-size: 10px; color: var(--navy-muted); }
+
+/* HEALTH */
+.hbadge { display: inline-flex; align-items: center; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 600; }
+.hb-sehat { background: rgba(5,150,105,0.12); color: #059669; }
+.hb-siaga1 { background: rgba(217,119,6,0.12); color: #D97706; }
+.hb-siaga2 { background: rgba(234,88,12,0.12); color: #EA580C; }
+.hb-siaga3 { background: rgba(220,38,38,0.12); color: #DC2626; }
+
+/* MAIN */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.topbar { height: var(--topbar-h); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; background: var(--bg-card); flex-shrink: 0; gap: 8px; box-shadow: var(--shadow-xs); position: relative; z-index: 5; }
+.topbar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+.topbar-sep { color: var(--text-tertiary); font-size: 12px; }
+.topbar-ctx { font-size: 13px; color: var(--text-secondary); }
+.topbar-spacer { flex: 1; }
+.topbar-action { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; padding: 5px 10px; border-radius: 7px; transition: background 0.1s, color 0.1s; }
+.topbar-action:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.content-wrap { flex: 1; overflow-y: auto; background: var(--bg-page); }
+.content-wrap::-webkit-scrollbar { width: 8px; }
+.content-wrap::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 99px; border: 2px solid var(--bg-page); }
+.content-wrap::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+.content-inner { max-width: var(--content-max); margin: 0 auto; padding: 24px 28px 40px; animation: contentIn 0.2s ease; }
+@keyframes contentIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* CARDS */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; box-shadow: var(--shadow-xs); }
+.card-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+.card-sub { font-size: 11px; color: var(--text-tertiary); }
+
+/* STAT CARDS */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow-xs); transition: border-color 0.15s, box-shadow 0.15s; }
+.stat-card:hover { border-color: #D1D5DB; box-shadow: var(--shadow-sm); }
+.stat-top { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.stat-ico { width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.stat-ico i { font-size:15px; }
+.stat-label { font-size: 10px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value { font-size: 23px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat-sub { font-size: 12px; margin-top: 3px; }
+.stat-up { color: var(--text-success); }
+.stat-dn { color: var(--text-danger); }
+.stat-neu { color: var(--text-secondary); }
+
+/* SECTION HEADER */
+.section-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; margin-top: 4px; }
+.section-hdr-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* TABLE */
+.tbl-wrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; color: var(--text-tertiary); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tbl td { padding: 10px 10px; border-bottom: 1px solid var(--border-light); color: var(--text-primary); vertical-align: middle; }
+.tbl tbody tr { transition: background 0.1s; }
+.tbl tbody tr:hover { background: var(--bg-secondary); }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl .muted { color: var(--text-secondary); } .tbl .pos { color: var(--text-success); } .tbl .neg { color: var(--text-danger); }
+.tbl .num { font-variant-numeric: tabular-nums; }
+
+/* USER CELL */
+.ucell { display:flex; align-items:center; gap:10px; }
+.uava { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; flex-shrink:0; }
+.uname { font-size:13px; font-weight:500; color:var(--text-primary); }
+.uemail { font-size:11px; color:var(--text-tertiary); }
+
+/* PILLS */
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border-radius: 99px; font-weight: 600; white-space: nowrap; }
+.pill-aktif { background: #ECFDF5; color: #059669; }
+.pill-nonaktif { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
+.pill-pending { background: #FFFBEB; color: #D97706; }
+.pill-ditolak { background: #FEF2F2; color: #DC2626; }
+.pill-verified { background: #ECFDF5; color: #059669; }
+.pill-onboard { background: #EFF6FF; color: #2563EB; }
+.pill-closed { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
+.pill-dibayar { background: #ECFDF5; color: #059669; }
+.pill-diproses { background: #EFF6FF; color: #2563EB; }
+.pill-ditahan { background: #FEF2F2; color: #DC2626; }
+.pill-menunggu { background: #FFFBEB; color: #D97706; }
+
+/* ROLE TAG */
+.rtag { display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:2px 9px; border-radius:6px; font-weight:600; }
+.rtag-admin { background:#EEF2FF; color:#4338CA; }
+.rtag-bapm { background:#ECFEFF; color:#0E7490; }
+.rtag-investor { background:#FDF4FF; color:#A21CAF; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: background 0.15s, box-shadow 0.15s, transform 0.1s; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--navy); color: #fff; box-shadow: var(--shadow-xs); }
+.btn-primary:hover { background: #1a3a5c; box-shadow: var(--shadow-sm); }
+.btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); box-shadow: var(--shadow-xs); }
+.btn-secondary:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.btn-sm { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; font-size: 12px; font-weight: 500; border-radius: 7px; cursor: pointer; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: background 0.1s, color 0.1s, border-color 0.1s; box-shadow: var(--shadow-xs); }
+.btn-sm:hover { background: var(--bg-secondary); color: var(--text-primary); border-color: #D1D5DB; }
+.btn-navy-sm { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; font-size: 12px; font-weight: 500; border-radius: 7px; cursor: pointer; border: 1px solid var(--navy); background: var(--navy); color: #fff; transition: background 0.15s; box-shadow: var(--shadow-xs); }
+.btn-navy-sm:hover { background: #1a3a5c; }
+.btn-success-sm { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; font-size:12px; font-weight:600; border-radius:7px; cursor:pointer; border:1px solid #059669; background:#059669; color:#fff; transition:background 0.15s; }
+.btn-success-sm:hover { background:#047857; }
+.btn-danger-sm { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; font-size:12px; font-weight:600; border-radius:7px; cursor:pointer; border:1px solid #FECACA; background:#FEF2F2; color:#DC2626; transition:background 0.15s; }
+.btn-danger-sm:hover { background:#FEE2E2; }
+.btn-row { display: flex; gap: 8px; margin-top: 16px; }
+.btn-ico { width:28px; height:28px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; border:1px solid var(--border); background:var(--bg-card); color:var(--text-secondary); transition:background 0.1s,color 0.1s; }
+.btn-ico:hover { background:var(--bg-secondary); color:var(--text-primary); }
+
+/* FORMS */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-field.full { grid-column: 1 / -1; }
+.form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.form-input { padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: var(--bg-card); color: var(--text-primary); outline: none; width: 100%; transition: border-color 0.15s, box-shadow 0.15s; box-shadow: var(--shadow-xs); }
+.form-input:hover { border-color: #D1D5DB; }
+.form-input:focus { border-color: #2563EB; box-shadow: var(--ring); }
+.form-input::placeholder { color: var(--text-tertiary); }
+select.form-input { cursor: pointer; }
+textarea.form-input { resize: vertical; min-height: 70px; }
+.form-sec-lbl { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.07em; margin: 16px 0 9px; }
+
+/* FILTER ROW */
+.filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.filter-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; background: var(--bg-card); color: var(--text-secondary); cursor: pointer; outline: none; transition: border-color 0.15s, box-shadow 0.15s, color 0.15s; box-shadow: var(--shadow-xs); }
+.filter-select:hover { border-color: #D1D5DB; color: var(--text-primary); }
+.filter-select:focus { border-color: #2563EB; box-shadow: var(--ring); }
+.search-box { display:flex; align-items:center; gap:7px; padding:6px 11px; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); box-shadow:var(--shadow-xs); flex:1; min-width:180px; max-width:280px; }
+.search-box i { color:var(--text-tertiary); font-size:15px; }
+.search-box input { border:none; outline:none; font-size:13px; background:transparent; color:var(--text-primary); width:100%; }
+.row-count { font-size: 12px; color: var(--text-tertiary); margin-left:auto; }
+
+/* BANNERS */
+.notif-bar { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 9px; padding: 11px 15px; display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; font-size: 12px; color: #92400E; line-height: 1.55; }
+.notif-bar i { margin-top: 1px; }
+.info-bar { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 9px; padding: 13px 16px; margin-bottom: 14px; font-size: 12px; color: #1E40AF; line-height:1.6; }
+.info-bar-title { font-size: 12px; font-weight: 600; color: #1E3A8A; margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
+.alert-bar { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 9px; padding: 11px 15px; display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; font-size: 12px; color: #991B1B; line-height: 1.55; }
+.alert-bar i { margin-top: 1px; }
+
+/* APPROVAL / TASK ITEMS */
+.task-item { display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--border-light); }
+.task-item:first-child { border-top:none; }
+.task-ico { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.task-ico i { font-size:16px; }
+.task-body { flex:1; min-width:0; }
+.task-title { font-size:13px; font-weight:500; color:var(--text-primary); }
+.task-sub { font-size:11px; color:var(--text-secondary); margin-top:2px; }
+
+/* QUEUE PANEL */
+.qpanel { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:8px 18px 10px; margin-bottom:18px; box-shadow:var(--shadow-xs); }
+.qpanel-hdr { display:flex; align-items:center; gap:9px; padding:12px 0 4px; }
+.qcount { font-size:11px; font-weight:600; background:#FEF2F2; color:var(--text-danger); padding:2px 8px; border-radius:99px; }
+
+/* MATRIX */
+.matrix { width:100%; border-collapse:collapse; font-size:12.5px; }
+.matrix th { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-tertiary); }
+.matrix th.col-role { text-align:center; }
+.matrix td { padding:9px 12px; border-bottom:1px solid var(--border-light); color:var(--text-secondary); }
+.matrix td.cap { color:var(--text-primary); font-weight:500; }
+.matrix td.col-role { text-align:center; }
+.matrix tr:last-child td { border-bottom:none; }
+.mx-yes { color:#059669; font-size:16px; }
+.mx-no { color:#D1D5DB; font-size:16px; }
+.mx-part { color:#D97706; font-size:13px; font-weight:600; }
+
+/* PROGRESS */
+.prog-bar-bg { height: 7px; background: var(--bg-tertiary); border-radius: 99px; overflow: hidden; }
+.prog-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s cubic-bezier(0.16,1,0.3,1); }
+
+/* PLACEHOLDER */
+.ph-card { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; padding: 40px 24px; text-align: center; }
+.ph-icon { font-size: 34px; color: var(--text-tertiary); margin-bottom: 10px; }
+.ph-title { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.ph-desc { font-size: 13px; color: var(--text-tertiary); line-height: 1.6; max-width: 420px; margin: 0 auto; }
+
+/* CONFIG ROW */
+.cfg-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 0; border-bottom:1px solid var(--border-light); }
+.cfg-row:last-child { border-bottom:none; }
+.cfg-info { flex:1; min-width:0; }
+.cfg-name { font-size:13px; font-weight:500; color:var(--text-primary); }
+.cfg-desc { font-size:11.5px; color:var(--text-secondary); margin-top:2px; line-height:1.5; }
+.cfg-val { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.cfg-num { width:74px; text-align:right; }
+
+/* TOGGLE */
+.tg { position:relative; width:38px; height:21px; border-radius:99px; background:#D1D5DB; cursor:pointer; transition:background 0.15s; flex-shrink:0; }
+.tg.on { background:#059669; }
+.tg::after { content:''; position:absolute; top:2px; left:2px; width:17px; height:17px; border-radius:50%; background:#fff; transition:transform 0.15s; box-shadow:0 1px 2px rgba(0,0,0,0.2); }
+.tg.on::after { transform:translateX(17px); }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); backdrop-filter: blur(2px); z-index: 300; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.15s ease; }
+.modal-box { background: var(--bg-card); border-radius: 14px; padding: 24px; width: 480px; max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: modalIn 0.18s cubic-bezier(0.16,1,0.3,1); }
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; letter-spacing: -0.01em; }
+.modal-sub { font-size:12px; color:var(--text-secondary); margin-bottom:16px; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* TOAST */
+.toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--navy); color:#fff; padding:11px 18px; border-radius:10px; font-size:13px; box-shadow:0 8px 30px rgba(0,0,0,0.25); z-index:400; display:flex; align-items:center; gap:9px; animation:toastIn 0.2s ease; }
+.toast i { color:#6EE7B7; font-size:16px; }
+@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(10px);} to { opacity:1; transform:translateX(-50%) translateY(0);} }
+
+.kvg { display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; }
+.kv-lbl { font-size:10px; font-weight:600; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px; }
+.kv-val { font-size:13px; color:var(--text-primary); font-weight:500; }
+.divider-h { height:1px; background:var(--border-light); margin:14px 0; }
+.link { color:var(--text-info); cursor:pointer; }
+.link:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="content-wrap"><div class="content-inner" id="content"></div></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal-box" id="modal-box" onclick="event.stopPropagation()"></div>
+</div>
+
+<script src="arunami-store.js"></script>
+<script>
+// ============================================================
+// SHARED STORE WIRING — data lokal tersinkron antar platform
+// (lihat arunami-store.js). Semua koleksi mulai KOSONG; data dibuat dari Admin.
+// ============================================================
+let portfolios, users, investorsReg, capTable, bhConfig, documents,
+    distBatches, healthRules, announcements, auditLog, earnHistory;
+function syncLocals(){
+  const d = Store.db;
+  portfolios=d.portfolios; users=d.users; investorsReg=d.investors;
+  capTable=d.capTable; bhConfig=d.bhConfig; documents=d.documents;
+  distBatches=d.distBatches; healthRules=d.healthRules;
+  announcements=d.announcements; auditLog=d.auditLog; earnHistory=d.earnHistory;
+}
+syncLocals();
+let _applyingRemote=false;
+Store.onChange((db,remote)=>{ if(remote){ _applyingRemote=true; syncLocals(); if(typeof render==='function') render(); _applyingRemote=false; } });
+const BRAND = {
+  nexavar:{bg:'#1e3a5f',text:'#8fb4d9',init:'NX'}, solaris:{bg:'#2d5016',text:'#8fc96e',init:'SA'},
+  kirana:{bg:'#1a3d6b',text:'#7aaad9',init:'KN'}, biru:{bg:'#0c3352',text:'#6ab4e0',init:'BS'},
+  cendana:{bg:'#3b2f63',text:'#b9a6e8',init:'CT'}, megapangan:{bg:'#5c3a16',text:'#e0b67a',init:'MP'},
+};
+
+// Yield realisasi per portfolio (juta) — diisi dari laporan; kosong = belum ada.
+let YIELD = {};
+function distFor(pid){ const y=YIELD[pid]||0; return (capTable[pid]||[]).map(i=>({...i, distJt:Math.round(i.nominalJt*(y/100)/12*10)/10})); }
+function distTotal(pid){ return Math.round(distFor(pid).reduce((s,i)=>s+i.distJt,0)*10)/10; }
+// Total nominal investor yang sudah tercatat di cap table (juta)
+function capSumJt(pid){ return (capTable[pid]||[]).reduce((s,i)=>s+(+i.nominalJt||0),0); }
+
+// Rincian holding + earning seorang investor di tiap portfolio
+function investorHoldings(name){
+  const out=[];
+  Object.keys(capTable).forEach(pid=>{
+    const entry=(capTable[pid]||[]).find(x=>x.name===name);
+    if(!entry) return;
+    const p=getP(pid); if(!p) return;
+    const totalNom=capSumJt(pid);
+    const ownership=totalNom>0?entry.nominalJt/totalNom:0; // porsi bagi hasil
+    const hist=earnHistory[pid]||[];
+    const last=hist[hist.length-1]||null;
+    const earnLast=last?Math.round(ownership*last.totalJt*100)/100:0;
+    const totalEarn=Math.round(hist.reduce((s,m)=>s+ownership*m.totalJt,0)*100)/100;
+    const roiBulanan=entry.nominalJt>0?(earnLast/entry.nominalJt*100):0;
+    out.push({pid, nama:p.name, status:p.status, nominalJt:entry.nominalJt, ownershipPct:Math.round(ownership*1000)/10,
+      earnLast, bulanLast:last?last.bulan:'—', totalEarn, roiBulanan:Math.round(roiBulanan*100)/100});
+  });
+  return out;
+}
+function investorSummary(name){
+  const hold=investorHoldings(name);
+  const totalInv=hold.reduce((s,h)=>s+h.nominalJt,0);
+  const totalEarn=Math.round(hold.reduce((s,h)=>s+h.totalEarn,0)*100)/100;
+  const avgRoi=hold.length?Math.round(hold.reduce((s,h)=>s+h.roiBulanan,0)/hold.length*100)/100:0;
+  return {hold, totalInv, totalEarn, count:hold.length, avgRoi};
+}
+// Sel "terisi vs target" untuk halaman perusahaan: target = investasiB (miliar), terisi = cap table
+function investasiCell(p){
+  const targetJt=(p.investasiB||0)*1000;
+  const filledJt=capSumJt(p.id);
+  const pct=targetJt>0?Math.round(filledJt/targetJt*100):0;
+  const barCol=pct>100?'#DC2626':pct>=100?'#059669':pct>=50?'#2563EB':'#D97706';
+  return `<div style="min-width:130px">
+    <div style="font-weight:600;font-size:12.5px">${rpJt(filledJt)} <span style="font-weight:400;color:var(--text-tertiary);font-size:11px">/ ${p.investasiB||0} M target</span></div>
+    <div style="height:5px;border-radius:3px;background:var(--bg-secondary);margin-top:4px"><div style="height:5px;border-radius:3px;background:${barCol};width:${Math.min(100,pct)}%"></div></div>
+    <div style="font-size:10.5px;color:var(--text-tertiary);margin-top:2px">${pct}% terisi${pct>100?' (over)':''} · ${capTable[p.id]?.length||0} investor</div>
+  </div>`;
+}
+
+const BH_SKEMA = ['Revenue sharing','Profit sharing','Blended (base + bonus)','Fixed return'];
+
+const DOC_TIPE = ['Kontrak/PKS','Addendum','Sertifikat','Jaminan','Pajak','Statement','Lainnya'];
+// Pilihan industri portfolio (dropdown, agar konsisten & mudah difilter)
+const INDUSTRIES = ['Pendidikan','Kesehatan','Fintech','Agritech','Logistik & Transportasi','Makanan & Minuman (F&B)','Ritel & E-commerce','Properti & Konstruksi','Manufaktur','Energi & Utilitas','Teknologi & SaaS','Media & Kreatif','Pariwisata & Perhotelan','Jasa Keuangan','Telekomunikasi','Pertambangan','Otomotif','Lainnya'];
+
+// — Bagi hasil & bukti transfer per periode —
+//   Alur: ADMIN proses bagi hasil + unggah bukti transfer → lapor ke BA-PM → BA-PM teruskan ke Investor
+// buktiPerInvestor: { investorName: filename|null } — satu bukti per investor
+// ============================================================
+// STATE
+// ============================================================
+const ME = {name:'Andi Pratama', role:'Super Admin', init:'AP'};
+let ST = { page:'dashboard', userRole:'', invKyc:'', coStatus:'', coIndustri:'', distStatus:'', distQuery:'', userQuery:'', docPid:'', docTipe:'' };
+
+// ============================================================
+// HELPERS
+// ============================================================
+function hClass(h){ return h==='Siaga 3'?'hb-siaga3':h==='Siaga 2'?'hb-siaga2':h==='Siaga 1'?'hb-siaga1':'hb-sehat'; }
+function hBadge(h){ return h==='—'?'<span class="card-sub">—</span>':`<span class="hbadge ${hClass(h)}">${h}</span>`; }
+function rtag(role){ const c=role==='Admin'?'rtag-admin':role==='BA-PM'?'rtag-bapm':'rtag-investor'; const ic=role==='Admin'?'ti-shield-lock':role==='BA-PM'?'ti-briefcase':'ti-user'; return `<span class="rtag ${c}"><i class="ti ${ic}" style="font-size:12px"></i>${role}</span>`; }
+function statusPill(s){
+  const m={Aktif:'pill-aktif',Nonaktif:'pill-nonaktif',Pending:'pill-pending',Ditolak:'pill-ditolak',
+    Terverifikasi:'pill-verified',Onboarding:'pill-onboard','Review legal':'pill-onboard',Closed:'pill-closed',
+    Dibayar:'pill-dibayar',Diproses:'pill-diproses',Ditahan:'pill-ditahan',Menunggu:'pill-menunggu',Terkirim:'pill-aktif',Draft:'pill-pending'};
+  return `<span class="pill ${m[s]||'pill-nonaktif'}">${s}</span>`;
+}
+function logo(pid, size){ const p=(portfolios||[]).find(x=>x.id===pid); const b=(p&&p.brand)||BRAND[pid]||{bg:'#374151',text:'#9CA3AF',init:(p?Store.initials(p.name):'?')}; size=size||34; if(b&&b.img) return `<div style="width:${size}px;height:${size}px;border-radius:8px;flex-shrink:0;overflow:hidden;background:#fff;border:1px solid var(--border)"><img src="${b.img}" style="width:100%;height:100%;object-fit:cover"></div>`; return `<div style="width:${size}px;height:${size}px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.32)}px;font-weight:700;background:${b.bg};color:${b.text}">${b.init}</div>`; }
+function rpB(b){ return 'IDR '+b+'B'; }
+function rpJt(jt){ if(jt>=1000) return 'Rp '+(jt/1000).toLocaleString('id-ID',{minimumFractionDigits:1,maximumFractionDigits:1})+' M'; return 'Rp '+jt.toLocaleString('id-ID',{minimumFractionDigits:1,maximumFractionDigits:1})+' jt'; }
+function getP(pid){ return portfolios.find(p=>p.id===pid); }
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.innerHTML=`<i class="ti ti-circle-check"></i>${msg}`; document.body.appendChild(t); setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity 0.3s';setTimeout(()=>t.remove(),300);},2400); }
+
+function totalAUM(){ return portfolios.filter(p=>p.status==='Aktif').reduce((s,p)=>s+p.investasiB,0); }
+function pendingBukti(){ return distBatches.filter(d=>d.status==='Perlu diproses'||d.status==='Diproses').length; }
+function pendingApprovals(){ return pendingBukti(); }
+function pendingKyc(){ return investorsReg.filter(i=>i.kyc==='Pending').length; }
+function onboardingCount(){ return portfolios.filter(p=>p.status!=='Aktif'&&p.status!=='Closed').length; }
+function totalTasks(){ return pendingApprovals()+pendingKyc()+onboardingCount(); }
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+const NAV = [
+  {sec:'Menu'},
+  {id:'dashboard', icon:'ti-layout-dashboard', lbl:'Dashboard'},
+  {sec:'Manajemen'},
+  {id:'users', icon:'ti-users', lbl:'Pengguna & akses'},
+  {id:'companies', icon:'ti-building-skyscraper', lbl:'Perusahaan portfolio'},
+  {id:'investors', icon:'ti-user-check', lbl:'Investor & KYC', badge:'kyc'},
+  {id:'dokumen', icon:'ti-folder-open', lbl:'Kontrak & dokumen'},
+  {sec:'Keuangan'},
+  {id:'distribusi', icon:'ti-coin', lbl:'Bagi hasil & transfer', badge:'dist'},
+  {id:'fees', icon:'ti-receipt-2', lbl:'Biaya platform'},
+  {sec:'Konfigurasi'},
+  {id:'bh-config', icon:'ti-percentage', lbl:'Pengaturan bagi hasil'},
+  {id:'rules', icon:'ti-adjustments', lbl:'Aturan health'},
+  {sec:'Kepatuhan'},
+  {id:'audit', icon:'ti-list-details', lbl:'Audit log'},
+  {id:'announce', icon:'ti-speakerphone', lbl:'Pengumuman'},
+  {div:true},
+  {id:'settings', icon:'ti-settings', lbl:'Pengaturan sistem'},
+];
+function renderSidebar(){
+  let h=`<div class="sb-logo"><div class="sb-logo-mark"><i class="ti ti-shield-lock"></i></div><div><div class="sb-logo-name">Arunami</div><div class="sb-logo-role">Admin Console</div></div></div>`;
+  h+='<div class="sb-nav">';
+  NAV.forEach(it=>{
+    if(it.sec){ h+=`<div class="sb-section">${it.sec}</div>`; return; }
+    if(it.div){ h+=`<div class="sb-divider" style="margin-top:8px"></div>`; return; }
+    let b='';
+    if(it.badge==='kyc'&&pendingKyc()>0) b=`<span class="sb-badge sb-badge-n">${pendingKyc()}</span>`;
+    if(it.badge==='dist'&&pendingBukti()>0) b=`<span class="sb-badge sb-badge-a">${pendingBukti()}</span>`;
+    h+=`<div class="sb-item${ST.page===it.id?' active':''}" onclick="nav('${it.id}')"><i class="ti ${it.icon}"></i><span class="sb-item-label">${it.lbl}</span>${b}</div>`;
+  });
+  h+='</div>';
+  h+=`<div class="sb-user"><div class="sb-avatar">${ME.init}</div><div class="sb-user-info"><div class="sb-user-name">${ME.name}</div><div class="sb-user-role">${ME.role}</div></div></div>`;
+  document.getElementById('sidebar').innerHTML=h;
+}
+function renderTopbar(){
+  const map={dashboard:'Dashboard',users:'Pengguna & akses',companies:'Perusahaan portfolio',investors:'Investor & KYC',dokumen:'Kontrak & dokumen',distribusi:'Bagi hasil & transfer','bh-config':'Pengaturan bagi hasil',fees:'Biaya platform',rules:'Aturan health',audit:'Audit log',announce:'Pengumuman',settings:'Pengaturan sistem'};
+  let h=`<span class="topbar-title">${map[ST.page]||ST.page}</span>`;
+  h+='<div class="topbar-spacer"></div>';
+  h+=`<span class="topbar-action" onclick="nav('approvals')"><i class="ti ti-bell"></i>${totalTasks()} tugas</span>`;
+  document.getElementById('topbar').innerHTML=h;
+}
+
+// ============================================================
+// PAGE — DASHBOARD
+// ============================================================
+function pageDashboard(){
+  const crit=portfolios.filter(p=>p.health==='Siaga 3').length;
+  const watch=portfolios.filter(p=>p.health==='Siaga 2').length;
+  const siaga1=portfolios.filter(p=>p.health==='Siaga 1').length;
+  const sehat=portfolios.filter(p=>p.health==='Sehat').length;
+  let h='';
+  h+='<div class="stat-grid">';
+  h+=statCard('ti-wallet','#EEF2FF','#4338CA','Total AUM aktif', rpB(totalAUM()), portfolios.filter(p=>p.status==='Aktif').length+' portfolio aktif','neu');
+  h+=statCard('ti-building-skyscraper','#ECFEFF','#0E7490','Perusahaan portfolio', portfolios.length, onboardingCount()+' dalam onboarding','neu');
+  h+=statCard('ti-users','#FDF4FF','#A21CAF','Total investor', investorsReg.length, pendingKyc()+' menunggu KYC','neu');
+  h+=statCard('ti-briefcase','#ECFDF5','#059669','BA-PM aktif', users.filter(u=>u.role==='BA-PM'&&u.status==='Aktif').length, users.filter(u=>u.role==='BA-PM').length+' total akun','neu');
+  h+='</div>';
+
+  // Task queue
+  h+=`<div class="qpanel"><div class="qpanel-hdr"><i class="ti ti-checklist" style="color:var(--text-info);font-size:17px"></i><span style="font-size:13px;font-weight:600">Antrean persetujuan & tugas admin</span><span class="qcount">${totalTasks()} item</span></div>`;
+  distBatches.filter(d=>d.status==='Perlu diproses').forEach(d=>{ const p=getP(d.pid);
+    const tot=distTotal(d.pid); const inv=(capTable[d.pid]||[]).length;
+    h+=`<div class="task-item"><div class="task-ico" style="background:#EFF6FF"><i class="ti ti-coin" style="color:#2563EB"></i></div><div class="task-body"><div class="task-title">Bagi hasil ${p?p.name:d.pid} — ${d.period}</div><div class="task-sub">${rpJt(tot)} untuk ${inv} investor · ${d.reason}</div></div><button class="btn-success-sm" onclick="openDistribusi('${d.id}')"><i class="ti ti-upload"></i>Proses</button></div>`;
+  });
+  investorsReg.filter(i=>i.kyc==='Pending').forEach(i=>{
+    h+=`<div class="task-item"><div class="task-ico" style="background:#FFFBEB"><i class="ti ti-id" style="color:#D97706"></i></div><div class="task-body"><div class="task-title">Verifikasi KYC — ${i.name}</div><div class="task-sub">${i.tipe} · NPWP ${i.npwp} · daftar ${i.join}</div></div><button class="btn-sm" onclick="openKyc('${i.id}')"><i class="ti ti-eye"></i>Periksa</button></div>`;
+  });
+  portfolios.filter(p=>p.status!=='Aktif'&&p.status!=='Closed').forEach(p=>{
+    h+=`<div class="task-item"><div class="task-ico" style="background:#EEF2FF"><i class="ti ti-building-plus" style="color:#4338CA"></i></div><div class="task-body"><div class="task-title">Onboarding — ${p.name} (${p.kode})</div><div class="task-sub">${p.industri} · ${rpB(p.investasiB)} · status: ${p.status} · PM: ${p.bapm}</div></div><button class="btn-sm" onclick="nav('companies')"><i class="ti ti-arrow-right"></i>Kelola</button></div>`;
+  });
+  h+='</div>';
+
+  // Health distribution + recent activity
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Sebaran kesehatan portfolio</span><span class="link" onclick="nav(\'companies\')">Kelola →</span></div>';
+  [['Siaga 3',crit,'#DC2626'],['Siaga 2',watch,'#EA580C'],['Siaga 1',siaga1,'#D97706'],['Sehat',sehat,'#059669']].forEach(r=>{
+    const names=portfolios.filter(p=>p.health===r[0]).map(p=>p.name).join(', ')||'—';
+    const pct=Math.round(r[1]/4*100);
+    h+=`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;font-weight:600;color:${r[2]}">${r[0]} · ${r[1]}</span><span style="font-size:11px;color:var(--text-tertiary)">${names}</span></div><div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%;background:${r[2]}"></div></div></div>`;
+  });
+  h+='<div class="card-sub" style="margin-top:4px"><i class="ti ti-info-circle" style="font-size:12px;vertical-align:-1px"></i> Status dihitung otomatis dari aturan health yang Admin tetapkan.</div></div>';
+
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Aktivitas lintas platform</span><span class="link" onclick="nav(\'audit\')">Audit log →</span></div>';
+  auditLog.slice(0,5).forEach(a=>{
+    h+=`<div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--border-light)"><div style="width:8px;height:8px;border-radius:50%;background:${a.col};margin-top:5px;flex-shrink:0"></div><div style="flex:1"><div style="font-size:12.5px;color:var(--text-primary)">${a.aksi}</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:1px">${a.actor} · ${a.role} · ${a.tgl}</div></div></div>`;
+  });
+  h+='</div></div>';
+
+  h+='<div class="info-bar" style="margin-top:14px"><div class="info-bar-title"><i class="ti ti-hierarchy-2"></i>Peran admin dalam ekosistem Arunami</div>Admin mengatur lapisan yang tidak ditangani BA-PM maupun Investor: akun & hak akses, onboarding perusahaan + penugasan BA-PM, verifikasi KYC investor, <strong>persetujuan distribusi</strong> sebelum dibayar, serta aturan health, template covenant & skema bagi hasil yang dipakai bersama. <span class="link" onclick="nav(\'settings\')">Lihat matriks peran →</span></div>';
+  return h;
+}
+function statCard(icon,bg,col,label,val,sub,tone){
+  return `<div class="stat-card"><div class="stat-top"><div class="stat-ico" style="background:${bg}"><i class="ti ${icon}" style="color:${col}"></i></div><div class="stat-label">${label}</div></div><div class="stat-value">${val}</div><div class="stat-sub stat-${tone||'neu'}">${sub}</div></div>`;
+}
+
+// ============================================================
+// PAGE — USERS
+// ============================================================
+function pageUsers(){
+  let rows=users.slice();
+  if(ST.userRole) rows=rows.filter(u=>u.role===ST.userRole);
+  if(ST.userQuery) rows=rows.filter(u=>u.name.toLowerCase().includes(ST.userQuery.toLowerCase())||u.email.toLowerCase().includes(ST.userQuery.toLowerCase()));
+  let h='';
+  h+='<div class="filter-row">';
+  h+=`<div class="search-box"><i class="ti ti-search"></i><input placeholder="Cari nama / email" value="${ST.userQuery}" oninput="ST.userQuery=this.value;renderContent()"></div>`;
+  h+=`<select class="filter-select" onchange="ST.userRole=this.value;renderContent()">`;
+  ['','Admin','BA-PM','Investor'].forEach(r=>h+=`<option value="${r}"${ST.userRole===r?' selected':''}>${r||'Semua peran'}</option>`);
+  h+='</select>';
+  h+=`<button class="btn-navy-sm" onclick="openAddUser()"><i class="ti ti-plus"></i>Tambah pengguna</button>`;
+  h+=`<span class="row-count">${rows.length} pengguna</span></div>`;
+
+  h+='<div class="card" style="padding:6px 8px"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pengguna</th><th>Peran</th><th>Cakupan</th><th>Status</th><th>Login terakhir</th><th></th></tr></thead><tbody>';
+  rows.forEach(u=>{
+    const timTag=u.timArunami?` <span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:#059669;background:rgba(5,150,105,0.12);padding:1px 7px;border-radius:20px;vertical-align:middle"><i class="ti ti-discount-check" style="font-size:11px"></i>Tim Arunami · bebas fee</span>`:'';
+    h+=`<tr><td><div class="ucell"><div class="uava" style="background:${u.color}22;color:${u.color}">${u.init}</div><div><div class="uname">${u.name}${timTag}</div><div class="uemail">${u.email}</div></div></div></td>`;
+    h+=`<td>${rtag(u.role)}</td><td class="muted">${u.scope}</td><td>${statusPill(u.status)}</td><td class="muted num">${u.last}</td>`;
+    h+=`<td style="text-align:right;white-space:nowrap"><div style="display:inline-flex;gap:4px;align-items:center">`;
+    if(u.status==='Aktif') h+=`<button class="btn-sm" onclick="toggleUser('${u.id}')">Nonaktifkan</button>`;
+    else if(u.status==='Nonaktif') h+=`<button class="btn-sm" onclick="toggleUser('${u.id}')">Aktifkan</button>`;
+    else h+=`<button class="btn-success-sm" onclick="toggleUser('${u.id}')">Aktivasi</button>`;
+    h+=`<button class="btn-sm" title="Edit" onclick="openUserModal('${u.id}')"><i class="ti ti-pencil"></i></button>`;
+    h+=`<button class="btn-danger-sm" title="Hapus" onclick="confirmDeleteUser('${u.id}')"><i class="ti ti-trash"></i></button>`;
+    h+=`</div></td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+
+// ============================================================
+// PAGE — COMPANIES
+// ============================================================
+function pageCompanies(){
+  let rows=portfolios.slice();
+  if(ST.coStatus) rows=rows.filter(p=>p.status===ST.coStatus);
+  if(ST.coIndustri) rows=rows.filter(p=>p.industri===ST.coIndustri);
+  let h='';
+  h+='<div class="info-bar"><div class="info-bar-title"><i class="ti ti-building-plus"></i>Onboarding & penugasan</div>Admin mendaftarkan perusahaan baru, menetapkan kode portfolio, dan menugaskan BA-PM. Perusahaan berstatus <strong>Aktif</strong> akan muncul di platform BA-PM & Investor. Yang masih onboarding hanya terlihat di sini. Gunakan tombol di setiap baris untuk atur <strong>bagi hasil investor</strong>, kelola <strong>dokumen/kontrak</strong>, atau ubah BA-PM.</div>';
+  h+='<div class="filter-row">';
+  h+=`<select class="filter-select" onchange="ST.coStatus=this.value;renderContent()">`;
+  ['','Aktif','Onboarding','Review legal','Closed'].forEach(s=>h+=`<option value="${s}"${ST.coStatus===s?' selected':''}>${s||'Semua status'}</option>`);
+  h+='</select>';
+  const indList=[...new Set(portfolios.map(p=>p.industri).filter(Boolean))];
+  h+=`<select class="filter-select" onchange="ST.coIndustri=this.value;renderContent()"><option value="">Semua industri</option>`;
+  indList.forEach(i=>h+=`<option value="${i}"${ST.coIndustri===i?' selected':''}>${i}</option>`);
+  h+='</select>';
+  h+=`<button class="btn-navy-sm" onclick="openAddCompany()"><i class="ti ti-plus"></i>Onboard perusahaan baru</button>`;
+  h+=`<span class="row-count">${rows.length} perusahaan</span></div>`;
+
+  h+='<div class="card" style="padding:6px 8px"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Perusahaan</th><th>Industri / tahap</th><th>Investasi (terisi / target)</th><th>Health</th><th>BA-PM</th><th>Status</th><th style="text-align:right">Aksi</th></tr></thead><tbody>';
+  rows.forEach(p=>{
+    const bh=bhConfig[p.id]; const docCount=documents.filter(d=>d.pid===p.id).length;
+    h+=`<tr><td><div class="ucell">${logo(p.id,34)}<div><div class="uname">${p.name}</div><div class="uemail">${p.kode} · ${p.pt}</div></div></div></td>`;
+    h+=`<td><div style="font-size:12.5px">${p.industri}</div><div class="uemail">${p.tahap}</div></td>`;
+    h+=`<td>${investasiCell(p)}</td>`;
+    h+=`<td>${hBadge(p.health)}</td>`;
+    const accList=p.bapmAccess||(p.bapm&&p.bapm!=='Belum ditugaskan'?[p.bapm]:[]);
+    const extraAcc=accList.filter(n=>n!==p.bapm).length;
+    h+=`<td class="muted"><div>${p.bapm}</div>${extraAcc>0?`<div style="font-size:11px;color:var(--text-tertiary);margin-top:1px"><i class="ti ti-users" style="font-size:11px;vertical-align:-1px"></i> +${extraAcc} BA-PM akses</div>`:''}</td><td>${statusPill(p.status)}</td>`;
+    h+=`<td style="text-align:right;white-space:nowrap;min-width:300px"><div style="display:inline-flex;gap:4px;align-items:center">`;
+    h+=`<button class="btn-sm" onclick="openBhModal('${p.id}')"><i class="ti ti-percentage"></i>Bagi hasil</button>`;
+    h+=`<button class="btn-sm" onclick="ST.docPid='${p.id}';nav('dokumen')"><i class="ti ti-folder"></i>${docCount} dok</button>`;
+    h+=`<button class="btn-sm" onclick="openAssign('${p.id}')"><i class="ti ti-user-cog"></i>BA-PM</button>`;
+    h+=`<button class="btn-sm" title="Edit perusahaan" onclick="openEditCompany('${p.id}')"><i class="ti ti-pencil"></i></button>`;
+    if(companyHasReports(p.id)) h+=`<button class="btn-sm" title="Tidak bisa dihapus — sudah ada laporan/distribusi masuk" disabled style="opacity:0.45;cursor:not-allowed"><i class="ti ti-trash"></i></button>`;
+    else h+=`<button class="btn-danger-sm" title="Hapus perusahaan" onclick="confirmDeleteCompany('${p.id}')"><i class="ti ti-trash"></i></button>`;
+    h+=`</div></td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+
+// ============================================================
+// PAGE — INVESTORS & KYC
+// ============================================================
+function pageInvestors(){
+  let rows=investorsReg.slice();
+  if(ST.invKyc) rows=rows.filter(i=>i.kyc===ST.invKyc);
+  let h='';
+  const pend=pendingKyc();
+  if(pend>0) h+=`<div class="notif-bar"><i class="ti ti-id"></i><div><strong>${pend} investor menunggu verifikasi KYC.</strong> Verifikasi diperlukan sebelum investor dapat ditautkan ke cap table portfolio dan menerima distribusi.</div></div>`;
+
+  // Stats: total investor & total investasi
+  const totInvestor=investorsReg.length;
+  const verifInvestor=investorsReg.filter(i=>i.kyc==='Terverifikasi').length;
+  const totInvestasiJt=Object.keys(capTable).reduce((s,pid)=>s+capSumJt(pid),0);
+  h+='<div class="stat-grid" style="grid-template-columns:repeat(2,1fr)">';
+  h+=statCard('ti-users','#FDF4FF','#A21CAF','Total investor', totInvestor, `${verifInvestor} terverifikasi · ${pend} pending`,'neu');
+  h+=statCard('ti-wallet','#ECFDF5','#059669','Total investasi tercatat', rpJt(totInvestasiJt), `tersebar di ${Object.keys(capTable).length} portfolio`,'neu');
+  h+='</div>';
+
+  h+='<div class="filter-row">';
+  h+=`<select class="filter-select" onchange="ST.invKyc=this.value;renderContent()">`;
+  ['','Terverifikasi','Pending','Ditolak'].forEach(s=>h+=`<option value="${s}"${ST.invKyc===s?' selected':''}>${s||'Semua status KYC'}</option>`);
+  h+='</select>';
+  h+=`<button class="btn-navy-sm" onclick="openInvestorForm()"><i class="ti ti-plus"></i>Tambah investor</button>`;
+  h+=`<span class="row-count">${rows.length} investor</span></div>`;
+
+  if(!rows.length){ h+=`<div class="card" style="padding:28px;text-align:center;color:var(--text-tertiary)"><i class="ti ti-users" style="font-size:22px"></i><div style="margin-top:8px;font-size:13px">Belum ada investor. Klik <strong>Tambah investor</strong> untuk mendaftarkan.</div></div>`; return h; }
+  h+='<div class="card" style="padding:6px 8px"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Investor</th><th>Tipe</th><th>NPWP</th><th>Holding</th><th>Total nominal</th><th>KYC</th><th></th></tr></thead><tbody>';
+  rows.forEach(i=>{
+    const sm=investorSummary(i.name);
+    h+=`<tr><td><div class="ucell"><div class="uava" style="background:#FDF4FF;color:#A21CAF">${i.init}</div><div><div class="uname">${i.name}</div><div class="uemail">${i.email}</div></div></div></td>`;
+    h+=`<td class="muted">${i.tipe}</td><td class="muted num" style="font-size:12px">${i.npwp||'—'}</td>`;
+    h+=`<td class="num">${sm.count}</td><td class="num" style="font-weight:600">${sm.totalInv? rpJt(sm.totalInv):'—'}</td>`;
+    h+=`<td>${statusPill(i.kyc)}</td>`;
+    h+=`<td style="text-align:right;white-space:nowrap"><div style="display:inline-flex;gap:4px;align-items:center">`;
+    h+=`<button class="btn-sm" title="Detail investasi & earning" onclick="openInvestorDetail('${i.id}')"><i class="ti ti-chart-pie"></i>Investasi</button>`;
+    if(i.kyc==='Pending') h+=`<button class="btn-success-sm" onclick="openKyc('${i.id}')"><i class="ti ti-eye"></i>Verifikasi</button>`;
+    else h+=`<button class="btn-sm" onclick="openKyc('${i.id}')">KYC</button>`;
+    h+=`</div></td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+
+function openInvestorForm(){
+  let h=`<div class="modal-title">Tambah investor</div><div class="modal-sub">Daftarkan investor baru ke registry KYC</div>`;
+  h+=`<div class="form-grid"><div class="form-field"><div class="form-label">Nama lengkap</div><input class="form-input" id="ni-name" placeholder="Nama"></div><div class="form-field"><div class="form-label">Tipe</div><select class="form-input" id="ni-tipe"><option>Individu</option><option>Institusi</option></select></div></div>`;
+  h+=`<div class="form-grid"><div class="form-field"><div class="form-label">Email</div><input class="form-input" id="ni-email" type="email" placeholder="email@..."></div><div class="form-field"><div class="form-label">NPWP (opsional)</div><input class="form-input" id="ni-npwp" placeholder="00.000.000.0-000.000"></div></div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveInvestor()"><i class="ti ti-check"></i>Daftarkan</button></div>`;
+  openModal(h);
+}
+function saveInvestor(){
+  const name=document.getElementById('ni-name').value.trim()||'Investor Baru';
+  const tipe=document.getElementById('ni-tipe').value;
+  const email=document.getElementById('ni-email').value.trim()||'investor@email.com';
+  const npwp=document.getElementById('ni-npwp').value.trim()||'';
+  const today=new Date().toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+  investorsReg.push(Store.newInvestor({name,email,tipe,npwp,kyc:'Pending',join:today}));
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Mendaftarkan investor ${name} (KYC pending)`,tgl:'Baru saja',icon:'ti-user-plus',col:'#4338CA'});
+  closeModalForce(); render(); toast('Investor terdaftar — menunggu verifikasi KYC');
+}
+
+function openInvestorDetail(id){
+  const iv=investorsReg.find(x=>x.id===id); if(!iv) return;
+  const s=investorSummary(iv.name);
+  let h=`<div class="modal-title">Detail investasi — ${iv.name}</div><div class="modal-sub">${iv.tipe} · ${iv.email} · ${statusPill(iv.kyc)}</div>`;
+  // 4 stat tiles
+  h+=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px">`;
+  const tile=(lbl,val,sub,col)=>`<div style="background:var(--bg-secondary);border-radius:9px;padding:11px 13px"><div style="font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">${lbl}</div><div style="font-size:16px;font-weight:700;color:${col||'var(--text-primary)'};margin-top:3px">${val}</div>${sub?`<div style="font-size:10.5px;color:var(--text-tertiary);margin-top:1px">${sub}</div>`:''}</div>`;
+  h+=tile('Total investasi',rpJt(s.totalInv),`${s.count} portfolio`);
+  h+=tile('Total earning',rpJt(s.totalEarn),'akumulasi bagi hasil','#059669');
+  h+=tile('Jumlah portfolio',s.count,'holding aktif');
+  h+=tile('Rata-rata ROI bulanan',s.avgRoi.toFixed(2)+'%','rerata antar portfolio','#2563EB');
+  h+=`</div>`;
+  // Per-portfolio detail
+  h+=`<div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:7px">Rincian per portfolio</div>`;
+  if(s.hold.length){
+    h+=`<div class="tbl-wrap"><table class="tbl" style="font-size:12px"><thead><tr><th>Portfolio</th><th>Status</th><th class="num">Investasi</th><th class="num">% milik</th><th class="num">Earning terakhir</th><th class="num">Total earning</th><th class="num">ROI/bln</th></tr></thead><tbody>`;
+    s.hold.forEach(hd=>{
+      h+=`<tr><td><div class="ucell">${logo(hd.pid,24)}<span style="font-weight:500">${hd.nama}</span></div></td>`;
+      h+=`<td>${statusPill(hd.status)}</td>`;
+      h+=`<td class="num">${rpJt(hd.nominalJt)}</td>`;
+      h+=`<td class="num">${hd.ownershipPct}%</td>`;
+      h+=`<td class="num" style="color:#059669;font-weight:600">${rpJt(hd.earnLast)}<div style="font-size:10px;color:var(--text-tertiary);font-weight:400">${hd.bulanLast}</div></td>`;
+      h+=`<td class="num" style="font-weight:600">${rpJt(hd.totalEarn)}</td>`;
+      h+=`<td class="num" style="color:#2563EB;font-weight:600">${hd.roiBulanan.toFixed(2)}%</td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  } else {
+    h+=`<div class="card-sub" style="padding:14px;text-align:center"><i class="ti ti-folder-off" style="font-size:13px;vertical-align:-2px"></i> Belum ada holding di portfolio mana pun.</div>`;
+  }
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Tutup</button></div>`;
+  openModal(h,true);
+}
+
+// ============================================================
+// PAGE — BAGI HASIL & TRANSFER  (Admin proses → lapor ke BA-PM → BA-PM teruskan ke investor)
+// ============================================================
+function pageDistribusi(){
+  let rows=distBatches.slice();
+  if(ST.distStatus) rows=rows.filter(d=>d.status===ST.distStatus);
+  let h='';
+
+  // Alur info
+  h+=`<div class="info-bar"><div class="info-bar-title"><i class="ti ti-arrows-right"></i>Alur bagi hasil</div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;font-size:12px">
+    <span style="background:#EFF6FF;color:#1d4ed8;padding:4px 10px;border-radius:6px;font-weight:600"><i class="ti ti-coin" style="font-size:12px;vertical-align:-1px"></i> Admin: hitung &amp; upload bukti transfer</span>
+    <i class="ti ti-arrow-right" style="color:var(--text-tertiary)"></i>
+    <span style="background:#ECFEFF;color:#0e7490;padding:4px 10px;border-radius:6px;font-weight:600"><i class="ti ti-send" style="font-size:12px;vertical-align:-1px"></i> Admin lapor ke BA-PM</span>
+    <i class="ti ti-arrow-right" style="color:var(--text-tertiary)"></i>
+    <span style="background:#F0FDF4;color:#15803d;padding:4px 10px;border-radius:6px;font-weight:600"><i class="ti ti-users" style="font-size:12px;vertical-align:-1px"></i> BA-PM kirim laporan + bukti ke investor</span>
+  </div></div>`;
+
+  // Stats
+  const perlu=distBatches.filter(d=>d.status==='Perlu diproses');
+  const dilaporkan=distBatches.filter(d=>d.status==='Dilaporkan ke BA-PM');
+  const diteruskan=distBatches.filter(d=>d.status==='Diteruskan ke Investor');
+  const ditahan=distBatches.filter(d=>d.status==='Ditahan');
+  const totalPerlu=perlu.reduce((s,d)=>s+distTotal(d.pid),0);
+  h+='<div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">';
+  h+=statCard('ti-clock','#FFFBEB','#D97706','Perlu diproses',perlu.length,perlu.length>0?rpJt(totalPerlu)+' menunggu':'—','neu');
+  h+=statCard('ti-send','#ECFEFF','#0E7490','Dilaporkan ke BA-PM',dilaporkan.length,'menunggu BA-PM teruskan','neu');
+  h+=statCard('ti-circle-check','#ECFDF5','#059669','Sudah ke investor',diteruskan.length,'BA-PM telah kirim','up');
+  h+=statCard('ti-hand-stop','#FEF2F2','#DC2626','Ditahan',ditahan.length,'pelanggaran covenant','dn');
+  h+='</div>';
+
+  h+='<div class="filter-row">';
+  h+=`<select class="filter-select" onchange="ST.distStatus=this.value;renderContent()">`;
+  ['','Perlu diproses','Dilaporkan ke BA-PM','Diteruskan ke Investor','Ditahan'].forEach(s=>h+=`<option value="${s}"${ST.distStatus===s?' selected':''}>${s||'Semua status'}</option>`);
+  h+='</select>';
+  h+=`<button class="btn-navy-sm" onclick="openTambahDistribusi()"><i class="ti ti-plus"></i>Buat batch baru</button>`;
+  h+=`<span class="row-count">${rows.length} batch</span></div>`;
+
+  h+='<div class="card" style="padding:6px 8px"><div class="tbl-wrap"><table class="tbl"><thead><tr>';
+  h+='<th>Portfolio</th><th>Periode</th><th>Investor</th><th>Total bagi hasil</th><th>Bukti transfer</th><th>Status</th><th style="text-align:right">Aksi</th>';
+  h+='</tr></thead><tbody>';
+  rows.forEach(d=>{
+    const p=getP(d.pid); const tot=distTotal(d.pid); const inv=(capTable[d.pid]||[]).length;
+    const bpi=d.buktiPerInvestor||{}; const buktiCount=Object.values(bpi).filter(Boolean).length;
+    const buktiLabel=buktiCount>0
+      ?`<span style="color:var(--text-success);font-size:12px"><i class="ti ti-file-check"></i> ${buktiCount}/${inv} investor</span>`
+      :`<span class="muted" style="font-size:12px">—</span>`;
+    h+=`<tr><td><div class="ucell">${logo(d.pid,30)}<div><div class="uname">${p?p.name:d.pid}</div><div class="uemail">${p?p.kode:''}</div></div></div></td>`;
+    h+=`<td class="muted num">${d.period}</td>`;
+    h+=`<td class="num">${inv} investor</td>`;
+    h+=`<td class="num" style="font-weight:600">${rpJt(tot)}</td>`;
+    h+=`<td>${buktiLabel}</td>`;
+    h+=`<td>${statusPill(d.status)}</td>`;
+    h+=`<td style="text-align:right;white-space:nowrap">`;
+    if(d.status==='Perlu diproses'){
+      h+=`<button class="btn-success-sm" onclick="openDistribusi('${d.id}')"><i class="ti ti-upload"></i>Proses &amp; upload bukti</button>`;
+    } else if(d.status==='Ditahan'){
+      h+=`<button class="btn-sm" onclick="openDistribusi('${d.id}')"><i class="ti ti-eye"></i>Tinjau</button>`;
+    } else if(d.status==='Dilaporkan ke BA-PM'){
+      h+=`<button class="btn-sm" onclick="openDistribusi('${d.id}')"><i class="ti ti-eye"></i>Detail</button>`;
+      h+=` <span style="font-size:11px;color:#0E7490;font-style:italic">Menunggu BA-PM</span>`;
+    } else {
+      h+=`<button class="btn-sm" onclick="openDistribusi('${d.id}')"><i class="ti ti-eye"></i>Detail</button>`;
+    }
+    h+=`</td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+
+  // Notif untuk BA-PM yang perlu menindaklanjuti
+  const perluBapm=distBatches.filter(d=>d.status==='Dilaporkan ke BA-PM');
+  if(perluBapm.length>0){
+    h+=`<div class="notif-bar" style="margin-top:4px"><i class="ti ti-alert-circle"></i><div><strong>${perluBapm.length} batch sudah dilaporkan ke BA-PM dan menunggu diteruskan ke investor.</strong> BA-PM (Reza Wijaya) akan melihat notifikasi ini di platform BA-PM dan mengirim laporan + bukti transfer ke masing-masing investor.</div></div>`;
+  }
+  return h;
+}
+function pageApprovals(){ return pageDistribusi(); }
+
+// ============================================================
+// PAGE — PLATFORM FEES
+// ============================================================
+function pageFees(){
+  let h='';
+  const active=portfolios.filter(p=>p.status==='Aktif');
+  let totalFee=0; active.forEach(p=>totalFee+=p.investasiB*1000*p.feePct/100);
+  h+='<div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">';
+  h+=statCard('ti-receipt-2','#EEF2FF','#4338CA','Estimasi fee tahunan', rpJt(totalFee), 'management fee gabungan','neu');
+  h+=statCard('ti-percentage','#ECFEFF','#0E7490','Rata-rata fee', (active.reduce((s,p)=>s+p.feePct,0)/active.length).toFixed(2)+'%', 'p.a. dari AUM','neu');
+  h+=statCard('ti-wallet','#ECFDF5','#059669','Basis AUM', rpB(totalAUM()), active.length+' portfolio','neu');
+  h+='</div>';
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Management fee per portfolio</span><span class="card-sub">Ditetapkan saat onboarding · ditagih ke perusahaan portfolio</span></div>';
+  h+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Portfolio</th><th>AUM</th><th>Fee %</th><th>Fee tahunan (est.)</th><th>Fee bulanan</th></tr></thead><tbody>';
+  active.forEach(p=>{ const fy=p.investasiB*1000*p.feePct/100;
+    h+=`<tr><td><div class="ucell">${logo(p.id,28)}<div><div class="uname">${p.name}</div><div class="uemail">${p.kode}</div></div></div></td>`;
+    h+=`<td class="num">${rpB(p.investasiB)}</td><td class="num">${p.feePct.toFixed(1)}%</td><td class="num" style="font-weight:600">${rpJt(fy)}</td><td class="num muted">${rpJt(fy/12)}</td></tr>`;
+  });
+  h+=`<tr style="border-top:2px solid var(--border)"><td style="font-weight:600">Total</td><td class="num" style="font-weight:600">${rpB(totalAUM())}</td><td></td><td class="num" style="font-weight:700">${rpJt(totalFee)}</td><td class="num" style="font-weight:600">${rpJt(totalFee/12)}</td></tr>`;
+  h+='</tbody></table></div></div>';
+  return h;
+}
+
+// ============================================================
+// PAGE — HEALTH RULES
+// ============================================================
+function pageRules(){
+  let h='';
+  h+='<div class="info-bar"><div class="info-bar-title"><i class="ti ti-shield-check"></i>SOP Penanganan Wanprestasi — Aturan Health Global</div>Ambang batas ini mengikuti SOP Penanganan Portfolio dengan Indikasi Wanprestasi. Mesin health di platform BA-PM menggunakan nilai ini untuk menentukan tahapan Siaga setiap portfolio. Perubahan berlaku ke semua portfolio aktif.</div>';
+
+  // SOP reference card
+  h+='<div class="card" style="margin-bottom:14px"><div class="card-hdr"><span class="card-title">Kerangka eskalasi SOP</span></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px">';
+  [
+    ['Siaga 1','Early Warning','#D97706','rgba(217,119,6,0.08)','ti-alert-triangle',
+      'Keterlambatan bayar/lapor >30 hari','Komunikasi vakum 2 minggu','Performa <20% dari target (1 bulan)',
+      'Klarifikasi kondisi usaha · Site Visit · Surat Peringatan I · Laporan ke investor'],
+    ['Siaga 2','Serious Concern','#EA580C','rgba(234,88,12,0.08)','ti-alert-circle',
+      'Keterlambatan >60 hari','Komunikasi vakum 1 bulan','Performa <20% dari target (2 bulan berturut)',
+      'Evaluasi komitmen Siaga 1 · Mediasi · Surat Peringatan II · Laporan ke investor'],
+    ['Siaga 3','Enforcement','#DC2626','rgba(220,38,38,0.08)','ti-flame',
+      'Keterlambatan >90 hari','Tidak kooperatif >1 bulan','Performa <20% dari target (3 bulan berturut)',
+      'Somasi resmi · Eskalasi ke investor · Langkah hukum · Forum Tripartit'],
+  ].forEach(([siaga,label,color,bg,icon,t1,t2,t3,tindakan])=>{
+    h+=`<div style="background:${bg};border:1px solid ${color}30;border-radius:10px;padding:14px 16px">`;
+    h+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:10px"><i class="ti ${icon}" style="color:${color};font-size:16px"></i><div><div style="font-size:13px;font-weight:700;color:${color}">${siaga}</div><div style="font-size:11px;color:${color}90;font-weight:500">${label}</div></div></div>`;
+    h+=`<div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:5px">Trigger (salah satu)</div>`;
+    h+=`<ul style="margin:0;padding-left:16px;font-size:12px;line-height:1.7;color:var(--text-secondary)"><li>${t1}</li><li>${t2}</li><li>${t3}</li></ul>`;
+    h+=`<div style="margin-top:10px;padding-top:8px;border-top:1px solid ${color}30;font-size:11px;color:var(--text-secondary)"><strong>Tindakan:</strong> ${tindakan}</div>`;
+    h+=`</div>`;
+  });
+  h+='</div></div>';
+
+  // Configurable thresholds
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Konfigurasi ambang batas</span><button class="btn-navy-sm" onclick="saveRules()"><i class="ti ti-device-floppy"></i>Simpan</button></div>';
+  h+='<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
+  [
+    ['','Siaga 1','Siaga 2','Siaga 3'],
+    ['Keterlambatan bayar/lapor (hari)','siaga1Hari','siaga2Hari','siaga3Hari'],
+    ['Vakum komunikasi (hari)','siaga1VakumHari','siaga2VakumHari','siaga3VakumHari'],
+    ['Performa di bawah target (bulan berturut)','siaga1PerfBulan','siaga2PerfBulan','siaga3PerfBulan'],
+  ].forEach((row,ri)=>{
+    const isHdr=ri===0;
+    if(isHdr){
+      h+=`<div style="display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr 1fr;background:var(--bg-secondary);border-bottom:1px solid var(--border)">`;
+      h+=`<div style="padding:9px 12px;font-size:11px;color:var(--text-tertiary)"></div>`;
+      ['Siaga 1','Siaga 2','Siaga 3'].forEach((s,si)=>{
+        const c=['#D97706','#EA580C','#DC2626'][si];
+        h+=`<div style="padding:9px 12px;font-size:11.5px;font-weight:700;color:${c};text-align:center">${s}</div>`;
+      });
+      h+='</div>';
+    } else {
+      h+=`<div style="display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr 1fr;${ri<3?'border-bottom:1px solid var(--border);':''}">`;
+      h+=`<div style="padding:9px 12px;font-size:12.5px;display:flex;align-items:center">${row[0]}</div>`;
+      [row[1],row[2],row[3]].forEach(k=>{
+        h+=`<div style="padding:7px 10px;text-align:center"><input type="number" class="form-input cfg-num" id="rule-${k}" value="${healthRules[k]}" style="width:100%;text-align:center;padding:5px 8px"></div>`;
+      });
+      h+='</div>';
+    }
+  });
+  h+='</div></div>';
+
+  // Preview table
+  h+='<div class="card"><div class="card-title" style="margin-bottom:12px">Status portfolio saat ini</div>';
+  const aktif=portfolios.filter(p=>p.status==='Aktif');
+  if(!aktif.length){
+    h+='<div style="padding:24px;text-align:center;color:var(--text-tertiary);font-size:13px"><i class="ti ti-building-off" style="font-size:20px"></i><br>Belum ada portfolio aktif. Status muncul setelah Admin meng-onboard portfolio.</div></div>';
+    return h;
+  }
+  h+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Portfolio</th><th>Status</th><th>Keterlambatan</th><th>Vakum komunikasi</th><th>Performa bawah target</th><th>Pemicu (SOP)</th></tr></thead><tbody>';
+  const today=new Date();
+  aktif.forEach(p=>{
+    const hari=p.keterlambatanHari||0;
+    const vakum=p.lastKontakTgl?Math.max(0,Math.floor((today-new Date(p.lastKontakTgl))/86400000)):0;
+    const perf=perfBulanAdmin(p.id);
+    // Pemicu sesuai kerangka eskalasi SOP: keterlambatan / komunikasi / performa
+    const trig=[];
+    if(hari>healthRules.siaga1Hari) trig.push('Keterlambatan bayar/lapor '+hari+' hari');
+    if(vakum>=healthRules.siaga1VakumHari) trig.push('Komunikasi vakum '+vakum+' hari');
+    if(perf>=healthRules.siaga1PerfBulan) trig.push('Performa di bawah target '+perf+' bln');
+    const pemicu=trig.length?trig.join(' · '):'Semua indikator dalam batas normal';
+    h+=`<tr><td>${p.name}</td><td>${hBadge(p.health||'Sehat')}</td><td class="muted num">${hari?hari+' hari':'—'}</td><td class="muted num">${vakum?vakum+' hari':'—'}</td><td class="muted num">${perf?perf+' bln':'—'}</td><td class="muted">${pemicu}</td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+// Performa: jumlah bulan berturut net profit < 80% target (dari shared store; kosong = 0)
+function perfBulanAdmin(pid){
+  const rows=(Store.db.monthlyReports[pid]||[]).filter(r=>r.np!=null).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const tgt=(Store.db.projTargets[pid]||{}).np; if(!tgt||!rows.length) return 0;
+  const targetNp=parseFloat(String(tgt).replace('M','')); if(!targetNp) return 0;
+  let c=0; for(const r of rows){ const a=parseFloat(String(r.np).replace('M','')); if(isNaN(a)) break; if(a<targetNp*0.8) c++; else break; } return c;
+}
+
+// ============================================================
+// PAGE — TEMPLATES & SCHEMES
+// ============================================================
+// ============================================================
+// PAGE — AUDIT LOG
+// ============================================================
+function pageAudit(){
+  let h='';
+  h+='<div class="card-sub" style="margin-bottom:14px"><i class="ti ti-shield-check" style="font-size:13px;vertical-align:-1px"></i> Jejak audit gabungan dari ketiga platform — Admin, BA-PM, dan Investor.</div>';
+  h+='<div class="card">';
+  auditLog.forEach(a=>{
+    h+=`<div class="task-item"><div class="task-ico" style="background:${a.col}18"><i class="ti ${a.icon}" style="color:${a.col}"></i></div><div class="task-body"><div class="task-title">${a.aksi}</div><div class="task-sub">${a.actor} · ${rtag(a.role)} · ${a.tgl}</div></div></div>`;
+  });
+  h+='</div>';
+  return h;
+}
+
+// ============================================================
+// PAGE — ANNOUNCEMENTS
+// ============================================================
+function pageAnnounce(){
+  let h='';
+  h+='<div class="filter-row"><span style="font-size:13px;color:var(--text-secondary)">Pengumuman ke seluruh atau sebagian pengguna platform.</span><button class="btn-navy-sm" style="margin-left:auto" onclick="openAnnounce()"><i class="ti ti-plus"></i>Buat pengumuman</button></div>';
+  h+='<div class="card" style="padding:6px 8px"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Judul</th><th>Target</th><th>Tanggal</th><th>Status</th><th></th></tr></thead><tbody>';
+  announcements.forEach(a=>{
+    h+=`<tr><td><div style="font-weight:500">${a.judul}</div><div class="uemail">${a.isi}</div></td><td>${rtag(a.target==='BA-PM'?'BA-PM':a.target==='Investor'?'Investor':'Admin').replace('Admin','Semua')}</td><td class="muted num">${a.tgl}</td><td>${statusPill(a.status)}</td><td style="text-align:right"><button class="btn-ico" onclick="toast('Detail pengumuman (demo)')"><i class="ti ti-dots"></i></button></td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+
+// ============================================================
+// PAGE — SYSTEM SETTINGS (role matrix)
+// ============================================================
+function pageSettings(){
+  let h='';
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Matriks peran & hak akses</span><span class="card-sub">Bagaimana ketiga platform berbagi tugas</span></div>';
+  h+='<table class="matrix"><thead><tr><th>Kapabilitas</th><th class="col-role">Admin</th><th class="col-role">BA-PM</th><th class="col-role">Investor</th></tr></thead><tbody>';
+  const caps=[
+    ['Kelola akun & hak akses', 1,0,0],
+    ['Onboarding perusahaan & tetapkan BA-PM', 1,0,0],
+    ['Verifikasi KYC investor', 1,0,0],
+    ['Setujui distribusi sebelum dibayar', 1,'p',0],
+    ['Atur aturan health global', 1,0,0],
+    ['Susun laporan & data keuangan portfolio', 'p',1,0],
+    ['Kelola covenant, milestone & catatan', 'p',1,0],
+    ['Jalankan meeting & engagement investor', 0,1,0],
+    ['Lihat portofolio & distribusi sendiri', 0,0,1],
+    ['Unduh laporan, dokumen & kontrak', 'p',1,1],
+    ['Audit log lintas platform', 1,'p',0],
+  ];
+  function cell(v){ return v===1?'<i class="ti ti-circle-check-filled mx-yes"></i>':v==='p'?'<span class="mx-part" title="Sebagian / lingkup terbatas">◑</span>':'<i class="ti ti-minus mx-no"></i>'; }
+  caps.forEach(c=>{ h+=`<tr><td class="cap">${c[0]}</td><td class="col-role">${cell(c[1])}</td><td class="col-role">${cell(c[2])}</td><td class="col-role">${cell(c[3])}</td></tr>`; });
+  h+='</tbody></table>';
+  h+='<div class="card-sub" style="margin-top:12px"><i class="ti ti-circle-check-filled mx-yes" style="font-size:13px;vertical-align:-2px"></i> Penuh &nbsp; <span class="mx-part">◑</span> Sebagian/terbatas &nbsp; <i class="ti ti-minus mx-no" style="font-size:13px;vertical-align:-2px"></i> Tidak ada</div></div>';
+
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+  h+='<div class="card"><div class="card-title" style="margin-bottom:12px">Branding & identitas</div>';
+  h+='<div class="kvg"><div><div class="kv-lbl">Nama platform</div><div class="kv-val">Arunami</div></div><div><div class="kv-lbl">Domain</div><div class="kv-val">app.arunami.id</div></div><div><div class="kv-lbl">Mata uang</div><div class="kv-val">IDR (Rupiah)</div></div><div><div class="kv-lbl">Zona waktu</div><div class="kv-val">WIB (GMT+7)</div></div></div></div>';
+  h+='<div class="card"><div class="card-title" style="margin-bottom:8px">Keamanan</div>';
+  [['Wajib 2FA untuk Admin & BA-PM',true],['Auto-logout 30 menit idle',true],['Persetujuan distribusi butuh 2 admin',false],['Log ekspor data investor',true]].forEach(s=>{
+    h+=`<div class="cfg-row"><div class="cfg-info"><div class="cfg-name" style="font-size:12.5px;font-weight:400">${s[0]}</div></div><div class="tg ${s[1]?'on':''}" onclick="this.classList.toggle('on')"></div></div>`;
+  });
+  h+='</div></div>';
+  return h;
+}
+
+// ============================================================
+// PAGE — KONTRAK & DOKUMEN
+// ============================================================
+function pageDocuments(){
+  let rows=documents.slice();
+  if(ST.docPid) rows=rows.filter(d=>d.pid===ST.docPid);
+  if(ST.docTipe) rows=rows.filter(d=>d.tipe===ST.docTipe);
+  let h='';
+  h+='<div class="info-bar"><div class="info-bar-title"><i class="ti ti-folder-open"></i>Kontrak, PKS &amp; dokumen lain</div>Admin mengunggah dan memperbarui semua dokumen hukum. Dokumen yang telah diunggah dapat diakses oleh BA-PM dan Investor (sesuai visibilitas) di platform masing-masing.</div>';
+  h+='<div class="filter-row">';
+  h+=`<select class="filter-select" onchange="ST.docPid=this.value;renderContent()">`;
+  h+=`<option value="">Semua portfolio</option>`;
+  portfolios.forEach(p=>h+=`<option value="${p.id}"${ST.docPid===p.id?' selected':''}>${p.name}</option>`);
+  h+='</select>';
+  h+=`<select class="filter-select" onchange="ST.docTipe=this.value;renderContent()">`;
+  h+=`<option value="">Semua tipe</option>`;
+  DOC_TIPE.forEach(t=>h+=`<option value="${t}"${ST.docTipe===t?' selected':''}>${t}</option>`);
+  h+='</select>';
+  h+=`<button class="btn-navy-sm" onclick="openDocModal(null)"><i class="ti ti-upload"></i>Upload dokumen baru</button>`;
+  h+=`<span class="row-count">${rows.length} dokumen</span></div>`;
+
+  h+='<div class="card" style="padding:6px 8px"><div class="tbl-wrap"><table class="tbl"><thead><tr>';
+  h+='<th>Nama dokumen</th><th>Portfolio</th><th>Tipe</th><th>Versi</th><th>Tanggal</th><th>Ukuran</th><th style="text-align:right">Aksi</th>';
+  h+='</tr></thead><tbody>';
+  if(rows.length===0){
+    h+=`<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-tertiary)"><i class="ti ti-folder" style="font-size:28px;display:block;margin-bottom:8px"></i>Belum ada dokumen</td></tr>`;
+  }
+  rows.forEach(d=>{
+    const p=getP(d.pid);
+    const tipeIco={
+      'Kontrak/PKS':'ti-writing','Addendum':'ti-file-plus','Sertifikat':'ti-certificate',
+      'Jaminan':'ti-lock','Pajak':'ti-receipt','Statement':'ti-chart-bar','Lainnya':'ti-file'
+    }[d.tipe]||'ti-file';
+    h+=`<tr>`;
+    h+=`<td><div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;border-radius:7px;background:var(--bg-secondary);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${tipeIco}" style="color:var(--text-secondary);font-size:15px"></i></div><div><div style="font-weight:500;font-size:13px">${d.nama}</div><div class="uemail">${d.size}</div></div></div></td>`;
+    h+=`<td><div class="ucell">${logo(d.pid,22)}<span style="font-size:12.5px">${p?p.name:d.pid}</span></div></td>`;
+    h+=`<td><span class="pill pill-pending" style="font-size:10px">${d.tipe}</span></td>`;
+    h+=`<td class="muted num">${d.versi}</td>`;
+    h+=`<td class="muted num">${d.tgl}</td>`;
+    h+=`<td class="muted">${d.size}</td>`;
+    h+=`<td style="text-align:right;white-space:nowrap">`;
+    h+=`<button class="btn-sm" style="margin-right:4px" onclick="openDocModal('${d.id}')"><i class="ti ti-pencil"></i>Edit</button>`;
+    h+=`<button class="btn-danger-sm" onclick="deleteDoc('${d.id}')"><i class="ti ti-trash"></i></button>`;
+    h+=`</td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+
+// ============================================================
+// PAGE — PENGATURAN BAGI HASIL PER PORTFOLIO
+// ============================================================
+function pageBhConfig(){
+  let h='';
+  h+='<div class="info-bar"><div class="info-bar-title"><i class="ti ti-percentage"></i>Pengaturan bagi hasil investor per portfolio</div>Skema dan parameter bagi hasil ditetapkan oleh Admin saat onboarding dan dapat diperbarui kapan saja. Pengaturan ini tampil ke BA-PM (untuk laporan) dan ke Investor (di portal mereka). Perubahan berlaku pada periode bagi hasil berikutnya.</div>';
+
+  portfolios.filter(p=>p.status==='Aktif'||p.status==='Onboarding').forEach(p=>{
+    const bh=bhConfig[p.id]||{skema:'—',basis:'—',frekuensi:'—',cap:'—',minimum:'—'};
+    const ct=capTable[p.id]||[];
+    h+=`<div class="card" style="margin-bottom:16px">`;
+    h+=`<div class="card-hdr"><div style="display:flex;align-items:center;gap:10px">${logo(p.id,36)}<div><div style="font-size:15px;font-weight:700">${p.name}</div><div class="uemail">${p.kode} · ${p.industri}</div></div></div>`;
+    h+=`<div style="display:flex;gap:8px;align-items:center"><button class="btn-sm" onclick="openCapModal('${p.id}')"><i class="ti ti-users-group"></i>Kelola investor</button><button class="btn-navy-sm" onclick="openBhModal('${p.id}')"><i class="ti ti-pencil"></i>Edit skema</button></div></div>`;
+
+    // Target investasi + pengembalian pokok
+    const tgtJt=(p.investasiB||0)*1000, filJt=capSumJt(p.id);
+    const tgtPct=tgtJt>0?Math.round(filJt/tgtJt*100):0;
+    const tgtBar=tgtPct>100?'#DC2626':tgtPct>=100?'#059669':tgtPct>=50?'#2563EB':'#D97706';
+    const pp=p.pengembalianPokok;
+    h+=`<div style="display:grid;grid-template-columns:2fr 1.4fr;gap:12px;margin-bottom:16px">`;
+    h+=`<div style="background:var(--bg-secondary);border-radius:8px;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Target investasi</div><div style="font-size:11px;font-weight:700;color:${tgtBar}">${tgtPct}% terisi${tgtPct>100?' (over)':''}</div></div>
+      <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-top:3px">${rpJt(filJt)} <span style="font-size:11px;font-weight:400;color:var(--text-tertiary)">/ ${p.investasiB||0} M target</span></div>
+      <div style="height:5px;border-radius:3px;background:var(--bg-card);margin-top:6px"><div style="height:5px;border-radius:3px;background:${tgtBar};width:${Math.min(100,tgtPct)}%"></div></div>
+    </div>`;
+    h+=`<div style="background:var(--bg-secondary);border-radius:8px;padding:12px 14px">
+      <div style="font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">Pengembalian pokok</div>
+      <div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;${pp?'color:#059669;background:rgba(5,150,105,0.12)':'color:#6B7280;background:rgba(107,114,128,0.12)'}"><i class="ti ${pp?'ti-check':'ti-minus'}" style="font-size:13px"></i>${pp?'Ada':'Tidak ada'}</div>
+      <div style="font-size:10.5px;color:var(--text-tertiary);margin-top:6px;line-height:1.4">${pp?'Annualized yield di BA-PM dihitung penuh.':'Annualized yield di BA-PM disesuaikan −20% (tanpa pokok).'}</div>
+    </div>`;
+    h+=`</div>`;
+
+    // Skema grid
+    h+=`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px">`;
+    [['Skema',bh.skema],['Basis perhitungan',bh.basis],['Frekuensi',bh.frekuensi],['Cap / batas atas',bh.cap],['Minimum return',bh.minimum]].forEach(([lbl,val])=>{
+      h+=`<div style="background:var(--bg-secondary);border-radius:8px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">${lbl}</div><div style="font-size:12.5px;font-weight:500;color:var(--text-primary)">${val}</div></div>`;
+    });
+    h+=`</div>`;
+
+    // Cap table — nominal & porsi (tanpa estimasi distribusi; yield tidak dihardcoded)
+    if(ct.length>0){
+      h+=`<div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Cap table investor</div>`;
+      h+=`<div class="tbl-wrap"><table class="tbl" style="font-size:12.5px"><thead><tr><th>Investor</th><th class="num">Nominal pokok</th><th class="num">% dari target</th></tr></thead><tbody>`;
+      const totalNominal=ct.reduce((s,i)=>s+i.nominalJt,0);
+      const targetJt=(p.investasiB||0)*1000;
+      ct.forEach(i=>{
+        const porsi=targetJt>0?Math.round(i.nominalJt/targetJt*100):0;
+        h+=`<tr><td><div class="ucell"><div class="uava" style="background:#FDF4FF;color:#A21CAF;width:26px;height:26px;font-size:10px">${i.init}</div>${i.name}</div></td>`;
+        h+=`<td class="num">${rpJt(i.nominalJt)}</td><td class="num">${porsi}%</td></tr>`;
+      });
+      const totalPorsi=targetJt>0?Math.round(totalNominal/targetJt*100):0;
+      h+=`<tr class="tbl-total" style="border-top:2px solid var(--border);background:var(--bg-secondary)"><td style="font-weight:600">Total</td><td class="num" style="font-weight:600">${rpJt(totalNominal)}</td><td class="num" style="${totalPorsi>100?'color:#DC2626;':''}font-weight:600">${totalPorsi}%</td></tr>`;
+      h+=`</tbody></table></div>`;
+    } else {
+      h+=`<div class="card-sub"><i class="ti ti-users" style="font-size:12px;vertical-align:-1px"></i> Cap table belum dikonfigurasi — klik <strong>Kelola investor</strong> untuk menetapkan investor & nominal.</div>`;
+    }
+    h+=`</div>`;
+  });
+  return h;
+}
+
+// ── Cap table editor (assign investor + nominal, persentase otomatis) ──
+let _capDraft=null, _capPid=null;
+function openCapModal(pid){
+  _capPid=pid;
+  _capDraft=(capTable[pid]||[]).map(i=>({...i}));
+  renderCapModal();
+}
+function renderCapModal(){
+  const pid=_capPid, p=getP(pid);
+  const used=_capDraft.map(i=>i.name);
+  const avail=investorsReg.filter(iv=>iv.kyc==='Terverifikasi'&&!used.includes(iv.name));
+  let h=`<div class="modal-title">Kelola investor — ${p.name}</div><div class="modal-sub">${p.kode} · tetapkan investor & nominal. Porsi % dihitung otomatis.</div>`;
+  // Target investasi — editable oleh admin
+  h+=`<div class="form-field full" style="margin-bottom:10px"><div class="form-label">Target nilai investasi (IDR Miliar)</div><input class="form-input" id="cap-target" type="number" min="0" step="0.1" value="${p.investasiB||0}" oninput="capRecalc()"></div>`;
+  // Banner target vs terisi
+  h+=`<div id="cap-target-banner" style="margin-bottom:14px"></div>`;
+  // Add investor row
+  h+=`<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;padding:12px;background:var(--bg-secondary);border-radius:9px">
+    <div style="flex:1"><div class="form-label">Tambah investor (KYC terverifikasi)</div>
+    <select class="form-input" id="cap-add-sel">${avail.length?avail.map(iv=>`<option value="${iv.id}">${iv.name} · ${iv.tipe}</option>`).join(''):'<option value="">— semua investor terverifikasi sudah ditambahkan —</option>'}</select></div>
+    <div style="width:130px"><div class="form-label">Nominal (juta)</div><input class="form-input" id="cap-add-nom" type="number" min="0" placeholder="0"></div>
+    <button class="btn btn-primary" style="height:38px;white-space:nowrap"${avail.length?'':' disabled'} onclick="capAddInvestor()"><i class="ti ti-plus"></i>Tambah</button>
+  </div>`;
+  // Current investors table
+  if(_capDraft.length){
+    h+=`<div class="tbl-wrap"><table class="tbl" style="font-size:12.5px"><thead><tr><th>Investor</th><th class="num" style="width:150px">Nominal (juta)</th><th class="num" style="width:90px">% dari target</th><th style="width:40px"></th></tr></thead><tbody id="cap-tbody">`;
+    _capDraft.forEach((it,idx)=>{ h+=capRowHtml(it,idx); });
+    h+=`<tr class="tbl-total" style="border-top:2px solid var(--border);background:var(--bg-secondary)"><td style="font-weight:600">Total</td><td class="num" style="font-weight:700"><span id="cap-total">Rp 0</span></td><td class="num" style="font-weight:600"><span id="cap-pct-total">—</span></td><td></td></tr>`;
+    h+=`</tbody></table></div>`;
+  } else {
+    h+=`<div class="card-sub" style="padding:16px;text-align:center"><i class="ti ti-users" style="font-size:14px;vertical-align:-2px"></i> Belum ada investor. Tambahkan investor di atas.</div>`;
+  }
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveCapTable()"><i class="ti ti-check"></i>Simpan cap table</button></div>`;
+  openModal(h);
+  capRecalc();
+}
+function capRowHtml(it,idx){
+  return `<tr><td><div class="ucell"><div class="uava" style="background:#FDF4FF;color:#A21CAF;width:26px;height:26px;font-size:10px">${it.init}</div>${it.name}</div></td>`+
+    `<td class="num"><input class="form-input" style="text-align:right;padding:5px 8px;height:32px" type="number" min="0" value="${it.nominalJt}" oninput="_capDraft[${idx}].nominalJt=+this.value||0;capRecalc()"></td>`+
+    `<td class="num" id="cap-pct-${idx}">—</td>`+
+    `<td style="text-align:center"><button class="btn-danger-sm" style="padding:4px 7px" title="Hapus" onclick="capRemove(${idx})"><i class="ti ti-trash"></i></button></td></tr>`;
+}
+function capRecalc(){
+  const total=_capDraft.reduce((s,i)=>s+(+i.nominalJt||0),0);
+  const p=getP(_capPid);
+  const tInput=document.getElementById('cap-target');
+  const targetB=tInput?(+tInput.value||0):(p.investasiB||0);
+  const targetJt=targetB*1000;
+  // Porsi % dihitung relatif ke target (bisa >100% saat over-subscribed)
+  _capDraft.forEach((it,idx)=>{ const cell=document.getElementById('cap-pct-'+idx); if(cell) cell.textContent=(targetJt>0?Math.round((+it.nominalJt||0)/targetJt*100):0)+'%'; });
+  const tot=document.getElementById('cap-total'); if(tot) tot.textContent=rpJt(total);
+  const totPctEl=document.getElementById('cap-pct-total');
+  if(totPctEl){ const tp=targetJt>0?Math.round(total/targetJt*100):0; totPctEl.textContent=tp+'%'; totPctEl.style.color=tp>100?'#DC2626':'inherit'; }
+  // Banner target vs terisi
+  const banner=document.getElementById('cap-target-banner');
+  if(banner){
+    const pct=targetJt>0?Math.round(total/targetJt*100):0;
+    const sisa=targetJt-total;
+    const over=sisa<0;
+    const barCol=over?'#DC2626':pct>=100?'#059669':pct>=50?'#2563EB':'#D97706';
+    const statusTxt=over?`<span style="color:#DC2626;font-weight:600">Melebihi target ${rpJt(-sisa)}</span>`
+      :sisa===0?`<span style="color:#059669;font-weight:600">Target terpenuhi</span>`
+      :`Sisa ke target: <strong>${rpJt(sisa)}</strong>`;
+    banner.innerHTML=`<div style="padding:11px 13px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:9px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px">
+        <span style="color:var(--text-secondary)">Terisi <strong style="color:var(--text-primary)">${rpJt(total)}</strong> dari target <strong style="color:var(--text-primary)">${targetB} M</strong></span>
+        <span style="font-weight:700;color:${barCol}">${pct}%</span>
+      </div>
+      <div style="height:6px;border-radius:3px;background:var(--bg-card);margin:7px 0 5px"><div style="height:6px;border-radius:3px;background:${barCol};width:${Math.min(100,pct)}%"></div></div>
+      <div style="font-size:11px;color:var(--text-tertiary)">${statusTxt}</div>
+    </div>`;
+  }
+}
+function capAddInvestor(){
+  const sel=document.getElementById('cap-add-sel'); const id=sel&&sel.value; if(!id) return;
+  const iv=investorsReg.find(x=>x.id===id); if(!iv) return;
+  const nom=parseFloat(document.getElementById('cap-add-nom').value)||0;
+  _capDraft.push({name:iv.name,init:iv.init,nominalJt:nom});
+  renderCapModal();
+}
+function capRemove(idx){ _capDraft.splice(idx,1); renderCapModal(); }
+function saveCapTable(){
+  const pid=_capPid, p=getP(pid);
+  capTable[pid]=_capDraft.map(i=>({name:i.name,init:i.init,nominalJt:+i.nominalJt||0}));
+  const tInput=document.getElementById('cap-target');
+  let targetChanged='';
+  if(p&&tInput){ const nt=+tInput.value||0; if(nt!==p.investasiB){ targetChanged=` · target → ${nt} M`; p.investasiB=nt; } }
+  if(p) p.investorCount=capTable[pid].length;
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Memperbarui cap table ${p.name} — ${capTable[pid].length} investor${targetChanged}`,tgl:'Baru saja',icon:'ti-users-group',col:'#4338CA'});
+  closeModalForce(); render(); toast('Cap table diperbarui');
+}
+
+// ============================================================
+// MODALS & ACTIONS
+// ============================================================
+function openModal(html,wide){ const mb=document.getElementById('modal-box'); mb.innerHTML=html; mb.style.width=wide?'780px':''; document.getElementById('modal').style.display='flex'; }
+function closeModal(e){ if(e&&e.target&&e.target.id!=='modal') return; document.getElementById('modal').style.display='none'; }
+function closeModalForce(){ document.getElementById('modal').style.display='none'; }
+
+// Bagi hasil: proses + upload bukti per investor → lapor ke BA-PM
+function openDistribusi(id){
+  const d=distBatches.find(x=>x.id===id); const p=getP(d.pid);
+  const inv=distFor(d.pid); const tot=distTotal(d.pid);
+  const isProses=d.status==='Perlu diproses';
+  const isDitahan=d.status==='Ditahan';
+  const sudah=d.status==='Dilaporkan ke BA-PM'||d.status==='Diteruskan ke Investor';
+  const bpi=d.buktiPerInvestor||{};
+  const prd=d.period.toLowerCase().replace(' ','-');
+
+  let h=`<div class="modal-title">${isProses?'Proses bagi hasil & upload bukti':isDitahan?'Bagi hasil ditahan':'Detail bagi hasil'}</div>`;
+  h+=`<div class="modal-sub">${p?p.name:d.pid} · ${d.period}</div>`;
+
+  if(isDitahan){
+    h+=`<div class="alert-bar"><i class="ti ti-hand-stop"></i><div><strong>Bagi hasil ditahan otomatis</strong> karena pelanggaran covenant. Melepas penahanan akan mengabaikan proteksi kontrak.<br><span style="margin-top:4px;display:block;font-size:11.5px">${d.reason}</span></div></div>`;
+    h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Tutup</button><button class="btn btn-primary" style="background:#DC2626" onclick="releaseHold('${id}')"><i class="ti ti-lock-open"></i>Lepas penahanan</button></div>`;
+    openModal(h); return;
+  }
+
+  // Per-investor table: distribusi + bukti upload per baris
+  h+=`<div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">${sudah?'Rincian per investor & bukti transfer':'Upload bukti transfer per investor'}</div>`;
+  h+=`<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px">`;
+  h+=`<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:var(--bg-secondary)">`;
+  h+=`<th style="padding:8px 10px;text-align:left;color:var(--text-tertiary);font-size:10.5px;text-transform:uppercase">Investor</th>`;
+  h+=`<th style="padding:8px 10px;text-align:right;color:var(--text-tertiary);font-size:10.5px;text-transform:uppercase">Bagi hasil</th>`;
+  h+=`<th style="padding:8px 10px;text-align:left;color:var(--text-tertiary);font-size:10.5px;text-transform:uppercase">Bukti transfer</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  inv.forEach((i)=>{
+    const slugName=i.name.toLowerCase().replace(/\s+/g,'-');
+    const defaultFile=`bukti-${d.pid}-${prd}-${slugName}.pdf`;
+    const existing=bpi[i.name]||'';
+    h+=`<tr style="border-top:1px solid var(--border-light)">`;
+    h+=`<td style="padding:8px 10px"><div style="display:flex;align-items:center;gap:7px"><div style="width:24px;height:24px;border-radius:50%;background:#FDF4FF;color:#A21CAF;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600">${i.init}</div><div><div style="font-size:12.5px">${i.name}</div><div style="font-size:10.5px;color:var(--text-tertiary)">${rpJt(i.nominalJt)}</div></div></div></td>`;
+    h+=`<td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--text-success);white-space:nowrap">${rpJt(i.distJt)}</td>`;
+    if(sudah){
+      h+=`<td style="padding:8px 10px">${existing?`<span style="color:var(--text-success);font-size:12px"><i class="ti ti-file-check"></i> ${existing}</span>`:`<span style="color:var(--text-tertiary);font-size:12px">—</span>`}</td>`;
+    } else {
+      h+=`<td style="padding:8px 10px"><div style="display:flex;gap:5px;align-items:center">`;
+      h+=`<input class="form-input" id="bukti-${i.name}" value="${existing}" placeholder="${defaultFile}" style="font-size:11.5px;padding:5px 8px;flex:1;min-width:0">`;
+      h+=`<button style="flex-shrink:0;cursor:pointer;padding:5px 8px;border:1px solid var(--border);border-radius:7px;font-size:11px;background:var(--bg-secondary);color:var(--text-secondary)" onclick="document.getElementById('bukti-${i.name}').value='${defaultFile}'"><i class="ti ti-upload"></i></button>`;
+      h+=`</div></td>`;
+    }
+    h+=`</tr>`;
+  });
+
+  h+=`<tr style="border-top:2px solid var(--border);background:var(--bg-secondary)"><td style="padding:8px 10px;font-weight:600">Total</td><td style="padding:8px 10px;text-align:right;font-weight:700;color:var(--text-success)">${rpJt(tot)}</td><td></td></tr>`;
+  h+=`</tbody></table></div>`;
+
+  if(sudah){
+    h+=`<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px">`;
+    h+=`<div style="font-size:10.5px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:3px">Status pelaporan</div>${d.reason}</div>`;
+    if(d.status==='Dilaporkan ke BA-PM'&&!d.bapmForwarded){
+      h+=`<div class="notif-bar"><i class="ti ti-clock"></i>Menunggu BA-PM (${p?p.bapm:'—'}) meneruskan laporan + bukti transfer ke setiap investor.</div>`;
+    } else if(d.bapmForwarded){
+      h+=`<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:12px;color:#065F46;margin-bottom:12px"><i class="ti ti-circle-check"></i> BA-PM telah meneruskan laporan &amp; bukti transfer ke semua investor.</div>`;
+    }
+    h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Tutup</button></div>`;
+    openModal(h); return;
+  }
+
+  h+=`<div class="form-field full" style="margin-bottom:12px">`;
+  h+=`<div class="form-label">Catatan untuk BA-PM</div>`;
+  h+=`<textarea class="form-input" id="dist-catatan" placeholder="Opsional — instruksi untuk BA-PM saat meneruskan ke investor..." style="min-height:52px"></textarea></div>`;
+
+  h+=`<div style="background:#ECFEFF;border:1px solid #A5F3FC;border-radius:8px;padding:10px 14px;font-size:12px;color:#0e7490;margin-bottom:14px">`;
+  h+=`<i class="ti ti-info-circle"></i> Setelah disubmit, <strong>BA-PM (${p?p.bapm:'—'})</strong> menerima data per investor beserta bukti transfer masing-masing untuk diteruskan ke setiap investor.</div>`;
+
+  h+=`<div class="btn-row">`;
+  h+=`<button class="btn btn-secondary" onclick="holdDistribusi('${id}')"><i class="ti ti-hand-stop"></i>Tahan</button>`;
+  h+=`<button class="btn btn-primary" style="background:#059669;flex:1" onclick="laporKeBapm('${id}')"><i class="ti ti-send"></i>Proses &amp; Lapor ke BA-PM</button>`;
+  h+=`</div>`;
+  openModal(h);
+}
+
+function laporKeBapm(id){
+  const d=distBatches.find(x=>x.id===id);
+  const inv=distFor(d.pid);
+  const bpi={};
+  inv.forEach(i=>{
+    const val=document.getElementById('bukti-'+i.name)?.value.trim();
+    const prd=d.period.toLowerCase().replace(' ','-');
+    bpi[i.name]=val||(val===''?`bukti-${d.pid}-${prd}-${i.name.toLowerCase().replace(/\s+/g,'-')}.pdf`:null);
+  });
+  const catatan=document.getElementById('dist-catatan')?.value.trim()||'';
+  const uploadCount=Object.values(bpi).filter(Boolean).length;
+  if(uploadCount===0){ toast('Upload minimal satu bukti transfer terlebih dahulu'); return; }
+  d.buktiPerInvestor=bpi; d.status='Dilaporkan ke BA-PM'; d.reportedToBapm=true; d.bapmForwarded=false;
+  d.reason=`Diproses ${ME.name} · ${uploadCount}/${inv.length} bukti terupload${catatan?' · '+catatan:''}`;
+  // Field yang dibutuhkan platform BA-PM (Distribusi dari Admin)
+  d.dikirimAdmin=new Date().toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+  d.diprosesby=ME.name;
+  d.catatan=catatan;
+  d.totalJt=distTotal(d.pid);
+  d.forwardedTo=d.forwardedTo||{};
+  const p=getP(d.pid);
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Memproses bagi hasil ${p?p.name:d.pid} ${d.period} (${rpJt(distTotal(d.pid))}) — dilaporkan ke BA-PM`,tgl:'Baru saja',icon:'ti-send',col:'#4338CA'});
+  closeModalForce(); render(); toast('Bagi hasil diproses & dilaporkan ke BA-PM');
+}
+function holdDistribusi(id){
+  const d=distBatches.find(x=>x.id===id); d.status='Ditahan'; d.reason='Ditahan manual oleh '+ME.name+' · '+nowStr();
+  closeModalForce(); render(); toast('Bagi hasil ditahan');
+}
+function releaseHold(id){
+  const d=distBatches.find(x=>x.id===id); d.status='Perlu diproses'; d.reason='Penahanan dilepas oleh '+ME.name+' · '+nowStr();
+  closeModalForce(); render(); toast('Penahanan dilepas — silakan proses kembali');
+}
+
+// Buat batch distribusi baru
+function openTambahDistribusi(){
+  let h=`<div class="modal-title">Buat batch bagi hasil baru</div><div class="modal-sub">Tentukan portfolio dan periode distribusi</div>`;
+  h+=`<div class="form-grid">`;
+  h+=`<div class="form-field"><div class="form-label">Portfolio</div><select class="form-input" id="nb-pid">`;
+  portfolios.filter(p=>p.status==='Aktif').forEach(p=>h+=`<option value="${p.id}">${p.name}</option>`);
+  h+=`</select></div>`;
+  const MONTHS=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+  const now=new Date(); const curMon=MONTHS[now.getMonth()]; const cy=now.getFullYear();
+  const years=[]; for(let y=cy-2;y<=cy+1;y++) years.push(y);
+  h+=`<div class="form-field"><div class="form-label">Bulan</div><select class="form-input" id="nb-month">${MONTHS.map(m=>`<option${m===curMon?' selected':''}>${m}</option>`).join('')}</select></div>`;
+  h+=`</div>`;
+  h+=`<div class="form-field full"><div class="form-label">Tahun</div><select class="form-input" id="nb-year">${years.map(y=>`<option${y===cy?' selected':''}>${y}</option>`).join('')}</select></div>`;
+  h+=`<div class="form-field full"><div class="form-label">Keterangan</div><input class="form-input" id="nb-reason" placeholder="Mis. Yield 10.7% · semua covenant pass"></div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveTambahDistribusi()"><i class="ti ti-check"></i>Buat batch</button></div>`;
+  openModal(h);
+}
+function saveTambahDistribusi(){
+  const pid=document.getElementById('nb-pid').value;
+  const period=document.getElementById('nb-month').value+' '+document.getElementById('nb-year').value;
+  const reason=document.getElementById('nb-reason').value.trim()||'—';
+  distBatches.unshift({id:Store.uid('db'),pid,period,status:'Perlu diproses',buktiPerInvestor:{},reportedToBapm:false,bapmForwarded:false,reason});
+  closeModalForce(); render(); toast('Batch bagi hasil dibuat');
+}
+
+const KYC_DOCS=[['ktp','KTP / identitas','ti-id'],['npwp','Kartu NPWP','ti-license'],['rekening','Rekening bank','ti-building-bank']];
+function openKyc(id){
+  const i=investorsReg.find(x=>x.id===id);
+  i.docs=i.docs||{};
+  let h=`<div class="modal-title">${i.kyc==='Pending'?'Verifikasi KYC':'Detail investor'}</div><div class="modal-sub">${i.name} · ${i.tipe}</div>`;
+  h+=`<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px"><div class="kvg"><div><div class="kv-lbl">Email</div><div class="kv-val">${i.email}</div></div><div><div class="kv-lbl">NPWP</div><div class="kv-val num">${i.npwp}</div></div><div><div class="kv-lbl">Tipe</div><div class="kv-val">${i.tipe}</div></div><div><div class="kv-lbl">Terdaftar</div><div class="kv-val">${i.join}</div></div></div></div>`;
+  h+=`<div class="form-sec-lbl" style="margin-top:0">Dokumen KYC <span style="font-weight:400;color:var(--text-tertiary);text-transform:none;letter-spacing:0">· diunggah manual oleh admin · opsional</span></div>`;
+  h+=`<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px">`;
+  KYC_DOCS.forEach(([key,label,icon])=>{
+    const file=i.docs[key];
+    h+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:${file?'rgba(5,150,105,0.05)':'var(--bg-card)'}">
+      <i class="ti ${icon}" style="font-size:17px;color:${file?'#059669':'var(--text-tertiary)'}"></i>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--text-primary)">${label} <span style="font-size:10.5px;font-weight:400;color:var(--text-tertiary)">(opsional)</span></div>
+        ${file?`<div style="font-size:11px;color:#059669;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="ti ti-paperclip" style="font-size:11px;vertical-align:-1px"></i> ${file}</div>`:`<div style="font-size:11px;color:var(--text-tertiary)">Belum diunggah</div>`}
+      </div>
+      <input type="file" id="kyc-${key}-${id}" style="display:none" accept="image/*,application/pdf" onchange="kycUploadDoc('${id}','${key}',this)">
+      ${file
+        ? `<button class="btn-sm" onclick="document.getElementById('kyc-${key}-${id}').click()"><i class="ti ti-refresh"></i>Ganti</button><button class="btn-danger-sm" title="Hapus" onclick="kycRemoveDoc('${id}','${key}')"><i class="ti ti-trash"></i></button>`
+        : `<button class="btn-navy-sm" onclick="document.getElementById('kyc-${key}-${id}').click()"><i class="ti ti-upload"></i>Unggah</button>`}
+    </div>`;
+  });
+  h+=`</div>`;
+  const uploaded=KYC_DOCS.filter(([k])=>i.docs[k]).length;
+  h+=`<div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">${uploaded}/3 dokumen terlampir · dokumen bersifat opsional, verifikasi tetap dapat dilakukan tanpa kelengkapan.</div>`;
+  if(i.kyc==='Pending'){
+    h+=`<div class="btn-row"><button class="btn btn-danger-sm" style="padding:8px 16px" onclick="rejectKyc('${id}')">Tolak</button><button class="btn btn-primary" style="background:#059669" onclick="approveKyc('${id}')"><i class="ti ti-check"></i>Verifikasi & aktifkan</button></div>`;
+  } else {
+    h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Tutup</button></div>`;
+  }
+  openModal(h);
+}
+function kycUploadDoc(id,key,input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const i=investorsReg.find(x=>x.id===id); if(!i) return;
+  i.docs=i.docs||{}; i.docs[key]=f.name;
+  const lbl=(KYC_DOCS.find(d=>d[0]===key)||[])[1]||key;
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Mengunggah ${lbl} untuk ${i.name}`,tgl:'Baru saja',icon:'ti-upload',col:'#4338CA'});
+  Store.commit(); openKyc(id);
+}
+function kycRemoveDoc(id,key){
+  const i=investorsReg.find(x=>x.id===id); if(!i||!i.docs) return;
+  delete i.docs[key];
+  Store.commit(); openKyc(id);
+}
+function approveKyc(id){ const i=investorsReg.find(x=>x.id===id); i.kyc='Terverifikasi'; const u=users.find(x=>x.email===i.email); if(u){u.status='Aktif'; u.scope='Terverifikasi';} auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Memverifikasi KYC investor ${i.name}`,tgl:'Baru saja',icon:'ti-user-check',col:'#4338CA'}); closeModalForce(); render(); toast('KYC terverifikasi — investor diaktifkan'); }
+function rejectKyc(id){ const i=investorsReg.find(x=>x.id===id); i.kyc='Ditolak'; closeModalForce(); render(); toast('KYC ditolak'); }
+
+function openAssign(pid){
+  const p=getP(pid);
+  const bapms=users.filter(u=>u.role==='BA-PM');
+  const access=p.bapmAccess||(p.bapm&&p.bapm!=='Belum ditugaskan'?[p.bapm]:[]);
+  let h=`<div class="modal-title">Penugasan BA-PM</div><div class="modal-sub">${p.name} · ${p.kode}</div>`;
+  h+=`<div class="form-field full"><div class="form-label">BA-PM penanggung jawab (PIC)</div><select class="form-input" id="assign-sel">`;
+  h+=`<option${p.bapm==='Belum ditugaskan'?' selected':''}>Belum ditugaskan</option>`;
+  bapms.forEach(b=>h+=`<option${p.bapm===b.name?' selected':''}>${b.name}</option>`);
+  h+=`</select></div>`;
+  h+=`<div class="form-field full" style="margin-top:12px"><div class="form-label">BA-PM yang punya akses ke portofolio ini</div>`;
+  h+=`<div style="font-size:11px;color:var(--text-tertiary);margin:-2px 0 8px">Centang semua BA-PM yang boleh melihat & mengelola portofolio ini. PIC otomatis mendapat akses.</div>`;
+  h+=`<div style="display:flex;flex-direction:column;gap:2px;border:1px solid var(--border);border-radius:9px;overflow:hidden">`;
+  bapms.forEach(b=>{
+    const on=access.includes(b.name);
+    h+=`<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border-light)" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''">
+      <input type="checkbox" class="assign-acc" value="${b.name.replace(/"/g,'&quot;')}"${on?' checked':''} style="width:16px;height:16px;accent-color:var(--navy);cursor:pointer">
+      <div class="uava" style="width:28px;height:28px;font-size:11px;background:${b.color}22;color:${b.color}">${b.init}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text-primary)">${b.name}</div><div style="font-size:11px;color:var(--text-tertiary)">${b.scope||b.email}</div></div>
+    </label>`;
+  });
+  h+=`</div></div>`;
+  h+=`<div class="form-field full" style="margin-top:12px"><div class="form-label">Status lifecycle</div><select class="form-input" id="assign-status">`;
+  ['Aktif','Onboarding','Review legal','Closed'].forEach(s=>h+=`<option${p.status===s?' selected':''}>${s}</option>`);
+  h+=`</select></div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveAssign('${pid}')"><i class="ti ti-check"></i>Simpan</button></div>`;
+  openModal(h);
+}
+function saveAssign(pid){
+  const p=getP(pid);
+  const nb=document.getElementById('assign-sel').value;
+  const ns=document.getElementById('assign-status').value;
+  let access=Array.from(document.querySelectorAll('.assign-acc:checked')).map(c=>c.value);
+  // PIC selalu termasuk dalam daftar akses
+  if(nb&&nb!=='Belum ditugaskan'&&!access.includes(nb)) access.push(nb);
+  p.bapm=nb; p.status=ns; p.bapmAccess=access;
+  const accLabel=access.length?`${access.length} BA-PM punya akses`:'tanpa akses BA-PM';
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Menugaskan ${nb} ke ${p.name} (PIC) · ${accLabel} · status: ${ns}`,tgl:'Baru saja',icon:'ti-user-cog',col:'#4338CA'});
+  closeModalForce(); render(); toast('Penugasan diperbarui');
+}
+
+function openAddUser(){ openUserModal(); }
+function openUserModal(id){
+  const u=id?users.find(x=>x.id===id):null;
+  const roleOpts=['BA-PM','Investor','Admin'].map(r=>`<option${u&&u.role===r?' selected':''}>${r}</option>`).join('');
+  let h=`<div class="modal-title">${u?'Edit pengguna':'Tambah pengguna'}</div><div class="modal-sub">${u?'Perbarui data & peran akun':'Buat akun & tetapkan peran'}</div>`;
+  h+=`<div class="form-grid"><div class="form-field"><div class="form-label">Nama lengkap</div><input class="form-input" id="nu-name" placeholder="Nama" value="${u?u.name.replace(/"/g,'&quot;'):''}"></div><div class="form-field"><div class="form-label">Peran</div><select class="form-input" id="nu-role">${roleOpts}</select></div></div>`;
+  h+=`<div class="form-grid"><div class="form-field"><div class="form-label">Email</div><input class="form-input" id="nu-email" type="email" placeholder="email@arunami.id" value="${u?u.email.replace(/"/g,'&quot;'):''}"></div><div class="form-field"><div class="form-label">Password${u?' <span style="font-weight:400;color:var(--text-tertiary)">(kosongkan jika tidak diubah)</span>':''}</div><input class="form-input" id="nu-pass" type="password" placeholder="${u?'••••••••':'Min. 8 karakter'}"></div></div>`;
+  h+=`<label class="form-field full" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:11px 13px;border:1px solid var(--border);border-radius:9px;background:var(--bg-secondary)"><input type="checkbox" id="nu-tim"${u&&u.timArunami?' checked':''} style="width:16px;height:16px;margin-top:1px;accent-color:var(--navy);cursor:pointer"><span><span style="font-size:13px;font-weight:600;color:var(--text-primary)">Tim Arunami (bebas fee)</span><br><span style="font-size:11px;color:var(--text-tertiary)">Anggota internal Arunami — dikecualikan dari fee platform pada bagi hasil.</span></span></label>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveUser('${id||''}')"><i class="ti ti-check"></i>${u?'Simpan perubahan':'Buat akun'}</button></div>`;
+  openModal(h);
+}
+function saveUser(id){
+  const name=document.getElementById('nu-name').value.trim()||'Pengguna Baru';
+  const email=document.getElementById('nu-email').value.trim()||'baru@arunami.id';
+  const role=document.getElementById('nu-role').value;
+  const pass=document.getElementById('nu-pass').value;
+  const timArunami=document.getElementById('nu-tim').checked;
+  const init=name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const color=role==='Admin'?'#4338CA':role==='BA-PM'?'#0E7490':'#A21CAF';
+  const existing=id?users.find(x=>x.id===id):null;
+  if(existing){
+    existing.name=name; existing.email=email; existing.role=role; existing.timArunami=timArunami; existing.init=init; existing.color=color;
+    if(pass) existing.pass=pass;
+    auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Mengubah akun ${role}: ${name}${timArunami?' (Tim Arunami — bebas fee)':''}`,tgl:'Baru saja',icon:'ti-user-edit',col:'#4338CA'});
+    closeModalForce(); render(); toast('Perubahan akun disimpan');
+  } else {
+    users.push({id:'u'+(users.length+1),name,email,role,pass,timArunami,status:'Pending',last:'Belum aktivasi',scope:'Baru',init,color});
+    auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Membuat akun ${role}: ${name}${timArunami?' (Tim Arunami — bebas fee)':''}`,tgl:'Baru saja',icon:'ti-user-plus',col:'#4338CA'});
+    closeModalForce(); render(); toast('Akun dibuat — undangan aktivasi dikirim');
+  }
+}
+function toggleUser(id){ const u=users.find(x=>x.id===id); u.status = u.status==='Aktif'?'Nonaktif':'Aktif'; render(); toast('Status '+u.name+': '+u.status); }
+function confirmDeleteUser(id){
+  const u=users.find(x=>x.id===id); if(!u) return;
+  let h=`<div class="modal-title">Hapus pengguna?</div>`;
+  h+=`<div style="display:flex;gap:13px;align-items:flex-start;padding:14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;margin-bottom:14px">
+    <div style="flex-shrink:0;width:38px;height:38px;border-radius:10px;background:#FEE2E2;display:flex;align-items:center;justify-content:center"><i class="ti ti-alert-triangle" style="font-size:20px;color:#DC2626"></i></div>
+    <div style="font-size:13px;color:var(--text-secondary);line-height:1.5">Anda akan menghapus akun <strong style="color:var(--text-primary)">${u.name}</strong> (${u.email}) dengan peran <strong style="color:var(--text-primary)">${u.role}</strong>.<br>Tindakan ini <strong style="color:#DC2626">tidak bisa dibatalkan</strong> — pengguna akan kehilangan akses ke platform.</div>
+  </div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-danger-sm" style="padding:8px 16px;font-size:13px" onclick="deleteUser('${id}')"><i class="ti ti-trash"></i>Ya, hapus pengguna</button></div>`;
+  openModal(h);
+}
+function deleteUser(id){
+  const u=users.find(x=>x.id===id); if(!u) return;
+  users.splice(users.indexOf(u),1);
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Menghapus akun ${u.role}: ${u.name}`,tgl:'Baru saja',icon:'ti-user-minus',col:'#DC2626'});
+  closeModalForce(); render(); toast('Pengguna '+u.name+' dihapus');
+}
+
+let _ncLogo=null;
+function ncLogoPreview(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>{ _ncLogo=e.target.result; const pv=document.getElementById('nc-logo-prev'); if(pv){ pv.innerHTML=`<img src="${_ncLogo}" style="width:100%;height:100%;object-fit:cover">`; } };
+  rd.readAsDataURL(f);
+}
+function openAddCompany(){
+  _ncLogo=null;
+  let h=`<div class="modal-title">Onboard perusahaan portfolio</div><div class="modal-sub">Daftarkan perusahaan baru ke platform</div>`;
+  h+=`<div class="form-field full"><div class="form-label">Logo perusahaan (opsional)</div><div style="display:flex;align-items:center;gap:12px"><div id="nc-logo-prev" style="width:48px;height:48px;border-radius:10px;border:1px solid var(--border);background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--text-tertiary);font-size:10px">Logo</div><input type="file" id="nc-logo" accept="image/*" style="display:none" onchange="ncLogoPreview(this)"><button type="button" class="btn btn-secondary" style="font-size:12px;padding:7px 12px" onclick="document.getElementById('nc-logo').click()"><i class="ti ti-upload"></i> Unggah logo</button><span style="font-size:11px;color:var(--text-tertiary)">PNG/JPG. Jika kosong, dipakai inisial otomatis.</span></div></div>`;
+  h+=`<div class="form-grid">`;
+  h+=`<div class="form-field"><div class="form-label">Nama merek</div><input class="form-input" id="nc-name" placeholder="Mis. Cendana Tech"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Badan hukum (PT)</div><input class="form-input" id="nc-pt" placeholder="PT ..."></div>`;
+  h+=`<div class="form-field"><div class="form-label">Industri</div><select class="form-input" id="nc-ind">${INDUSTRIES.map(i=>`<option>${i}</option>`).join('')}</select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Target nilai investasi (IDR Miliar)</div><input class="form-input" id="nc-inv" type="number" placeholder="12"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Tahap</div><select class="form-input" id="nc-tahap"><option>Prospek</option><option>Due Diligence</option><option>Onboarding</option><option>Aktif</option></select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Fee platform (%)</div><input class="form-input" id="nc-fee" type="number" step="0.1" value="2.0" placeholder="2.0"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Kontrak mulai</div><input class="form-input" id="nc-kmulai" type="date"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Kontrak selesai</div><input class="form-input" id="nc-kselesai" type="date"></div>`;
+  h+=`</div>`;
+  h+=`<div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin:10px 0 6px">Pengaturan bagi hasil awal</div>`;
+  h+=`<div class="form-grid">`;
+  h+=`<div class="form-field"><div class="form-label">Skema bagi hasil</div><select class="form-input" id="nc-bhskema">${BH_SKEMA.map(s=>`<option>${s}</option>`).join('')}</select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Frekuensi</div><select class="form-input" id="nc-bhfrek"><option>Bulanan</option><option>Triwulanan</option><option>Semesteran</option><option>Tahunan</option></select></div>`;
+  h+=`</div>`;
+  h+=`<div class="form-field full"><div class="form-label">Basis perhitungan</div><input class="form-input" id="nc-bhbasis" placeholder="Mis. 10% p.a. dari nominal pokok, dibayar bulanan"></div>`;
+  h+=`<div class="form-grid" style="margin-top:8px">`;
+  h+=`<div class="form-field"><div class="form-label">Cap return (kosongkan jika tidak ada)</div><input class="form-input" id="nc-bhcap" placeholder="Mis. 15% p.a."></div>`;
+  h+=`<div class="form-field"><div class="form-label">Return minimum (kosongkan jika tidak ada)</div><input class="form-input" id="nc-bhmin" placeholder="Mis. 8% p.a. dijamin"></div>`;
+  h+=`</div>`;
+  h+=`<label class="form-field full" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:11px 13px;margin-top:8px;border:1px solid var(--border);border-radius:9px;background:var(--bg-secondary)"><input type="checkbox" id="nc-pokok" style="width:16px;height:16px;margin-top:1px;accent-color:var(--navy);cursor:pointer"><span><span style="font-size:13px;font-weight:600;color:var(--text-primary)">Ada pengembalian pokok</span><br><span style="font-size:11px;color:var(--text-tertiary)">Pokok dikembalikan di akhir kontrak. Jika tidak, annualized yield di BA-PM disesuaikan −20%.</span></span></label>`;
+  h+=`<div class="form-field full" style="margin-top:8px"><div class="form-label">Tugaskan BA-PM</div><select class="form-input" id="nc-bapm"><option>Belum ditugaskan</option>`;
+  users.filter(u=>u.role==='BA-PM').forEach(b=>h+=`<option>${b.name}</option>`);
+  h+=`</select></div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveCompany()"><i class="ti ti-check"></i>Onboard</button></div>`;
+  openModal(h);
+}
+function saveCompany(){
+  const name=document.getElementById('nc-name').value.trim()||'Perusahaan Baru';
+  const pt=document.getElementById('nc-pt').value.trim()||'PT Baru';
+  const ind=document.getElementById('nc-ind').value.trim()||'—';
+  const inv=parseFloat(document.getElementById('nc-inv').value)||0;
+  const tahap=document.getElementById('nc-tahap').value||'Onboarding';
+  const fee=parseFloat(document.getElementById('nc-fee').value)||2.0;
+  const kmulai=document.getElementById('nc-kmulai').value||'—';
+  const kselesai=document.getElementById('nc-kselesai').value||'—';
+  const bapm=document.getElementById('nc-bapm').value;
+  const skema=document.getElementById('nc-bhskema').value;
+  const basis=document.getElementById('nc-bhbasis').value.trim()||'—';
+  const frekuensi=document.getElementById('nc-bhfrek').value;
+  const cap=document.getElementById('nc-bhcap').value.trim()||'Tidak ada';
+  const minimum=document.getElementById('nc-bhmin').value.trim()||'Tidak ada';
+  const pokok=document.getElementById('nc-pokok').checked;
+  const durTotal=parseInt(document.getElementById('nc-dur')&&document.getElementById('nc-dur').value)||24;
+  const init=name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const palette=[['#1e3a5f','#8fb4d9'],['#2d5016','#8fc96e'],['#1a3d6b','#7aaad9'],['#0c3352','#6ab4e0'],['#3b2f63','#b9a6e8'],['#5c3a16','#e0b67a']];
+  const pal=palette[portfolios.length%palette.length];
+  const kode=(init||'PF')+'-'+String(portfolios.length+1).padStart(3,'0');
+  const active=tahap==='Aktif';
+  const today=new Date().toISOString().slice(0,10);
+  const np=Store.newPortfolio({name,kode,pt,industri:ind,tahap,investasiB:inv,health:active?'Sehat':'—',status:active?'Aktif':'Onboarding',
+    bapm,bapmAccess:(bapm&&bapm!=='Belum ditugaskan')?[bapm]:[],kontrakMulai:kmulai,kontrakSelesai:kselesai,opMulai:kmulai,
+    durTotal,feePct:fee,pengembalianPokok:pokok,keterlambatanHari:0,lastKontakTgl:today,init,brand:{bg:pal[0],text:pal[1],init,img:_ncLogo||null}});
+  portfolios.push(np); const id=np.id;
+  bhConfig[id]={skema,basis,frekuensi,cap,minimum};
+  capTable[id]=[];
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Onboarding perusahaan ${name} — skema ${skema}`,tgl:'Baru saja',icon:'ti-building-plus',col:'#4338CA'});
+  closeModalForce(); render(); toast('Perusahaan ditambahkan — pengaturan bagi hasil tersimpan');
+}
+
+// Apakah portfolio sudah punya laporan/distribusi masuk (penentu boleh dihapus atau tidak)
+function companyHasReports(pid){
+  const mr=(Store.db.monthlyReports&&Store.db.monthlyReports[pid])||[];
+  return mr.length>0 || distBatches.some(d=>d.pid===pid);
+}
+
+function openEditCompany(id){
+  const p=getP(id); if(!p) return;
+  _ncLogo=null;
+  const b=p.brand||{};
+  let h=`<div class="modal-title">Edit perusahaan portfolio</div><div class="modal-sub">${p.name} · ${p.kode||''}</div>`;
+  // Logo
+  const prevInner=b.img?`<img src="${b.img}" style="width:100%;height:100%;object-fit:cover">`:(b.init||Store.initials(p.name));
+  h+=`<div class="form-field full"><div class="form-label">Logo perusahaan</div><div style="display:flex;align-items:center;gap:12px"><div id="ec-logo-prev" style="width:48px;height:48px;border-radius:10px;border:1px solid var(--border);background:${b.img?'#fff':(b.bg||'var(--bg-secondary)')};color:${b.text||'var(--text-tertiary)'};display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:12px;font-weight:700">${prevInner}</div><input type="file" id="ec-logo" accept="image/*" style="display:none" onchange="ecLogoPreview(this)"><button type="button" class="btn btn-secondary" style="font-size:12px;padding:7px 12px" onclick="document.getElementById('ec-logo').click()"><i class="ti ti-upload"></i> Ganti logo</button></div></div>`;
+  h+=`<div class="form-grid">`;
+  h+=`<div class="form-field"><div class="form-label">Nama merek</div><input class="form-input" id="ec-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Badan hukum (PT)</div><input class="form-input" id="ec-pt" value="${(p.pt||'').replace(/"/g,'&quot;')}"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Industri</div><select class="form-input" id="ec-ind">${INDUSTRIES.map(i=>`<option${p.industri===i?' selected':''}>${i}</option>`).join('')}</select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Tahap</div><select class="form-input" id="ec-tahap">${['Prospek','Due Diligence','Onboarding','Aktif'].map(t=>`<option${p.tahap===t?' selected':''}>${t}</option>`).join('')}</select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Target nilai investasi (IDR Miliar)</div><input class="form-input" id="ec-inv" type="number" value="${p.investasiB||0}"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Fee platform (%)</div><input class="form-input" id="ec-fee" type="number" step="0.1" value="${p.feePct||0}"></div>`;
+  h+=`</div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveEditCompany('${id}')"><i class="ti ti-check"></i>Simpan perubahan</button></div>`;
+  openModal(h);
+}
+function ecLogoPreview(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>{ _ncLogo=e.target.result; const pv=document.getElementById('ec-logo-prev'); if(pv){ pv.style.background='#fff'; pv.innerHTML=`<img src="${_ncLogo}" style="width:100%;height:100%;object-fit:cover">`; } };
+  rd.readAsDataURL(f);
+}
+function saveEditCompany(id){
+  const p=getP(id); if(!p) return;
+  p.name=document.getElementById('ec-name').value.trim()||p.name;
+  p.pt=document.getElementById('ec-pt').value.trim()||p.pt;
+  p.industri=document.getElementById('ec-ind').value;
+  p.tahap=document.getElementById('ec-tahap').value;
+  p.investasiB=parseFloat(document.getElementById('ec-inv').value)||0;
+  p.feePct=parseFloat(document.getElementById('ec-fee').value)||0;
+  // sinkron string investasi (dipakai BA-PM/Investor)
+  p.investasi='IDR '+p.investasiB+'B'; p.investasiTotal='IDR '+p.investasiB+'B';
+  if(p.tahap==='Aktif' && p.status!=='Aktif') p.status='Aktif';
+  // brand: perbarui inisial + logo bila diganti
+  const init=Store.initials(p.name);
+  p.brand=p.brand||{}; p.brand.init=init; if(_ncLogo) p.brand.img=_ncLogo;
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Mengubah data perusahaan ${p.name} (industri: ${p.industri} · tahap: ${p.tahap})`,tgl:'Baru saja',icon:'ti-edit',col:'#4338CA'});
+  closeModalForce(); render(); toast('Data perusahaan diperbarui');
+}
+
+function confirmDeleteCompany(id){
+  const p=getP(id); if(!p) return;
+  if(companyHasReports(id)){ toast('Tidak bisa dihapus — sudah ada laporan/distribusi masuk'); return; }
+  const invCount=(capTable[id]||[]).length;
+  let h=`<div class="modal-title">Hapus perusahaan?</div>`;
+  h+=`<div style="display:flex;gap:13px;align-items:flex-start;padding:14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;margin-bottom:14px">
+    <div style="flex-shrink:0;width:38px;height:38px;border-radius:10px;background:#FEE2E2;display:flex;align-items:center;justify-content:center"><i class="ti ti-alert-triangle" style="font-size:20px;color:#DC2626"></i></div>
+    <div style="font-size:13px;color:var(--text-secondary);line-height:1.5">Anda akan menghapus <strong style="color:var(--text-primary)">${p.name}</strong> (${p.kode||'—'}) beserta pengaturan bagi hasil, cap table${invCount?` (${invCount} investor)`:''}, dan dokumennya.<br>Tindakan ini <strong style="color:#DC2626">tidak bisa dibatalkan</strong>. Perusahaan akan hilang dari platform BA-PM & Investor.</div>
+  </div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-danger-sm" style="padding:8px 16px;font-size:13px" onclick="deleteCompany('${id}')"><i class="ti ti-trash"></i>Ya, hapus perusahaan</button></div>`;
+  openModal(h);
+}
+function deleteCompany(id){
+  const p=getP(id); if(!p) return;
+  if(companyHasReports(id)){ closeModalForce(); toast('Tidak bisa dihapus — sudah ada laporan masuk'); return; }
+  const i=portfolios.indexOf(p); if(i>=0) portfolios.splice(i,1);
+  delete bhConfig[id]; delete capTable[id];
+  for(let k=documents.length-1;k>=0;k--){ if(documents[k].pid===id) documents.splice(k,1); }
+  if(Store.db.monthlyReports) delete Store.db.monthlyReports[id];
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Menghapus perusahaan portfolio: ${p.name}`,tgl:'Baru saja',icon:'ti-building-off',col:'#DC2626'});
+  closeModalForce(); render(); toast('Perusahaan '+p.name+' dihapus');
+}
+
+// ── Dokumen & Kontrak ──────────────────────────────────────
+function openDocModal(id){
+  const doc=id?documents.find(x=>x.id===id):null;
+  let h=`<div class="modal-title">${doc?'Edit dokumen':'Upload dokumen baru'}</div><div class="modal-sub">${doc?doc.nama:'Tambah kontrak, PKS, atau dokumen lain'}</div>`;
+  h+=`<div class="form-field full"><div class="form-label">Nama dokumen</div><input class="form-input" id="doc-nama" value="${doc?doc.nama:''}" placeholder="Mis. Perjanjian Investasi NX-002"></div>`;
+  h+=`<div class="form-grid" style="margin-top:10px">`;
+  h+=`<div class="form-field"><div class="form-label">Portfolio</div><select class="form-input" id="doc-pid">`;
+  portfolios.forEach(p=>h+=`<option value="${p.id}" ${doc&&doc.pid===p.id?'selected':''}>${p.name}</option>`);
+  h+=`</select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Tipe dokumen</div><select class="form-input" id="doc-tipe">`;
+  DOC_TIPE.forEach(t=>h+=`<option ${doc&&doc.tipe===t?'selected':''}>${t}</option>`);
+  h+=`</select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Versi</div><input class="form-input" id="doc-versi" value="${doc?doc.versi:'v1.0'}" placeholder="v1.0"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Tanggal dokumen</div><input class="form-input" id="doc-tgl" value="${doc?doc.tgl:''}" placeholder="1 Jan 2025"></div>`;
+  h+=`</div>`;
+  h+=`<div class="form-field full" style="margin-top:10px"><div class="form-label">Upload file</div>`;
+  h+=`<div style="display:flex;align-items:center;gap:8px">`;
+  h+=`<input class="form-input" id="doc-file" value="${doc?doc.size:''}" placeholder="Klik 'Pilih file' atau ketik nama file" style="flex:1">`;
+  h+=`<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg-secondary);color:var(--text-secondary);white-space:nowrap" onclick="document.getElementById('doc-file').value='dokumen-baru-'+(new Date().getTime()%10000)+'.pdf (1.2 MB)'"><i class="ti ti-upload"></i>Pilih file</label>`;
+  h+=`</div></div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveDoc('${id||''}')"><i class="ti ti-check"></i>${doc?'Simpan perubahan':'Upload dokumen'}</button></div>`;
+  openModal(h);
+}
+function saveDoc(id){
+  const nama=document.getElementById('doc-nama').value.trim()||'Dokumen baru';
+  const pid=document.getElementById('doc-pid').value;
+  const tipe=document.getElementById('doc-tipe').value;
+  const versi=document.getElementById('doc-versi').value.trim()||'v1.0';
+  const tgl=document.getElementById('doc-tgl').value.trim()||nowStr();
+  const fileRaw=document.getElementById('doc-file').value.trim()||'1.0 MB';
+  const size=fileRaw.includes('MB')||fileRaw.includes('KB')?fileRaw.split('(').pop().replace(')','').trim():'1.0 MB';
+  if(id){
+    const doc=documents.find(x=>x.id===id);
+    Object.assign(doc,{nama,pid,tipe,versi,tgl,size});
+    auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Update dokumen: ${nama} (${tipe} · ${versi})`,tgl:'Baru saja',icon:'ti-file-pencil',col:'#4338CA'});
+    toast('Dokumen diperbarui');
+  } else {
+    documents.unshift({id:'d'+(documents.length+1),pid,nama,tipe,versi,tgl,size});
+    auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Upload dokumen baru: ${nama} (${tipe})`,tgl:'Baru saja',icon:'ti-file-plus',col:'#4338CA'});
+    toast('Dokumen berhasil diupload');
+  }
+  closeModalForce(); render();
+}
+function deleteDoc(id){
+  const doc=documents.find(x=>x.id===id);
+  if(!doc) return;
+  if(!confirm(`Hapus "${doc.nama}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+  documents.splice(documents.indexOf(doc),1);
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Menghapus dokumen: ${doc.nama}`,tgl:'Baru saja',icon:'ti-trash',col:'#DC2626'});
+  render(); toast('Dokumen dihapus');
+}
+
+// ── Bagi Hasil Config ──────────────────────────────────────
+function openBhModal(pid){
+  const p=getP(pid); const cfg=bhConfig[pid]||{skema:'Fixed return',basis:'',frekuensi:'Bulanan',cap:'Tidak ada',minimum:'Tidak ada'};
+  let h=`<div class="modal-title">Pengaturan bagi hasil</div><div class="modal-sub">${p?p.name:pid}</div>`;
+  h+=`<div class="form-grid">`;
+  h+=`<div class="form-field"><div class="form-label">Skema bagi hasil</div><select class="form-input" id="bh-skema">${BH_SKEMA.map(s=>`<option ${cfg.skema===s?'selected':''}>${s}</option>`).join('')}</select></div>`;
+  h+=`<div class="form-field"><div class="form-label">Frekuensi pembayaran</div><select class="form-input" id="bh-frek"><option ${cfg.frekuensi==='Bulanan'?'selected':''}>Bulanan</option><option ${cfg.frekuensi.startsWith('Bulanan +')?'selected':''}>Bulanan + triwulanan</option><option ${cfg.frekuensi==='Triwulanan'?'selected':''}>Triwulanan</option><option ${cfg.frekuensi==='Semesteran'?'selected':''}>Semesteran</option><option ${cfg.frekuensi==='Tahunan'?'selected':''}>Tahunan</option></select></div>`;
+  h+=`</div>`;
+  h+=`<div class="form-field full" style="margin-top:10px"><div class="form-label">Basis perhitungan</div><textarea class="form-input" id="bh-basis" style="min-height:56px" placeholder="Mis. 10,5% p.a. dari nominal pokok">${cfg.basis}</textarea></div>`;
+  h+=`<div class="form-grid" style="margin-top:8px">`;
+  h+=`<div class="form-field"><div class="form-label">Cap return</div><input class="form-input" id="bh-cap" value="${cfg.cap}" placeholder="Mis. 15% p.a. atau 'Tidak ada'"></div>`;
+  h+=`<div class="form-field"><div class="form-label">Return minimum (jaminan)</div><input class="form-input" id="bh-min" value="${cfg.minimum}" placeholder="Mis. 10% p.a. dijamin atau 'Tidak ada'"></div>`;
+  h+=`</div>`;
+  h+=`<label class="form-field full" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:11px 13px;margin-top:10px;border:1px solid var(--border);border-radius:9px;background:var(--bg-secondary)"><input type="checkbox" id="bh-pokok"${p&&p.pengembalianPokok?' checked':''} style="width:16px;height:16px;margin-top:1px;accent-color:var(--navy);cursor:pointer"><span><span style="font-size:13px;font-weight:600;color:var(--text-primary)">Ada pengembalian pokok</span><br><span style="font-size:11px;color:var(--text-tertiary)">Pokok investor dikembalikan di akhir kontrak. Jika tidak dicentang, annualized yield di BA-PM disesuaikan −20% (tanpa pokok).</span></span></label>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveBhConfig('${pid}')"><i class="ti ti-check"></i>Simpan konfigurasi</button></div>`;
+  openModal(h);
+}
+function saveBhConfig(pid){
+  const skema=document.getElementById('bh-skema').value;
+  const basis=document.getElementById('bh-basis').value.trim()||'—';
+  const frekuensi=document.getElementById('bh-frek').value;
+  const cap=document.getElementById('bh-cap').value.trim()||'Tidak ada';
+  const minimum=document.getElementById('bh-min').value.trim()||'Tidak ada';
+  const pokok=document.getElementById('bh-pokok').checked;
+  bhConfig[pid]={skema,basis,frekuensi,cap,minimum};
+  const p=getP(pid);
+  if(p) p.pengembalianPokok=pokok;
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:`Update pengaturan bagi hasil ${p?p.name:pid} → ${skema} · pokok: ${pokok?'ada':'tidak ada'}`,tgl:'Baru saja',icon:'ti-percentage',col:'#4338CA'});
+  closeModalForce(); render(); toast('Konfigurasi bagi hasil disimpan');
+}
+
+function openAnnounce(){
+  let h=`<div class="modal-title">Buat pengumuman</div><div class="modal-sub">Kirim ke pengguna platform</div>`;
+  h+=`<div class="form-field full"><div class="form-label">Judul</div><input class="form-input" id="an-judul" placeholder="Judul pengumuman"></div>`;
+  h+=`<div class="form-field full" style="margin-top:10px"><div class="form-label">Target</div><select class="form-input" id="an-target"><option>Semua</option><option>BA-PM</option><option>Investor</option></select></div>`;
+  h+=`<div class="form-field full" style="margin-top:10px"><div class="form-label">Isi</div><textarea class="form-input" id="an-isi" placeholder="Tulis pesan..."></textarea></div>`;
+  h+=`<div class="btn-row"><button class="btn btn-secondary" onclick="closeModalForce()">Batal</button><button class="btn btn-primary" onclick="saveAnnounce()"><i class="ti ti-send"></i>Kirim</button></div>`;
+  openModal(h);
+}
+function saveAnnounce(){
+  const judul=document.getElementById('an-judul').value.trim()||'Pengumuman tanpa judul';
+  const target=document.getElementById('an-target').value;
+  const isi=document.getElementById('an-isi').value.trim()||'—';
+  announcements.unshift({id:'an'+(announcements.length+1),judul,target,tgl:nowStr(),status:'Terkirim',isi});
+  closeModalForce(); render(); toast('Pengumuman terkirim ke '+target);
+}
+
+function saveRules(){
+  ['siaga1Hari','siaga2Hari','siaga3Hari','siaga1VakumHari','siaga2VakumHari','siaga3VakumHari','siaga1PerfBulan','siaga2PerfBulan','siaga3PerfBulan','contractWarn','contractCrit'].forEach(k=>{ const el=document.getElementById('rule-'+k); if(el) healthRules[k]=parseFloat(el.value)||0; });
+  auditLog.unshift({actor:ME.name,role:'Admin',aksi:'Memperbarui aturan health SOP Wanprestasi',tgl:'Baru saja',icon:'ti-shield-check',col:'#4338CA'});
+  Store.commit(); toast('Aturan health SOP disimpan — berlaku ke semua portfolio aktif');
+}
+
+function nowStr(){ return '17 Jun 2024'; }
+
+// ============================================================
+// ROUTER
+// ============================================================
+function renderContent(){
+  const map={dashboard:pageDashboard,users:pageUsers,companies:pageCompanies,investors:pageInvestors,approvals:pageApprovals,distribusi:pageDistribusi,dokumen:pageDocuments,'bh-config':pageBhConfig,fees:pageFees,rules:pageRules,audit:pageAudit,announce:pageAnnounce,settings:pageSettings};
+  document.getElementById('content').innerHTML=(map[ST.page]||pageDashboard)();
+}
+function render(){ renderSidebar(); renderTopbar(); renderContent(); if(!_applyingRemote) Store.commit(); }
+function nav(id){ ST.page=id; render(); window.scrollTo&&window.scrollTo(0,0); const cw=document.querySelector('.content-wrap'); if(cw) cw.scrollTop=0; }
+
+render();
+</script>
+</body>
+</html>

@@ -419,6 +419,15 @@ export interface InvestorReportDoc {
   /** Coverage range for all-time reports (earliest / latest counted month, YYYY-MM). */
   coverageFirst?: string
   coverageLatest?: string
+  /**
+   * Per-investor read state. Each investorReports doc belongs to exactly one
+   * investor, so a boolean on the doc is sufficient — no separate read-tracking
+   * collection needed. Absent = unread (backwards-compatible with older docs).
+   * Reset to false whenever the report is re-drafted (a revision the investor
+   * hasn't seen), and flipped to true by the investor when they open it.
+   */
+  isRead?: boolean
+  readAt?: Timestamp
 }
 
 // ─── AI Extraction with Classification ───────────────────────────────────

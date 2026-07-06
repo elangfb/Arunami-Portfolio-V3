@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arunami — Portal Investor</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #F3F4F6; color: #111827; overflow: hidden; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+button, input, select, textarea { font-family: inherit; }
+:focus-visible { outline: 2px solid #2563EB; outline-offset: 1px; }
+
+:root {
+  --navy: #0F2744; --navy-hover: rgba(255,255,255,0.07); --navy-active: rgba(255,255,255,0.13);
+  --navy-border: rgba(255,255,255,0.09); --navy-text: #C8D8EB; --navy-muted: #7A96B3;
+  --bg-page: #F3F4F6; --bg-card: #FFFFFF; --bg-secondary: #F9FAFB; --bg-tertiary: #F3F4F6;
+  --border: #E5E7EB; --border-light: #F3F4F6;
+  --text-primary: #111827; --text-secondary: #6B7280; --text-tertiary: #9CA3AF;
+  --text-success: #059669; --text-danger: #DC2626; --text-warning: #D97706; --text-info: #2563EB;
+  --bg-success: #ECFDF5; --bg-danger: #FEF2F2; --bg-warning: #FFFBEB; --bg-info: #EFF6FF;
+  --sidebar-w: 228px; --topbar-h: 52px; --content-max: 1100px;
+  --shadow-xs: 0 1px 2px rgba(16,24,40,0.04);
+  --shadow-sm: 0 1px 3px rgba(16,24,40,0.06), 0 1px 2px rgba(16,24,40,0.04);
+  --shadow-md: 0 4px 12px rgba(16,24,40,0.08);
+  --ring: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* SIDEBAR */
+.sidebar { width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; z-index: 10; }
+.sb-logo { padding: 18px 18px 14px; border-bottom: 1px solid var(--navy-border); flex-shrink: 0; }
+.sb-logo-name { font-size: 15px; font-weight: 600; color: #fff; letter-spacing: 0.01em; }
+.sb-logo-role { font-size: 11px; color: var(--navy-muted); margin-top: 1px; }
+.sb-back { display: flex; align-items: center; gap: 6px; padding: 10px 18px 8px; color: var(--navy-muted); font-size: 12px; cursor: pointer; border-bottom: 1px solid var(--navy-border); flex-shrink: 0; transition: color 0.15s; }
+.sb-back:hover { color: #fff; }
+.sb-pctx { padding: 10px 18px 10px; border-bottom: 1px solid var(--navy-border); flex-shrink: 0; }
+.sb-pname { font-size: 13px; font-weight: 500; color: #fff; margin-bottom: 5px; }
+.sb-nav { flex: 1; overflow-y: auto; padding: 6px 0 8px; }
+.sb-nav::-webkit-scrollbar { width: 3px; }
+.sb-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+.sb-section { font-size: 10px; font-weight: 600; color: var(--navy-muted); letter-spacing: 0.09em; text-transform: uppercase; padding: 10px 18px 4px; }
+.sb-item { display: flex; align-items: center; gap: 9px; padding: 7px 18px 7px 15px; cursor: pointer; color: var(--navy-text); font-size: 13px; transition: background 0.1s, color 0.1s; border-left: 3px solid transparent; }
+.sb-item:hover { background: var(--navy-hover); color: #fff; }
+.sb-item.active { background: var(--navy-active); color: #fff; border-left-color: #60A5FA; }
+.sb-item i { font-size: 16px; flex-shrink: 0; opacity: 0.8; }
+.sb-item.active i { opacity: 1; }
+.sb-item-label { flex: 1; }
+.sb-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 99px; line-height: 1.5; }
+.sb-badge-n { background: rgba(217,119,6,0.3); color: #FCD34D; }
+.sb-badge-a { background: rgba(220,38,38,0.3); color: #FCA5A5; }
+.sb-divider { height: 1px; background: var(--navy-border); margin: 5px 18px; }
+.sb-user { padding: 11px 14px; border-top: 1px solid var(--navy-border); display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.sb-avatar { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.sb-user-info { flex: 1; min-width: 0; }
+.sb-user-name { font-size: 12px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-user-role { font-size: 10px; color: var(--navy-muted); }
+
+/* HEALTH */
+.hbadge { display: inline-flex; align-items: center; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 600; }
+.hb-sehat { background: rgba(5,150,105,0.15); color: #10B981; }
+.hb-siaga1 { background: rgba(217,119,6,0.15); color: #D97706; }
+.hb-siaga2 { background: rgba(234,88,12,0.15); color: #EA580C; }
+.hb-siaga3 { background: rgba(220,38,38,0.15); color: #EF4444; }
+
+/* MAIN */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.topbar { height: var(--topbar-h); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; background: var(--bg-card); flex-shrink: 0; gap: 8px; box-shadow: var(--shadow-xs); position: relative; z-index: 5; }
+.topbar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+.topbar-sep { color: var(--text-tertiary); font-size: 12px; }
+.topbar-ctx { font-size: 13px; color: var(--text-secondary); }
+.topbar-spacer { flex: 1; }
+.topbar-action { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; padding: 5px 10px; border-radius: 7px; transition: background 0.1s, color 0.1s; }
+.topbar-action:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.content-wrap { flex: 1; overflow-y: auto; background: var(--bg-page); }
+.content-wrap::-webkit-scrollbar { width: 8px; }
+.content-wrap::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 99px; border: 2px solid var(--bg-page); }
+.content-wrap::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+.content-inner { max-width: var(--content-max); margin: 0 auto; padding: 24px 28px 40px; animation: contentIn 0.2s ease; }
+@keyframes contentIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* CARDS */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; box-shadow: var(--shadow-xs); }
+.card-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+.card-sub { font-size: 11px; color: var(--text-tertiary); }
+
+/* KPI */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow-xs); transition: border-color 0.15s, box-shadow 0.15s; }
+.kpi-card:hover { border-color: #D1D5DB; box-shadow: var(--shadow-sm); }
+.kpi-label { font-size: 10px; color: var(--text-tertiary); font-weight: 600; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi-value { font-size: 21px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.kpi-delta { font-size: 11px; margin-top: 4px; font-weight: 500; }
+.delta-up { color: var(--text-success); } .delta-dn { color: var(--text-danger); } .delta-neu { color: var(--text-secondary); }
+
+/* TABLE */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; color: var(--text-tertiary); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tbl td { padding: 9px 10px; border-bottom: 1px solid var(--border-light); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.tbl tbody tr { transition: background 0.1s; }
+.tbl tbody tr:hover { background: var(--bg-secondary); }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl .muted { color: var(--text-secondary); } .tbl .pos { color: var(--text-success); } .tbl .neg { color: var(--text-danger); }
+.tbl .total-row td { font-weight: 600; background: var(--bg-secondary); }
+
+/* TABS */
+.tab-row { display: flex; gap: 2px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 9px; padding: 3px; margin-bottom: 18px; width: fit-content; }
+.tab { padding: 6px 16px; border-radius: 7px; font-size: 13px; cursor: pointer; color: var(--text-secondary); transition: background 0.15s, color 0.15s, box-shadow 0.15s; user-select: none; }
+.tab:hover { color: var(--text-primary); }
+.tab.active { background: var(--bg-card); color: var(--text-primary); font-weight: 600; box-shadow: var(--shadow-sm); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: background 0.15s, box-shadow 0.15s, transform 0.1s; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--navy); color: #fff; box-shadow: var(--shadow-xs); }
+.btn-primary:hover { background: #1a3a5c; box-shadow: var(--shadow-sm); }
+.btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); box-shadow: var(--shadow-xs); }
+.btn-secondary:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.btn-sm { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; font-size: 12px; font-weight: 500; border-radius: 7px; cursor: pointer; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: background 0.1s, color 0.1s, border-color 0.1s; box-shadow: var(--shadow-xs); }
+.btn-sm:hover { background: var(--bg-secondary); color: var(--text-primary); border-color: #D1D5DB; }
+.btn-navy-sm { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; font-size: 12px; font-weight: 500; border-radius: 7px; cursor: pointer; border: 1px solid var(--navy); background: var(--navy); color: #fff; transition: background 0.15s; box-shadow: var(--shadow-xs); }
+.btn-navy-sm:hover { background: #1a3a5c; }
+.btn-row { display: flex; gap: 8px; margin-top: 16px; }
+
+/* FORMS */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.form-input { padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: var(--bg-card); color: var(--text-primary); outline: none; width: 100%; transition: border-color 0.15s, box-shadow 0.15s; box-shadow: var(--shadow-xs); }
+.form-input:hover { border-color: #D1D5DB; }
+.form-input:focus { border-color: #2563EB; box-shadow: var(--ring); }
+.form-input::placeholder { color: var(--text-tertiary); }
+.form-input[readonly] { background: var(--bg-secondary); color: var(--text-secondary); }
+select.form-input { cursor: pointer; }
+.form-sec-lbl { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.07em; margin: 16px 0 9px; }
+
+/* PILLS */
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border-radius: 99px; font-weight: 600; white-space: nowrap; }
+.pill-read { background: #ECFDF5; color: #059669; }
+.pill-unread { background: #FFFBEB; color: #D97706; }
+.pill-paid { background: #ECFDF5; color: #059669; }
+.pill-proc { background: #EFF6FF; color: #2563EB; }
+.pill-hold { background: #FEF2F2; color: #DC2626; }
+.pill-pending { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
+
+/* BANNERS */
+.notif-bar { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 9px; padding: 11px 15px; display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; font-size: 12px; color: #92400E; line-height: 1.55; }
+.notif-bar i { margin-top: 1px; }
+.info-bar { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 9px; padding: 13px 16px; margin-bottom: 14px; font-size: 12px; color: #1E40AF; }
+.info-bar-title { font-size: 12px; font-weight: 600; color: #1E3A8A; margin-bottom: 8px; display: flex; align-items: center; gap: 7px; }
+.info-bar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
+.info-bar-item { display: flex; flex-direction: column; gap: 1px; }
+.info-bar-lbl { font-size: 10px; font-weight: 600; color: #3B82F6; text-transform: uppercase; letter-spacing: 0.06em; }
+.info-bar-val { font-size: 12px; color: #1E3A8A; font-weight: 500; }
+.info-bar-note { font-size: 11px; color: #3B82F6; margin-top: 8px; padding-top: 8px; border-top: 1px solid #BFDBFE; }
+.alert-bar { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 9px; padding: 11px 15px; display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; font-size: 12px; color: #991B1B; line-height: 1.55; }
+.alert-bar i { margin-top: 1px; }
+
+/* CHART */
+.chart-wrap { width: 100%; margin-bottom: 6px; }
+.chart-legend { display: flex; gap: 16px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* STAT CARDS */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow-xs); transition: border-color 0.15s, box-shadow 0.15s; }
+.stat-card:hover { border-color: #D1D5DB; box-shadow: var(--shadow-sm); }
+.stat-label { font-size: 10px; color: var(--text-tertiary); font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value { font-size: 22px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat-sub { font-size: 12px; margin-top: 3px; }
+.stat-up { color: var(--text-success); }
+.stat-dn { color: var(--text-danger); }
+.stat-neu { color: var(--text-secondary); }
+
+/* SECTION HEADER */
+.section-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-hdr-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ALERT PANEL */
+.alert-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; box-shadow: var(--shadow-xs); }
+.alert-item { display: flex; align-items: flex-start; gap: 11px; padding: 9px 0; border-top: 1px solid var(--border-light); cursor: pointer; }
+.alert-item:first-of-type { border-top: none; }
+.alert-item:hover .alert-item-title { color: var(--text-info); }
+.alert-item-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.alert-item-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+/* HOLDING CARD (investor flavoured) */
+.hold-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.hold-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; box-shadow: var(--shadow-xs); }
+.hold-card:hover { border-color: #93C5FD; box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.hold-card-siaga1 { border-left: 4px solid #D97706; }
+.hold-card-siaga2 { border-left: 4px solid #EA580C; }
+.hold-card-siaga3 { border-left: 4px solid #DC2626; }
+.hold-card-top { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 12px; }
+.hold-logo { width: 46px; height: 46px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+.hold-info { flex: 1; min-width: 0; }
+.hold-id { font-size: 10px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 2px; }
+.hold-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.hold-pt { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hold-fin-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border-light); border-top: 1px solid var(--border-light); }
+.fin-item { background: var(--bg-card); padding: 10px 12px; }
+.fin-label { font-size: 10px; color: var(--text-tertiary); font-weight: 500; margin-bottom: 3px; }
+.fin-val { font-size: 14px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fin-change { font-size: 10px; margin-top: 2px; font-weight: 500; }
+.fin-up { color: var(--text-success); }
+.fin-dn { color: var(--text-danger); }
+.badge-tag { display: inline-flex; align-items: center; font-size: 10px; padding: 2px 7px; border-radius: 5px; font-weight: 500; }
+.badge-navy { background: #0F2744; color: #C8D8EB; }
+.badge-gray { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
+.hold-pos-row { display: flex; gap: 16px; padding: 0 16px 10px; }
+.hold-pos-lbl { font-size: 11px; color: var(--text-tertiary); }
+.hold-pos-val { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-left: 3px; }
+
+/* ALLOCATION */
+.alloc-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-light); }
+.alloc-row:last-child { border-bottom: none; }
+.alloc-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.alloc-bar-bg { flex: 1; height: 7px; background: var(--bg-tertiary); border-radius: 99px; overflow: hidden; }
+.alloc-bar-fill { height: 100%; border-radius: 99px; }
+
+/* RENEWAL TIMELINE */
+.rl-bar { height: 36px; border-radius: 8px; overflow: hidden; display: flex; margin-bottom: 16px; }
+.rl-segment { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; }
+
+/* DOC ROW */
+.doc-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border-light); }
+.doc-row:last-child { border-bottom: none; }
+.doc-ico { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-secondary); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--text-secondary); flex-shrink: 0; }
+
+/* MESSAGES */
+.msg-thread { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 8px; }
+.msg { display: flex; gap: 10px; max-width: 76%; }
+.msg-out { align-self: flex-end; flex-direction: row-reverse; }
+.msg-bubble { padding: 10px 13px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
+.msg-in .msg-bubble { background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary); border-top-left-radius: 3px; }
+.msg-out .msg-bubble { background: var(--navy); color: #fff; border-top-right-radius: 3px; }
+.msg-meta { font-size: 10px; color: var(--text-tertiary); margin-top: 4px; }
+.msg-out .msg-meta { text-align: right; }
+
+/* INV ROW */
+.inv-row { display: flex; align-items: center; gap: 11px; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+.inv-row:last-child { border-bottom: none; }
+.inv-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-info); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text-info); flex-shrink: 0; }
+
+/* HEALTH TOOLTIP */
+.htt-wrap { position: relative; display: inline-flex; }
+.htt-wrap .htt { display: none; position: absolute; bottom: calc(100% + 6px); left: 0; background: var(--navy); color: #C8D8EB; border-radius: 8px; padding: 10px 13px; font-size: 11.5px; line-height: 1.7; z-index: 99; min-width: 220px; max-width: 280px; box-shadow: 0 4px 16px rgba(0,0,0,.22); pointer-events: none; white-space: normal; }
+.htt-wrap:hover .htt { display: block; }
+.htt-title { font-weight: 600; margin-bottom: 4px; }
+.htt-reason { display: flex; align-items: flex-start; gap: 5px; font-size: 11px; color: rgba(200,216,235,0.8); }
+.htt-date { font-size: 10px; color: var(--navy-muted); margin-top: 5px; }
+
+/* DURATION BAR */
+.dur-row { display: flex; justify-content: space-between; padding: 0 16px 4px; font-size: 11px; color: var(--text-tertiary); }
+.dur-val { font-weight: 500; color: var(--text-secondary); }
+.dur-bar-wrap { padding: 0 16px 12px; }
+.dur-bar-bg { height: 5px; background: var(--bg-tertiary); border-radius: 99px; overflow: hidden; }
+.dur-bar-fill { height: 100%; border-radius: 99px; background: var(--navy); }
+.dur-bar-fill-warn { background: #DC2626; }
+
+/* FILTER ROW */
+.filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.filter-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; background: var(--bg-card); color: var(--text-secondary); cursor: pointer; outline: none; transition: border-color 0.15s, box-shadow 0.15s, color 0.15s; box-shadow: var(--shadow-xs); }
+.filter-select:hover { border-color: #D1D5DB; color: var(--text-primary); }
+.filter-select:focus { border-color: #2563EB; box-shadow: var(--ring); }
+.row-count { font-size: 12px; color: var(--text-tertiary); align-self: center; }
+
+/* PLACEHOLDER */
+.ph-card { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; padding: 48px 24px; text-align: center; }
+.ph-icon { font-size: 36px; color: var(--text-tertiary); margin-bottom: 12px; }
+.ph-title { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.ph-desc { font-size: 13px; color: var(--text-tertiary); line-height: 1.6; max-width: 380px; margin: 0 auto 16px; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); backdrop-filter: blur(2px); z-index: 300; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.15s ease; }
+.modal-box { background: var(--bg-card); border-radius: 14px; padding: 24px; width: 440px; max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: modalIn 0.18s cubic-bezier(0.16,1,0.3,1); }
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 14px; letter-spacing: -0.01em; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.view-all { font-size: 12px; color: var(--text-info); cursor: pointer; }
+.view-all:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="content-wrap"><div class="content-inner" id="content"></div></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal-box" id="modal-box" onclick="event.stopPropagation()"></div>
+</div>
+
+<script src="arunami-store.js"></script>
+<script>
+// ============================================================
+// SHARED STORE WIRING — Investor mengonsumsi data dari Admin/BA-PM (shared store)
+// portfolios & holdings difilter ke investor yang login (ME). Hanya-baca.
+// ============================================================
+let portfolios, holdings, bhKontrak, documents, covenants, milestones, PNL_DATA, MONTHLY_ROWS, PERIODS, PERIOD_TS;
+function myHoldings(){
+  const ct=Store.db.capTable||{}; const out=[];
+  Object.keys(ct).forEach(pid=>{ const arr=ct[pid]||[]; const tot=arr.reduce((s,i)=>s+(+i.nominalJt||0),0);
+    const mine=arr.find(i=>i.name===ME.name);
+    if(mine) out.push({pid, porsi: tot>0?Math.round((+mine.nominalJt||0)/tot*100):0, nominal:+mine.nominalJt||0, masuk:'', bulanKe:0, totalReceived:0});
+  });
+  return out;
+}
+function syncLocals(){
+  const d=Store.db;
+  holdings=myHoldings();
+  const myPids=new Set(holdings.map(h=>h.pid));
+  portfolios=(d.portfolios||[]).filter(p=>myPids.has(p.id));
+  bhKontrak=d.bhConfig||{};
+  documents=(d.documents||[]).filter(x=>x.pid==='all'||myPids.has(x.pid));
+  covenants={}; milestones={}; PNL_DATA={};
+  // Data bulanan & periode — dari shared store (kosong sampai BA-PM input laporan)
+  MONTHLY_ROWS=[]; const mr=d.monthlyReports||{}; Object.keys(mr).forEach(pid=>{ (mr[pid]||[]).forEach(r=>MONTHLY_ROWS.push(r)); });
+  // Periode = gabungan laporan bulanan + periode distribusi bagi hasil untuk investor ini
+  PERIOD_TS={};
+  MONTHLY_ROWS.forEach(r=>{ if(r.bulan) PERIOD_TS[r.bulan]=r.ts||periodTs(r.bulan); });
+  (d.distBatches||[]).forEach(b=>{ if(b.reportedToBapm && (b.buktiPerInvestor||{})[ME.name]!==undefined && b.period) PERIOD_TS[b.period]=periodTs(b.period); });
+  PERIODS=Object.keys(PERIOD_TS).sort((a,b)=>PERIOD_TS[b]-PERIOD_TS[a]);
+}
+function periodTs(label){ const m={Jan:1,Feb:2,Mar:3,Apr:4,Mei:5,Jun:6,Jul:7,Agt:8,Sep:9,Okt:10,Nov:11,Des:12}; const parts=(label||'').split(' '); return (parseInt(parts[1])||0)*100+(m[parts[0]]||0); }
+// Pastikan profil investor yang login (ME) terdaftar di registry Admin (shared store),
+// agar Admin bisa meng-assign investor ini ke portfolio baru.
+function ensureMyProfile(){
+  const inv=Store.db.investors;
+  let me=inv.find(x=>(ME.email&&x.email===ME.email)||x.name===ME.name);
+  if(!me){
+    me=Store.newInvestor({name:ME.name,email:ME.email,tipe:ME.tipe||'Individu',npwp:ME.npwp||'',kyc:'Terverifikasi',join:ME.joinDate||''});
+    inv.push(me); Store.commit();
+  }
+  return me;
+}
+Store.onChange((db,remote)=>{ if(remote){ syncLocals(); if(typeof render==='function') render(); } });
+
+const _OLD_portfolios_unused = [
+  {id:'nexavar', name:'Nexavar Capital', health:'Siaga 2', kode:'NX-001', pt:'PT Nexavar Kapital Indonesia',
+   industri:'Fintech', tahap:'Series B', investasiTotal:'IDR 32B', durTotal:24, contractDays:45,
+   kontrakMulai:'Jan 2023', kontrakSelesai:'Des 2024', opMulai:'Feb 2023', pengembalianPokok:false,
+   healthReasons:['Keterlambatan laporan >30 hari (Siaga 1) — eskalasi ke Siaga 2 karena berlangsung >60 hari','Covenant pass rate 0% — 2 covenant gagal berturut','Kontrak habis 45 hari lagi'],
+   issueText:'Siaga 2 – Serious Concern · keterlambatan laporan >60 hari · kontrak 45 hari lagi'},
+  {id:'solaris', name:'Solaris Agro', health:'Siaga 1', kode:'SA-002', pt:'PT Solaris Agrikultura Nusantara',
+   industri:'Agritech', tahap:'Series A', investasiTotal:'IDR 18B', durTotal:36, contractDays:82,
+   kontrakMulai:'Agt 2023', kontrakSelesai:'Jul 2026', opMulai:'Sep 2023', pengembalianPokok:false,
+   healthReasons:['Keterlambatan laporan 20 hari (masuk ambang Siaga 1 >30 hari)','1 covenant fail: gross margin 11.2% (min 15%)','Performa di bawah target 1 bulan berturut'],
+   issueText:'Siaga 1 – Early Warning · keterlambatan laporan 20 hari · 1 covenant fail'},
+  {id:'kirana', name:'Kirana Nusantara', health:'Sehat', kode:'KN-003', pt:'PT Kirana Nusantara Sejahtera',
+   industri:'Pendidikan', tahap:'Series A', investasiTotal:'IDR 20B', durTotal:24, contractDays:210,
+   kontrakMulai:'Des 2023', kontrakSelesai:'Nov 2025', opMulai:'Jan 2024', pengembalianPokok:true,
+   healthReasons:['Tidak ada keterlambatan bayar/lapor','Semua covenant pass (100%)','Performa sesuai target — yield naik 3 bulan berturut'],
+   issueText:'Yield naik 3 bulan berturut · semua covenant pass'},
+  {id:'biru', name:'Biru Samudra', health:'Sehat', kode:'BS-004', pt:'PT Biru Samudra Makmur',
+   industri:'Logistik', tahap:'Pre-Series A', investasiTotal:'IDR 8B', durTotal:36, contractDays:178,
+   kontrakMulai:'Apr 2024', kontrakSelesai:'Mar 2027', opMulai:'Mei 2024', pengembalianPokok:true,
+   healthReasons:['Tidak ada keterlambatan bayar/lapor','Semua covenant pass','Yield stabil di atas threshold — kontrak masih 30 bulan'],
+   issueText:'Semua indikator dalam batas normal'},
+];
+
+const BRAND = {
+  nexavar: { bg:'#2563EB', text:'#DBEAFE', initials:'NX' },
+  solaris:  { bg:'#16A34A', text:'#DCFCE7', initials:'SA' },
+  kirana:   { bg:'#9333EA', text:'#F3E8FF', initials:'KN' },
+  biru:     { bg:'#0891B2', text:'#CFFAFE', initials:'BS' },
+};
+const KODE = {nexavar:'NX',solaris:'SA',kirana:'KN',biru:'BS'};
+const INDUSTRI_COLOR = {
+  'Fintech':'#2563EB', 'Agritech':'#16A34A', 'Pendidikan':'#9333EA', 'Logistik':'#0891B2',
+};
+
+const _OLD_bhKontrak = {
+  nexavar: { skema:'Revenue sharing', basis:'7% dari gross revenue bulanan', frekuensi:'Bulanan', minimum:'Tidak ada jaminan minimum', cap:'15% p.a. (annualized)', catatan:'Dihitung sebelum COGS. Jika revenue negatif, distribusi ditangguhkan ke bulan berikutnya.', referensi:'Pasal 8 Perjanjian Investasi · Addendum Bagi Hasil, Jul 2022' },
+  solaris: { skema:'Profit sharing', basis:'60% net profit untuk investor, 40% manajemen', frekuensi:'Bulanan', minimum:'Tidak ada jaminan minimum — profit-linked', cap:'Tidak ada', catatan:'Dihitung setelah COGS, opex, dan penyusutan. Bulan dengan net profit negatif tidak menghasilkan distribusi.', referensi:'Pasal 9 Perjanjian Investasi, Jan 2022' },
+  kirana: { skema:'Blended — revenue base + profit bonus', basis:'Base: 10% p.a. dari nominal investasi (dibayar bulanan). Bonus: +2% p.a. jika net profit bulanan > Rp 400jt', frekuensi:'Bulanan (base) · Triwulanan (bonus)', minimum:'10% p.a. dijamin dari nominal pokok', cap:'Tidak ada', catatan:'Bonus profit dievaluasi setiap akhir kuartal. Pembayaran bonus dijumlah dengan distribusi bulan ketiga.', referensi:'Pasal 7 Perjanjian Investasi · Addendum Skema Bonus, Sep 2023' },
+  biru: { skema:'Fixed return', basis:'10,5% p.a. dari nominal investasi, dibayar proporsional per bulan', frekuensi:'Bulanan', minimum:'10,5% p.a. — tidak bergantung pada kinerja operasional', cap:'Tidak ada', catatan:'Return bersifat fixed dan dijamin. Didukung jaminan fidusia atas aset operasional senilai 120% dari nominal investasi.', referensi:'Pasal 6 Perjanjian Investasi · Akta Fidusia No. 12/2022' },
+};
+
+// Company performance indicators (read-only for investor)
+const _OLD_covenants = {
+  nexavar:[ {covenant:'DSCR minimum',periode:'Bulanan',wajib:'1.2x',aktual:'0.89x',hasil:'Gagal'},
+            {covenant:'Gross margin minimum',periode:'Bulanan',wajib:'15%',aktual:'11.2%',hasil:'Gagal'} ],
+  solaris:[ {covenant:'Gross margin minimum',periode:'Bulanan',wajib:'25%',aktual:'28.5%',hasil:'Pass'},
+            {covenant:'Revenue growth YoY',periode:'Triwulanan',wajib:'>5%',aktual:'8.2%',hasil:'Pass'} ],
+  kirana:[ {covenant:'Inventory turnover',periode:'Triwulanan',wajib:'>4x',aktual:'5.2x',hasil:'Pass'},
+           {covenant:'Current ratio',periode:'Triwulanan',wajib:'>1.5x',aktual:'2.1x',hasil:'Pass'} ],
+  biru:[ {covenant:'Fleet utilization',periode:'Bulanan',wajib:'>75%',aktual:'71%',hasil:'Gagal'},
+         {covenant:'Maintenance cost ratio',periode:'Triwulanan',wajib:'<8%',aktual:'6.5%',hasil:'Pass'} ],
+};
+const _OLD_milestones = {
+  nexavar:[ {title:'Restrukturisasi utang selesai',target:'DSCR >= 1.2',targetDate:'31 Des 2024',status:'delayed'},
+            {title:'Approval manajemen baru',target:'SK diterbitkan',targetDate:'15 Nov 2024',status:'achieved'} ],
+  solaris:[ {title:'Ekspansi lahan fase 2',target:'50 ha tambahan',targetDate:'31 Mar 2025',status:'on-track'},
+            {title:'Sertifikasi organik USDA',target:'Sertifikat diterima',targetDate:'30 Jun 2025',status:'on-track'} ],
+  kirana:[ {title:'Pembukaan outlet baru',target:'3 outlet Jabodetabek',targetDate:'31 Jan 2025',status:'on-track'},
+           {title:'Implementasi POS sistem',target:'Semua outlet live',targetDate:'15 Des 2024',status:'achieved'} ],
+  biru:[ {title:'Penambahan armada kapal',target:'2 kapal baru',targetDate:'30 Apr 2025',status:'on-track'},
+         {title:'Sertifikasi ISM Code',target:'Sertifikat diterima',targetDate:'31 Des 2024',status:'delayed'} ],
+};
+
+// Monthly company numbers (yield drives the investor's distribution)
+// MONTHLY_ROWS, PERIODS, PERIOD_TS → diturunkan dari shared store (lihat wiring di atas)
+// PERIODS (newest-first) limited to inclusive [from..to]; '' = open bound, order-agnostic
+function periodsBetween(fromP, toP){
+  let lo=fromP?PERIOD_TS[fromP]:-Infinity, hi=toP?PERIOD_TS[toP]:Infinity;
+  if(lo>hi){ const t=lo; lo=hi; hi=t; }
+  return PERIODS.filter(b=>{ const t=PERIOD_TS[b]; return t>=lo && t<=hi; });
+}
+
+// ── Detailed P&L per company per period (IDR juta) ──────────────────────────
+const _OLD_PNL_DATA = {
+  nexavar: {
+    'Jul 2024': { rev:1420, hppList:[{nama:'Biaya penyaluran dana',nilai:892},{nama:'Biaya platform & infrastruktur',nilai:198},{nama:'Biaya akuisisi kredit',nilai:131}], hpp:1221, opexList:[{nama:'Gaji & tunjangan',nilai:65},{nama:'Teknologi & hosting',nilai:42},{nama:'G&A',nilai:20},{nama:'Pemasaran',nilai:15}], opex:142, da:18, bunga:20, pajak:5, labaBersih:14, note:'Gross margin 14.0% — mendekati batas covenant minimum 15%. Yield investor masih terjaga di 7.4% meski volume penyaluran mulai tertekan.' },
+    'Agt 2024': { rev:1350, hppList:[{nama:'Biaya penyaluran dana',nilai:832},{nama:'Biaya platform & infrastruktur',nilai:205},{nama:'Biaya akuisisi kredit',nilai:138}], hpp:1175, opexList:[{nama:'Gaji & tunjangan',nilai:66},{nama:'Teknologi & hosting',nilai:43},{nama:'G&A',nilai:21},{nama:'Pemasaran',nilai:15}], opex:145, da:18, bunga:21, pajak:0, labaBersih:-9, note:'Gross margin turun ke 13.0%, di bawah covenant minimum 15%. Net loss bulan ini akibat penurunan volume penyaluran dana. Pengelola memantau ketat kondisi arus kas.' },
+    'Sep 2024': { rev:1300, hppList:[{nama:'Biaya penyaluran dana',nilai:798},{nama:'Biaya platform & infrastruktur',nilai:212},{nama:'Biaya akuisisi kredit',nilai:134}], hpp:1144, opexList:[{nama:'Gaji & tunjangan',nilai:67},{nama:'Teknologi & hosting',nilai:44},{nama:'G&A',nilai:22},{nama:'Pemasaran',nilai:15}], opex:148, da:18, bunga:21, pajak:0, labaBersih:-31, note:'Gross margin 12.0% — ketiga kalinya berturut di bawah covenant minimum 15%. DSCR mulai tertekan. Distribusi investor bulan ini masih diproses dari cadangan kas operasional.' },
+    'Okt 2024': { rev:1200, hppList:[{nama:'Biaya penyaluran dana',nilai:732},{nama:'Biaya platform & infrastruktur',nilai:218},{nama:'Biaya akuisisi kredit',nilai:116}], hpp:1066, opexList:[{nama:'Gaji & tunjangan',nilai:68},{nama:'Teknologi & hosting',nilai:45},{nama:'G&A',nilai:22},{nama:'Pemasaran',nilai:15}], opex:150, da:18, bunga:21, pajak:0, labaBersih:-55, note:'Gross margin 11.2% — jauh di bawah covenant minimum 15%. DSCR 0.89x (minimum 1.2x). Distribusi Oktober ditahan sesuai Pasal 8 perjanjian investasi. Manajemen sedang mengajukan restrukturisasi tenor.' },
+  },
+  solaris: {
+    'Jul 2024': { rev:2450, hppList:[{nama:'Biaya pertanian & panen',nilai:1124},{nama:'Biaya pengolahan & pengemasan',nilai:342},{nama:'Biaya distribusi logistik',nilai:200}], hpp:1666, opexList:[{nama:'Gaji & tunjangan',nilai:142},{nama:'Biaya lahan & sewa',nilai:85},{nama:'R&D & sertifikasi',nilai:62},{nama:'Pemasaran & ekspor',nilai:50}], opex:339, da:42, bunga:36, pajak:93, labaBersih:274, note:'Gross margin 32.0% — di atas covenant minimum 25%. Revenue tumbuh solid. Progress sertifikasi organik USDA berjalan sesuai rencana ekspansi fase 2.' },
+    'Agt 2024': { rev:2500, hppList:[{nama:'Biaya pertanian & panen',nilai:1148},{nama:'Biaya pengolahan & pengemasan',nilai:350},{nama:'Biaya distribusi logistik',nilai:202}], hpp:1700, opexList:[{nama:'Gaji & tunjangan',nilai:145},{nama:'Biaya lahan & sewa',nilai:85},{nama:'R&D & sertifikasi',nilai:63},{nama:'Pemasaran & ekspor',nilai:50}], opex:343, da:42, bunga:37, pajak:93, labaBersih:285, note:'Gross margin 32.0%. Revenue naik didorong permintaan ekspor pasar Jepang. Ekspansi lahan fase 2 masih on-track sesuai jadwal Q1 2025.' },
+    'Sep 2024': { rev:2600, hppList:[{nama:'Biaya pertanian & panen',nilai:1196},{nama:'Biaya pengolahan & pengemasan',nilai:362},{nama:'Biaya distribusi logistik',nilai:236}], hpp:1794, opexList:[{nama:'Gaji & tunjangan',nilai:148},{nama:'Biaya lahan & sewa',nilai:86},{nama:'R&D & sertifikasi',nilai:64},{nama:'Pemasaran & ekspor',nilai:52}], opex:350, da:43, bunga:38, pajak:94, labaBersih:281, note:'Gross margin 31.0%. Net profit sedikit tertekan oleh kenaikan biaya logistik distribusi. Semua covenant masih pass. Yield 9.4% di bawah proyeksi 1.8pp.' },
+    'Okt 2024': { rev:2800, hppList:[{nama:'Biaya pertanian & panen',nilai:1288},{nama:'Biaya pengolahan & pengemasan',nilai:392},{nama:'Biaya distribusi logistik',nilai:322}], hpp:2002, opexList:[{nama:'Gaji & tunjangan',nilai:152},{nama:'Biaya lahan & sewa',nilai:87},{nama:'R&D & sertifikasi',nilai:65},{nama:'Pemasaran & ekspor',nilai:55}], opex:302, da:45, bunga:38, pajak:113, labaBersih:310, note:'Revenue tertinggi dalam 4 bulan terakhir. Gross margin 28.5% sedikit turun akibat kenaikan biaya logistik distribusi namun masih di atas covenant minimum 25%.' },
+  },
+  kirana: {
+    'Jul 2024': { rev:3600, hppList:[{nama:'Biaya pengajar & konten',nilai:864},{nama:'Biaya fasilitas & operasional',nilai:432},{nama:'Biaya teknologi platform',nilai:144}], hpp:1440, opexList:[{nama:'Gaji staf non-pengajar',nilai:680},{nama:'Pemasaran & akuisisi siswa',nilai:385},{nama:'Pengembangan outlet',nilai:265},{nama:'G&A',nilai:147}], opex:1477, da:50, bunga:28, pajak:151, labaBersih:454, note:'Gross margin 60.0%. Kinerja solid didorong pembukaan outlet baru Jabodetabek. Inventory turnover 5.2x dan current ratio 2.1x — semua covenant pass.' },
+    'Agt 2024': { rev:3750, hppList:[{nama:'Biaya pengajar & konten',nilai:900},{nama:'Biaya fasilitas & operasional',nilai:450},{nama:'Biaya teknologi platform',nilai:150}], hpp:1500, opexList:[{nama:'Gaji staf non-pengajar',nilai:700},{nama:'Pemasaran & akuisisi siswa',nilai:395},{nama:'Pengembangan outlet',nilai:282},{nama:'G&A',nilai:167}], opex:1544, da:52, bunga:29, pajak:156, labaBersih:469, note:'Gross margin 60.0%. Implementasi sistem POS di seluruh outlet berhasil menekan biaya G&A. Siswa aktif tumbuh 12% MoM.' },
+    'Sep 2024': { rev:3900, hppList:[{nama:'Biaya pengajar & konten',nilai:936},{nama:'Biaya fasilitas & operasional',nilai:468},{nama:'Biaya teknologi platform',nilai:156}], hpp:1560, opexList:[{nama:'Gaji staf non-pengajar',nilai:718},{nama:'Pemasaran & akuisisi siswa',nilai:415},{nama:'Pengembangan outlet',nilai:305},{nama:'G&A',nilai:169}], opex:1607, da:53, bunga:30, pajak:163, labaBersih:487, note:'Revenue tumbuh 8.3% MoM. Persiapan pembukaan 3 outlet baru Jabodetabek mendorong kenaikan beban pengembangan. Semua covenant pass dengan margin nyaman.' },
+    'Okt 2024': { rev:4100, hppList:[{nama:'Biaya pengajar & konten',nilai:984},{nama:'Biaya fasilitas & operasional',nilai:492},{nama:'Biaya teknologi platform',nilai:164}], hpp:1640, opexList:[{nama:'Gaji staf non-pengajar',nilai:758},{nama:'Pemasaran & akuisisi siswa',nilai:428},{nama:'Pengembangan outlet',nilai:322},{nama:'G&A',nilai:174}], opex:1682, da:55, bunga:30, pajak:193, labaBersih:500, note:'Revenue tertinggi sepanjang sejarah perusahaan. Gross margin 60.0%. Pembukaan outlet baru meningkatkan kapasitas 35%. Yield naik ke 11.4% — di atas target.' },
+  },
+  biru: {
+    'Jul 2024': { rev:3150, hppList:[{nama:'Biaya operasional armada',nilai:1260},{nama:'Bahan bakar & pelumas',nilai:630},{nama:'Biaya pelabuhan & bongkar muat',nilai:315}], hpp:2205, opexList:[{nama:'Gaji ABK & personel',nilai:132},{nama:'Perawatan & perbaikan armada',nilai:95},{nama:'Administrasi & asuransi',nilai:56}], opex:283, da:88, bunga:34, pajak:135, labaBersih:405, note:'Fleet utilization 78% — di atas target covenant 75%. Gross margin 30.0%. Return fixed 10.5% p.a. terjaga penuh. Semua covenant pass.' },
+    'Agt 2024': { rev:3200, hppList:[{nama:'Biaya operasional armada',nilai:1280},{nama:'Bahan bakar & pelumas',nilai:640},{nama:'Biaya pelabuhan & bongkar muat',nilai:320}], hpp:2240, opexList:[{nama:'Gaji ABK & personel',nilai:135},{nama:'Perawatan & perbaikan armada',nilai:98},{nama:'Administrasi & asuransi',nilai:58}], opex:291, da:88, bunga:34, pajak:137, labaBersih:410, note:'Gross margin 30.0%. Revenue naik didorong kontrak baru rute Surabaya–Makassar. Fleet utilization 76%, masih di atas covenant. Sertifikasi ISM Code dalam proses.' },
+    'Sep 2024': { rev:3300, hppList:[{nama:'Biaya operasional armada',nilai:1320},{nama:'Bahan bakar & pelumas',nilai:660},{nama:'Biaya pelabuhan & bongkar muat',nilai:330}], hpp:2310, opexList:[{nama:'Gaji ABK & personel',nilai:138},{nama:'Perawatan & perbaikan armada',nilai:102},{nama:'Administrasi & asuransi',nilai:59}], opex:299, da:89, bunga:35, pajak:142, labaBersih:425, note:'Fleet utilization 74% — mulai mendekati batas covenant minimum 75%. Perawatan rutin kapal meningkat beban operasional. Return fixed tetap terjaga sesuai kontrak.' },
+    'Okt 2024': { rev:3500, hppList:[{nama:'Biaya operasional armada',nilai:1400},{nama:'Bahan bakar & pelumas',nilai:700},{nama:'Biaya pelabuhan & bongkar muat',nilai:350}], hpp:2450, opexList:[{nama:'Gaji ABK & personel',nilai:148},{nama:'Perawatan & perbaikan armada',nilai:118},{nama:'Administrasi & asuransi',nilai:66}], opex:332, da:90, bunga:35, pajak:148, labaBersih:445, note:'Fleet utilization 71% — di bawah covenant minimum 75%. Kapal dalam jadwal perawatan berkala menyebabkan penurunan utilisasi. Sertifikasi ISM Code masih dalam proses.' },
+  },
+};
+const NEXT_MONTH = {'Okt 2024':'Nov 2024','Sep 2024':'Okt 2024','Agt 2024':'Sep 2024','Jul 2024':'Agt 2024'};
+const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt'];
+
+// ============================================================
+// DATA — the logged-in investor ("me") and positions
+// ============================================================
+const ME = {
+  name:'Budi Santoso', init:'BS', email:'budi.santoso@email.com', phone:'+62 812-3456-7890',
+  joinDate:'Jan 2023', tipe:'Investor individu', npwp:'09.254.871.3-014.000',
+  bank:{bank:'BCA', no:'•••• •••• 4521', atasNama:'Budi Santoso'},
+};
+ensureMyProfile(); // daftarkan profil investor (ME) ke registry Admin bila belum ada
+syncLocals(); // isi portfolios/holdings/bhKontrak/documents dari shared store (butuh ME)
+// porsi = % kepemilikan investor di portofolio; nominal = Rp juta
+const _OLD_holdings = [
+  {pid:'nexavar', porsi:30, nominal:450,  masuk:'Feb 2023', bulanKe:21, totalReceived:52},
+  {pid:'solaris', porsi:20, nominal:500,  masuk:'Sep 2023', bulanKe:14, totalReceived:54},
+  {pid:'kirana',  porsi:25, nominal:1000, masuk:'Jan 2024', bulanKe:10, totalReceived:92},
+  {pid:'biru',    porsi:20, nominal:600,  masuk:'Mei 2024', bulanKe:6,  totalReceived:32},
+];
+
+// report read-state, keyed `${pid}__${period}`
+let reportRead = {};
+
+const _OLD_documents = [
+  {pid:'nexavar', nama:'Perjanjian Investasi Utama NX-001', tipe:'Kontrak', tgl:'10 Jan 2023', size:'2.1 MB'},
+  {pid:'nexavar', nama:'Addendum Bagi Hasil', tipe:'Kontrak', tgl:'12 Jul 2022', size:'860 KB'},
+  {pid:'solaris', nama:'Perjanjian Investasi Utama SA-002', tipe:'Kontrak', tgl:'5 Agt 2023', size:'1.9 MB'},
+  {pid:'kirana',  nama:'Perjanjian Investasi Utama KN-003', tipe:'Kontrak', tgl:'15 Des 2023', size:'2.4 MB'},
+  {pid:'kirana',  nama:'Sertifikat Kepemilikan KN-003', tipe:'Sertifikat', tgl:'15 Des 2023', size:'480 KB'},
+  {pid:'biru',    nama:'Perjanjian Investasi Utama BS-004', tipe:'Kontrak', tgl:'4 Apr 2024', size:'2.0 MB'},
+  {pid:'biru',    nama:'Akta Fidusia No. 12/2022', tipe:'Jaminan', tgl:'4 Apr 2024', size:'1.1 MB'},
+  {pid:'all',     nama:'Laporan Pajak Tahunan 2023', tipe:'Pajak', tgl:'31 Mar 2024', size:'1.2 MB'},
+  {pid:'all',     nama:'Statement Portofolio Q3 2024', tipe:'Statement', tgl:'5 Okt 2024', size:'940 KB'},
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let ST = {
+  level:'global', page:'overview', pid:null,
+  holdSearch:'', holdStatus:'',
+  distPid:'', distFrom:'', distTo:'', distStatus:'',
+  perfFrom:'', perfTo:'',
+  lapPid:'', dokPid:'', dokTipe:'',
+  hPerfStart:0, hPerfEnd:9, hLapPeriod:'',
+  allocView:'porto',
+};
+
+// ============================================================
+// HELPERS
+// ============================================================
+function hClass(h){ return h==='Siaga 3'?'hb-siaga3':h==='Siaga 2'?'hb-siaga2':h==='Siaga 1'?'hb-siaga1':'hb-sehat'; }
+function hBadge(h){ return `<span class="hbadge ${hClass(h)}">${h}</span>`; }
+function getP(pid){ return portfolios.find(x=>x.id===pid); }
+function getH(pid){ return holdings.find(x=>x.pid===pid); }
+function brandOf(pid){ const p=getP(pid); const pb=p&&p.brand; if(pb) return {bg:pb.bg,text:pb.text,initials:pb.init||pb.initials||'?',img:pb.img||null}; return BRAND[pid]||{bg:'#374151',text:'#fff',initials:(p?p.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase():'?'),img:null}; }
+// Konten logo: gambar bila ada, kalau tidak inisial. Pakai di dalam .hold-logo
+function logoInner(b){ return b&&b.img?`<img src="${b.img}" style="width:100%;height:100%;object-fit:cover">`:(b?b.initials:'?'); }
+function logoBg(b){ return b&&b.img?'#fff':(b?b.bg:'#374151'); }
+function curH(){ return getH(ST.pid); }
+function curP(){ return getP(ST.pid); }
+
+// Rp formatting (input in juta)
+function rp(jt){
+  if(jt>=1000) return 'Rp '+(jt/1000).toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})+' M';
+  return 'Rp '+Math.round(jt).toLocaleString('id-ID')+' jt';
+}
+function rpj(jt){ return 'Rp '+jt.toLocaleString('id-ID',{minimumFractionDigits:1,maximumFractionDigits:1})+' jt'; }
+
+function latestPeriod(){ return PERIODS[0]||''; }
+function prevPeriod(){ return PERIODS[1]||''; }
+// Distribusi bagi hasil untuk investor ini — dari batch yang diproses Admin & diteruskan BA-PM.
+// Status: Ditahan / Diproses (belum diteruskan) / Dibayar (sudah diteruskan BA-PM).
+function _distRec(b){
+  const p=getP(b.pid); const h=getH(b.pid); const porsi=h?h.porsi:0;
+  const fwd=(b.forwardedTo||{})[ME.name]===true;
+  const status = b.status==='Ditahan' ? 'Ditahan' : (fwd?'Dibayar':'Diproses');
+  const jt = Math.round((+b.totalJt||0)*porsi/100*10)/10;
+  return { pid:b.pid, porto:p?p.name:b.pid, bulan:b.period, ts:periodTs(b.period), jt, yield:'', porsi,
+    status, tgl: status==='Dibayar'?(b.dikirimAdmin||'—'):(status==='Diproses'?'Menunggu transfer':'—'),
+    bukti: fwd?(b.buktiPerInvestor||{})[ME.name]:null };
+}
+function allDistRecords(){
+  const recs=[]; const myPids=new Set(holdings.map(h=>h.pid));
+  (Store.db.distBatches||[]).forEach(b=>{
+    if(!b.reportedToBapm) return;
+    if((b.buktiPerInvestor||{})[ME.name]===undefined) return;
+    if(!myPids.has(b.pid)) return;
+    recs.push(_distRec(b));
+  });
+  return recs.sort((a,b)=>b.ts-a.ts);
+}
+function distOf(pid, bulan){ const r=allDistRecords().find(x=>x.pid===pid&&x.bulan===bulan); return r?r.jt:0; }
+function distStatus(pid, bulan){ const r=allDistRecords().find(x=>x.pid===pid&&x.bulan===bulan); return r?r.status:'—'; }
+function totalInvested(){ return holdings.reduce((s,h)=>s+h.nominal,0); }
+function totalReceived(){ return holdings.reduce((s,h)=>s+h.totalReceived,0); }
+function blendedYield(){
+  const ti=totalInvested(); if(!ti) return '0.00';
+  const lp=latestPeriod();
+  const w=holdings.reduce((s,h)=>{ const row=MONTHLY_ROWS.find(r=>r.kode===KODE[h.pid]&&r.bulan===lp); return s+h.nominal*(row?(parseFloat(row.yield)||0):0); },0);
+  return (w/ti).toFixed(2);
+}
+function monthDistTotal(bulan){ return allDistRecords().filter(r=>r.bulan===bulan).reduce((s,r)=>s+r.jt,0); }
+function reportSent(pid,period){ return true; }
+function reportIsRead(pid,period){ return !!reportRead[`${pid}__${period}`]; }
+function unreadReportCount(){
+  let n=0; holdings.forEach(h=>PERIODS.forEach(p=>{ if(reportSent(h.pid,p) && !reportIsRead(h.pid,p)) n++; }));
+  return n;
+}
+// single-line SVG chart with area fill
+function lineSVG(vals, labels, color){
+  const W=480,H=140,pl=42,pr=14,pt=14,pb=28,cw=W-pl-pr,ch=H-pt-pb,n=vals.length;
+  const maxV=Math.max(...vals)*1.15||1, minV=Math.min(...vals,0);
+  const xp=i=>pl+i*(cw/((n-1)||1)), yp=v=>pt+ch-((v-minV)/((maxV-minV)||1))*ch;
+  let line=`M${xp(0)},${yp(vals[0])}`, area=`M${xp(0)},${pt+ch} L${xp(0)},${yp(vals[0])}`;
+  for(let i=1;i<n;i++){ line+=` L${xp(i)},${yp(vals[i])}`; area+=` L${xp(i)},${yp(vals[i])}`; }
+  area+=` L${xp(n-1)},${pt+ch} Z`;
+  let g='',xl='',dots='';
+  [0,0.5,1].forEach(f=>{ const y=pt+ch*(1-f); g+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W-pr}" y2="${y.toFixed(1)}" stroke="#E5E7EB" stroke-width="0.8"/>`; });
+  for(let i=0;i<n;i++){ xl+=`<text x="${xp(i).toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="10" fill="#9CA3AF">${labels[i]}</text>`; dots+=`<circle cx="${xp(i).toFixed(1)}" cy="${yp(vals[i]).toFixed(1)}" r="2.6" fill="${color}"/>`; }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.18"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${g}<path d="${area}" fill="url(#ag)"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.2"/>${dots}${xl}</svg>`;
+}
+// dual line (aktual vs proyeksi)
+function miniSVG(aktual, plan, labels, colorA, colorB){
+  const W=480,H=140,pl=34,pr=12,pt=12,pb=28,cw=W-pl-pr,ch=H-pt-pb,n=aktual.length;
+  const maxV=Math.max(...aktual,...plan)*1.12||1;
+  const xp=i=>pl+i*(cw/((n-1)||1)), yp=v=>pt+ch-(v/maxV)*ch;
+  let pP=`M${xp(0)},${yp(plan[0])}`, aP=`M${xp(0)},${yp(aktual[0])}`;
+  for(let i=1;i<n;i++){ pP+=` L${xp(i)},${yp(plan[i])}`; aP+=` L${xp(i)},${yp(aktual[i])}`; }
+  let g='',xl='';
+  [0,0.5,1].forEach(f=>{ const y=pt+ch*(1-f); g+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W-pr}" y2="${y.toFixed(1)}" stroke="#E5E7EB" stroke-width="0.8"/>`; });
+  labels.forEach((l,i)=>{ xl+=`<text x="${xp(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="10" fill="#9CA3AF">${l}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block">${g}<path d="${pP}" fill="none" stroke="${colorB}" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.55"/><path d="${aP}" fill="none" stroke="${colorA}" stroke-width="2.2"/>${xl}</svg>`;
+}
+// donut chart
+function donutSVG(segments){
+  const total=segments.reduce((s,x)=>s+x.value,0)||1, R=58, r=37, cx=70, cy=70; let a0=-Math.PI/2, paths='';
+  segments.forEach(s=>{
+    const frac=s.value/total, a1=a0+frac*2*Math.PI, large=frac>0.5?1:0;
+    const x0=cx+R*Math.cos(a0), y0=cy+R*Math.sin(a0), x1=cx+R*Math.cos(a1), y1=cy+R*Math.sin(a1);
+    const xi1=cx+r*Math.cos(a1), yi1=cy+r*Math.sin(a1), xi0=cx+r*Math.cos(a0), yi0=cy+r*Math.sin(a0);
+    paths+=`<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${R},${R} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${xi1.toFixed(2)},${yi1.toFixed(2)} A${r},${r} 0 ${large} 0 ${xi0.toFixed(2)},${yi0.toFixed(2)} Z" fill="${s.color}"/>`;
+    a0=a1;
+  });
+  return `<svg viewBox="0 0 140 140" width="132" height="132">${paths}</svg>`;
+}
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+function renderSidebar(){
+  const sb=document.getElementById('sidebar');
+  let h=`<div class="sb-logo"><div class="sb-logo-name">Arunami</div><div class="sb-logo-role">Portal Investor</div></div>`;
+  if(ST.level==='global'){
+    const ur=unreadReportCount();
+    h+='<div class="sb-nav">';
+    h+='<div class="sb-section">Menu</div>';
+    h+=navItem('overview','ti-home-2','Dashboard');
+    h+=navItem('holdings','ti-briefcase','Portofolio Saya');
+    h+='<div class="sb-section">Returns</div>';
+    h+=navItem('distribusi','ti-coin','Distribusi');
+    h+=navItem('performa','ti-chart-line','Performa');
+    h+='<div class="sb-section">Laporan &amp; Dokumen</div>';
+    h+=navItem('laporan','ti-file-description','Laporan', ur>0?'n':'', ur);
+    h+=navItem('dokumen','ti-folder','Dokumen');
+    h+='<div class="sb-section">Kontrak</div>';
+    const renewSoon=holdings.filter(hh=>{ const p=getP(hh.pid); return p&&p.contractDays!=null&&p.contractDays<90; }).length;
+    h+=navItem('kontrak','ti-calendar-event','Kontrak & renewal', renewSoon>0?'a':'', renewSoon);
+    h+='<div class="sb-divider" style="margin-top:8px"></div>';
+    h+=navItem('profil','ti-settings','Profil & pengaturan');
+    h+='</div>';
+  } else {
+    const p=curP();
+    h+='<div class="sb-back" onclick="navG(\'holdings\')"><i class="ti ti-arrow-left"></i>Portofolio Saya</div>';
+    if(p) h+=`<div class="sb-pctx"><div class="sb-pname">${p.name}</div>${hBadge(p.health)}</div>`;
+    const items=[
+      {sec:'Posisi saya'},
+      {id:'ov',lbl:'Overview',icon:'ti-layout-dashboard'},
+      {id:'bh',lbl:'Return Saya',icon:'ti-coin'},
+      {sec:'Performa perusahaan'},
+      {id:'perf',lbl:'Performa',icon:'ti-trending-up'},
+      {id:'cov',lbl:'Covenants & milestones',icon:'ti-shield-check', badge: (covenants[ST.pid]||[]).filter(c=>c.hasil==='Gagal').length>0?'a':''},
+      {sec:'Laporan & Kontrak'},
+      {id:'lap',lbl:'Laporan',icon:'ti-file-description'},
+      {id:'kon',lbl:'Kontrak',icon:'ti-calendar-event', badge: p&&p.contractDays<90?'a':''},
+      {id:'dok',lbl:'Dokumen',icon:'ti-folder'},
+    ];
+    h+='<div class="sb-nav">';
+    items.forEach(it=>{
+      if(it.sec){ h+=`<div class="sb-section">${it.sec}</div>`; return; }
+      let b='';
+      if(it.badge==='a') b='<span class="sb-badge sb-badge-a">!</span>';
+      h+=`<div class="sb-item${ST.page===it.id?' active':''}" onclick="navL2('${it.id}')"><i class="ti ${it.icon}"></i><span class="sb-item-label">${it.lbl}</span>${b}</div>`;
+    });
+    h+='</div>';
+  }
+  h+=`<div class="sb-user"><div class="sb-avatar">${ME.init}</div><div class="sb-user-info"><div class="sb-user-name">${ME.name}</div><div class="sb-user-role">${ME.tipe}</div></div></div>`;
+  sb.innerHTML=h;
+}
+function navItem(id,icon,label,badge,bv){
+  let b='';
+  if(badge==='n'&&bv>0) b=`<span class="sb-badge sb-badge-n">${bv}</span>`;
+  if(badge==='a') b=`<span class="sb-badge sb-badge-a">${bv||'!'}</span>`;
+  return `<div class="sb-item${ST.page===id?' active':''}" onclick="navG('${id}')"><i class="ti ${icon}"></i><span class="sb-item-label">${label}</span>${b}</div>`;
+}
+
+// ============================================================
+// TOPBAR
+// ============================================================
+function renderTopbar(){
+  const tb=document.getElementById('topbar');
+  const gMap={overview:'Dashboard',holdings:'Portofolio Saya',distribusi:'Distribusi',performa:'Performa',laporan:'Laporan',dokumen:'Dokumen',kontrak:'Kontrak & renewal',profil:'Profil & pengaturan'};
+  const lMap={ov:'Overview',bh:'Return Saya',perf:'Performa',cov:'Covenants & milestones',lap:'Laporan',kon:'Kontrak',dok:'Dokumen'};
+  let title='', ctx='';
+  if(ST.level==='global'){ title=gMap[ST.page]||ST.page; }
+  else { const p=curP(); title=lMap[ST.page]||ST.page; ctx=p?p.name:''; }
+  let h=`<span class="topbar-title">${title}</span>`;
+  if(ctx) h+=`<span class="topbar-sep">·</span><span class="topbar-ctx">${ctx}</span>`;
+  h+='<div class="topbar-spacer"></div>';
+  h+=`<span class="topbar-action" onclick="navG('dokumen')"><i class="ti ti-download"></i>Dokumen</span>`;
+  tb.innerHTML=h;
+}
+
+// ============================================================
+// PAGES — GLOBAL
+// ============================================================
+function pageDashboard(){
+  const ti=totalInvested(), tr=totalReceived(), by=blendedYield();
+  const latestP=PERIODS[0]||'', prevP=PERIODS[1]||'';
+  const oktTotal=latestP?monthDistTotal(latestP):0, sepTotal=prevP?monthDistTotal(prevP):0;
+  const mom=sepTotal>0?((oktTotal-sepTotal)/sepTotal*100).toFixed(1):'0.0';
+
+  let h='';
+  h+='<div class="stat-grid">';
+  h+=`<div class="stat-card"><div class="stat-label">Total nilai investasi</div><div class="stat-value">${rp(ti)}</div><div class="stat-sub stat-neu">${holdings.length} portofolio aktif</div></div>`;
+  h+=`<div class="stat-card"><div class="stat-label">Total distribusi diterima</div><div class="stat-value">${rp(tr)}</div><div class="stat-sub stat-up">Sejak bergabung ${ME.joinDate}</div></div>`;
+  h+=`<div class="stat-card"><div class="stat-label">Distribusi ${latestP||'—'}</div><div class="stat-value">${rpj(oktTotal)}</div><div class="stat-sub ${mom>=0?'stat-up':'stat-dn'}">${prevP?(mom>=0?'+':'')+mom+'% vs '+prevP:'—'}</div></div>`;
+  h+=`<div class="stat-card"><div class="stat-label">Avg yield (annualised)</div><div class="stat-value">${by}%</div><div class="stat-sub stat-neu">Tertimbang seluruh posisi</div></div>`;
+  h+='</div>';
+
+  const alerts=[];
+  portfolios.forEach(p=>{ if(p.health&&String(p.health).indexOf('Siaga')===0){
+    alerts.push({sev:p.health==='Siaga 1'?'w':'c', pid:p.id, icon:p.health==='Siaga 1'?'ti-alert-triangle':'ti-alert-circle',
+      tag:p.health, title:`${p.name} masuk ${p.health}`, sub:p.issueText||(p.healthReasons||[]).join(' · ')||'Perlu perhatian.'});
+  }});
+  const critCount=alerts.filter(a=>a.sev==='c').length;
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap">';
+  h+='<div style="display:flex;align-items:center;gap:8px"><i class="ti ti-bell-ringing" style="font-size:16px;color:var(--text-warning)"></i><span class="section-hdr-title" style="font-size:13px">Perlu perhatian Anda</span></div>';
+  h+=`<span style="font-size:11px;color:var(--text-tertiary)">${critCount>0?`<strong style="color:var(--text-danger)">${critCount} mendesak</strong> · `:''}${alerts.length} hal terkait investasi Anda</span></div>`;
+  h+='<div class="alert-panel">';
+  alerts.forEach(a=>{
+    const col=a.sev==='c'?'#DC2626':'#D97706', bg=a.sev==='c'?'#FEF2F2':'#FFFBEB';
+    h+=`<div class="alert-item" onclick="openH('${a.pid}')">`;
+    h+=`<div style="width:30px;height:30px;border-radius:7px;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${a.icon}" style="color:${col};font-size:15px"></i></div>`;
+    h+=`<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="alert-item-title">${a.title}</span><span class="pill" style="background:${bg};color:${col};font-size:10px;padding:1px 8px">${a.tag}</span></div>`;
+    h+=`<div class="alert-item-sub">${a.sub}</div>`;
+    h+=`<div style="font-size:11px;color:var(--text-info);font-weight:500;margin-top:5px">Lihat detail ${getP(a.pid).name} <i class="ti ti-arrow-right" style="font-size:11px;vertical-align:-1px"></i></div></div>`;
+    h+=`<i class="ti ti-chevron-right" style="font-size:13px;color:var(--text-tertiary);flex-shrink:0;align-self:center"></i></div>`;
+  });
+  h+='</div>';
+
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">';
+  const av=ST.allocView||'porto';
+  let segs, allocRows;
+  if(av==='porto'){
+    segs=holdings.map(hh=>({value:hh.nominal,color:brandOf(hh.pid).bg}));
+    allocRows=holdings.map(hh=>{
+      const pct=Math.round(hh.nominal/ti*100);
+      return `<div class="alloc-row"><span class="alloc-dot" style="background:${brandOf(hh.pid).bg}"></span><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:500;color:var(--text-primary)">${getP(hh.pid).name}</div></div><span style="font-size:12px;font-weight:600;color:var(--text-primary)">${rp(hh.nominal)}</span><span style="font-size:11px;color:var(--text-tertiary);width:32px;text-align:right">${pct}%</span></div>`;
+    });
+  } else {
+    const byInd={};
+    holdings.forEach(hh=>{ const ind=getP(hh.pid).industri; byInd[ind]=(byInd[ind]||0)+hh.nominal; });
+    segs=Object.entries(byInd).map(([ind,v])=>({value:v,color:INDUSTRI_COLOR[ind]||'#9CA3AF'}));
+    allocRows=Object.entries(byInd).map(([ind,v])=>{
+      const pct=Math.round(v/ti*100), col=INDUSTRI_COLOR[ind]||'#9CA3AF';
+      return `<div class="alloc-row"><span class="alloc-dot" style="background:${col}"></span><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:500;color:var(--text-primary)">${ind}</div></div><span style="font-size:12px;font-weight:600;color:var(--text-primary)">${rp(v)}</span><span style="font-size:11px;color:var(--text-tertiary);width:32px;text-align:right">${pct}%</span></div>`;
+    });
+  }
+  h+='<div class="card" style="margin-bottom:0">';
+  h+=`<div class="card-hdr"><span class="card-title">Alokasi investasi</span><div class="tab-row" style="margin:0"><div class="tab${av==='porto'?' active':''}" onclick="setAllocView('porto')">Portofolio</div><div class="tab${av==='industri'?' active':''}" onclick="setAllocView('industri')">Industri</div></div></div>`;
+  h+=`<div style="display:flex;align-items:center;gap:18px"><div style="flex-shrink:0">${donutSVG(segs)}</div><div style="flex:1">${allocRows.join('')}</div></div></div>`;
+  const trend=[...PERIODS].reverse().map(b=>monthDistTotal(b));
+  const tlabels=[...PERIODS].reverse().map(b=>b.split(' ')[0]);
+  h+='<div class="card" style="margin-bottom:0"><div class="card-hdr"><span class="card-title">Tren distribusi bulanan</span><span class="card-sub">total seluruh posisi</span></div>';
+  h+=`<div class="chart-wrap">${lineSVG(trend,tlabels,'#2563EB')}</div>`;
+  h+=`<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Distribusi total per bulan (Rp juta) — termasuk porsi Nexavar yang ditahan.</div>`;
+  h+='</div></div>';
+  return h;
+}
+
+function holdingCardHTML(hh){
+  const p=getP(hh.pid), b=brandOf(hh.pid);
+  const borderCls=p.health==='Siaga 3'?' hold-card-siaga3':p.health==='Siaga 2'?' hold-card-siaga2':p.health==='Siaga 1'?' hold-card-siaga1':'';
+  const lp=latestPeriod(), pp=prevPeriod();
+  const okt=lp?distOf(hh.pid,lp):0, sep=pp?distOf(hh.pid,pp):0;
+  const dChange=sep>0?((okt-sep)/sep*100).toFixed(0):0;
+  const row=MONTHLY_ROWS.find(r=>r.kode===KODE[hh.pid]&&r.bulan===lp);
+  const annY=row?parseFloat(row.yield).toFixed(1):'—';
+  const yPrev=parseFloat((MONTHLY_ROWS.find(r=>r.kode===KODE[hh.pid]&&r.bulan===pp)||{}).yield)||0;
+  const yUp=row?parseFloat(row.yield)>=yPrev:true;
+  const hMap={'Siaga 3':'hb-siaga3','Siaga 2':'hb-siaga2','Siaga 1':'hb-siaga1',Sehat:'hb-sehat'};
+  const hLabel={'Siaga 3':'Siaga 3 — Enforcement · tindakan hukum','Siaga 2':'Siaga 2 — Serious Concern · mediasi lanjutan','Siaga 1':'Siaga 1 — Early Warning · peringatan pertama',Sehat:'Sehat — semua indikator baik'};
+  const durPct=p.durTotal?Math.round(hh.bulanKe/p.durTotal*100):0, durWarn=p.durTotal&&hh.bulanKe>=(p.durTotal-3);
+  const oktStatus=lp?distStatus(hh.pid,lp):'—';
+
+  let h=`<div class="hold-card${borderCls}" onclick="openH('${hh.pid}')"><div class="hold-card-top">`;
+  h+=`<div class="hold-logo" style="background:${logoBg(b)};color:${b.text};overflow:hidden">${logoInner(b)}</div>`;
+  h+='<div class="hold-info">';
+  h+=`<div class="hold-id">${p.kode}</div>`;
+  h+=`<div class="hold-name">${p.name}</div>`;
+  h+=`<div class="hold-pt">${p.pt}</div>`;
+  h+='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:7px">';
+  h+=`<div class="htt-wrap"><span class="hbadge ${hMap[p.health]}"><span style="width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;background:currentColor"></span>${p.health}</span><div class="htt"><div class="htt-title">${hLabel[p.health]}</div>`;
+  p.healthReasons.forEach(r=>{ h+=`<div class="htt-reason"><i class="ti ti-point" style="font-size:12px;flex-shrink:0"></i>${r}</div>`; });
+  h+=`<div class="htt-date">Dinilai oleh pengelola${lp?' · '+lp:''}</div></div></div>`;
+  h+=`<span class="badge-tag badge-navy">${p.industri}</span>`;
+  h+='</div></div></div>';
+  h+=`<div class="hold-pos-row"><span><span class="hold-pos-lbl">Porsi saya</span><span class="hold-pos-val">${hh.porsi}%</span></span><span><span class="hold-pos-lbl">Nilai</span><span class="hold-pos-val">${rp(hh.nominal)}</span></span><span><span class="hold-pos-lbl">Diterima</span><span class="hold-pos-val">${rp(hh.totalReceived)}</span></span></div>`;
+  h+=`<div class="dur-row"><span>Durasi kerjasama</span><span class="dur-val">Bln ke-${hh.bulanKe} / ${p.durTotal}${durWarn?' ⚠':''}</span></div>`;
+  h+=`<div class="dur-bar-wrap"><div class="dur-bar-bg"><div class="dur-bar-fill${durWarn?' dur-bar-fill-warn':''}" style="width:${durPct}%"></div></div></div>`;
+  const distLabel = oktStatus==='Ditahan'?'<span class="fin-dn">Ditahan</span>':rpj(okt);
+  h+='<div class="hold-fin-grid">';
+  h+=`<div class="fin-item"><div class="fin-label">Distribusi ${lp||'—'}</div><div class="fin-val" style="font-size:13px">${distLabel}</div><div class="fin-change fin-${dChange>=0?'up':'dn'}">${oktStatus==='Ditahan'?'Sesuai kontrak':(pp?(dChange>=0?'▲ +':'▼ ')+dChange+'%':'—')}</div></div>`;
+  h+=`<div class="fin-item"><div class="fin-label">Yield (p.a.)</div><div class="fin-val">${annY}%</div><div class="fin-change fin-${yUp?'up':'dn'}">${yUp?'▲ naik':'▼ turun'}</div></div>`;
+  h+=`<div class="fin-item"><div class="fin-label">ROI total</div><div class="fin-val">${(hh.totalReceived/hh.nominal*100).toFixed(1)}%</div><div class="fin-change fin-up">akumulatif</div></div>`;
+  h+='</div></div>';
+  return h;
+}
+
+function pageHoldings(){
+  const fStatus=ST.holdStatus||'', fSearch=(ST.holdSearch||'').toLowerCase();
+  const filtered=holdings.filter(hh=>{
+    const p=getP(hh.pid);
+    const ms=!fStatus||p.health.toLowerCase()===fStatus;
+    const mq=!fSearch||p.name.toLowerCase().includes(fSearch)||p.kode.toLowerCase().includes(fSearch)||p.industri.toLowerCase().includes(fSearch);
+    return ms&&mq;
+  });
+  let h='<div class="filter-row" style="align-items:center">';
+  h+=`<input type="text" class="filter-select" placeholder="Cari nama, kode, industri…" style="min-width:200px;flex:1" value="${ST.holdSearch||''}" oninput="setHoldSearch(this.value)">`;
+  h+='<select class="filter-select" onchange="setHoldStatus(this.value)"><option value="">Semua status</option>';
+  [['siaga 3','Siaga 3'],['siaga 2','Siaga 2'],['siaga 1','Siaga 1'],['sehat','Sehat']].forEach(s=>{ h+=`<option value="${s[0]}"${fStatus===s[0]?' selected':''}>${s[1]}</option>`; });
+  h+='</select>';
+  h+=`<span class="row-count">${filtered.length} / ${holdings.length} portofolio</span></div>`;
+  if(!filtered.length){
+    h+='<div class="ph-card"><div class="ph-icon"><i class="ti ti-filter-off"></i></div><div class="ph-title">Tidak ada portofolio yang sesuai</div><div class="ph-desc">Coba ubah filter atau kata kunci pencarian.</div></div>';
+  } else {
+    h+='<div class="hold-grid">';
+    filtered.forEach(hh=>{ h+=holdingCardHTML(hh); });
+    h+='</div>';
+  }
+  return h;
+}
+
+function pageDistribusiGlobal(){
+  let recs=allDistRecords();
+  const fp=ST.distPid||'', ff=ST.distFrom||'', ft=ST.distTo||'', fs=ST.distStatus||'';
+  const rng=periodsBetween(ff,ft);
+  recs=recs.filter(r=>(!fp||r.pid===fp)&&rng.includes(r.bulan)&&(!fs||r.status===fs));
+  const paidTot=allDistRecords().filter(r=>r.status==='Dibayar').reduce((s,r)=>s+r.jt,0);
+  const procTot=allDistRecords().filter(r=>r.status==='Diproses').reduce((s,r)=>s+r.jt,0);
+  const holdTot=allDistRecords().filter(r=>r.status==='Ditahan').reduce((s,r)=>s+r.jt,0);
+
+  let h='';
+  h+='<div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">';
+  h+=`<div class="stat-card"><div class="stat-label">Dibayar (periode tampil)</div><div class="stat-value" style="color:var(--text-success)">${rpj(paidTot)}</div><div class="stat-sub stat-neu">Sudah ditransfer ke rekening</div></div>`;
+  h+=`<div class="stat-card"><div class="stat-label">Sedang diproses</div><div class="stat-value" style="color:var(--text-info)">${rpj(procTot)}</div><div class="stat-sub stat-neu">Menunggu transfer</div></div>`;
+  h+=`<div class="stat-card"><div class="stat-label">Ditahan</div><div class="stat-value" style="color:var(--text-danger)">${rpj(holdTot)}</div><div class="stat-sub stat-dn">Ditangguhkan sesuai kontrak</div></div>`;
+  h+='</div>';
+
+  if(procTot>0||holdTot>0){
+    h+='<div class="notif-bar"><i class="ti ti-info-circle" style="font-size:15px;flex-shrink:0"></i><div>'+(procTot>0?'Sebagian distribusi sedang diproses dan menunggu transfer. ':'')+(holdTot>0?'Sebagian distribusi ditahan sesuai ketentuan kontrak.':'')+'</div></div>';
+  }
+
+  h+='<div class="filter-row">';
+  h+='<select class="filter-select" onchange="setDistPid(this.value)"><option value="">Semua portofolio</option>';
+  holdings.forEach(hh=>{ h+=`<option value="${hh.pid}"${fp===hh.pid?' selected':''}>${getP(hh.pid).name}</option>`; });
+  h+='</select>';
+  h+='<span style="font-size:12px;color:var(--text-tertiary);align-self:center">Periode:</span>';
+  h+='<select class="filter-select" onchange="setDistFrom(this.value)"><option value="">Dari (awal)</option>';
+  PERIODS.forEach(m=>{ h+=`<option value="${m}"${ff===m?' selected':''}>${m}</option>`; });
+  h+='</select>';
+  h+='<span style="font-size:12px;color:var(--text-tertiary);align-self:center">s/d</span>';
+  h+='<select class="filter-select" onchange="setDistTo(this.value)"><option value="">Sampai (akhir)</option>';
+  PERIODS.forEach(m=>{ h+=`<option value="${m}"${ft===m?' selected':''}>${m}</option>`; });
+  h+='</select>';
+  h+='<select class="filter-select" onchange="setDistStatus(this.value)"><option value="">Semua status</option>';
+  ['Dibayar','Diproses','Ditahan'].forEach(s=>{ h+=`<option value="${s}"${fs===s?' selected':''}>${s}</option>`; });
+  h+='</select>';
+  h+=`<span class="row-count">${recs.length} distribusi</span></div>`;
+
+  h+='<div class="card"><table class="tbl"><thead><tr><th>Portofolio</th><th>Periode</th><th style="text-align:right">Porsi</th><th style="text-align:right">Yield</th><th style="text-align:right">Distribusi</th><th>Tanggal</th><th>Status</th><th></th></tr></thead><tbody>';
+  if(!recs.length){
+    h+='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-tertiary);font-style:italic">Tidak ada distribusi yang sesuai filter.</td></tr>';
+  } else {
+    recs.forEach(r=>{
+      const sc=r.status==='Dibayar'?'pill-paid':r.status==='Diproses'?'pill-proc':'pill-hold';
+      const proof=r.status==='Dibayar'?`<button class="btn-sm" onclick="openProof('${r.pid}','${r.bulan}')"><i class="ti ti-file-download" style="font-size:11px"></i>Bukti</button>`:'';
+      h+=`<tr><td style="cursor:pointer" onclick="openH('${r.pid}')"><div style="font-weight:600;color:var(--navy)">${r.porto}</div><div style="font-size:11px;color:var(--text-tertiary);font-family:monospace">${getP(r.pid).kode}</div></td>`;
+      h+=`<td><span class="badge-tag badge-gray">${r.bulan}</span></td>`;
+      h+=`<td style="text-align:right" class="muted">${r.porsi}%</td>`;
+      h+=`<td style="text-align:right;font-weight:600;color:var(--navy)">${r.yield}</td>`;
+      h+=`<td style="text-align:right;font-weight:600">${r.status==='Ditahan'?'<span class="neg">—</span>':rpj(r.jt)}</td>`;
+      h+=`<td class="muted">${r.tgl}</td>`;
+      h+=`<td><span class="pill ${sc}">${r.status}</span></td>`;
+      h+=`<td style="text-align:right">${proof}</td></tr>`;
+    });
+  }
+  h+='</tbody></table></div>';
+  return h;
+}
+
+function pagePerformaGlobal(){
+  const ff=ST.perfFrom||'', ft=ST.perfTo||'';
+  const rng=periodsBetween(ff,ft);          // newest-first subset of PERIODS
+  const cols=[...rng].reverse();            // oldest-first for chart/table columns
+  const yieldPeriod=rng[0]||latestPeriod();  // latest period in range drives the yield bars
+
+  let h='<div class="info-bar"><div class="info-bar-title"><i class="ti ti-chart-line" style="font-size:15px"></i>Performa lintas portofolio</div>Bandingkan yield dan kontribusi distribusi tiap posisi Anda. Data kinerja perusahaan diterbitkan oleh pengelola Arunami.</div>';
+
+  h+='<div class="filter-row" style="align-items:center">';
+  h+='<span style="font-size:12px;color:var(--text-tertiary);align-self:center">Periode:</span>';
+  h+='<select class="filter-select" onchange="setPerfFrom(this.value)"><option value="">Dari (awal)</option>';
+  PERIODS.forEach(m=>{ h+=`<option value="${m}"${ff===m?' selected':''}>${m}</option>`; });
+  h+='</select>';
+  h+='<span style="font-size:12px;color:var(--text-tertiary);align-self:center">s/d</span>';
+  h+='<select class="filter-select" onchange="setPerfTo(this.value)"><option value="">Sampai (akhir)</option>';
+  PERIODS.forEach(m=>{ h+=`<option value="${m}"${ft===m?' selected':''}>${m}</option>`; });
+  h+='</select>';
+  h+=`<span class="row-count">${cols.length} periode</span></div>`;
+
+  h+=`<div class="card"><div class="card-hdr"><span class="card-title">Yield annualised per portofolio</span><span class="card-sub">${yieldPeriod}</span></div>`;
+  const maxY=Math.max(0,...holdings.map(hh=>parseFloat((MONTHLY_ROWS.find(r=>r.kode===KODE[hh.pid]&&r.bulan===yieldPeriod)||{}).yield)||0));
+  holdings.forEach(hh=>{
+    const y=parseFloat((MONTHLY_ROWS.find(r=>r.kode===KODE[hh.pid]&&r.bulan===yieldPeriod)||{}).yield)||0;
+    const pct=Math.round(y/maxY*100);
+    h+=`<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border-light)"><div style="width:130px;font-size:13px;font-weight:500;cursor:pointer" onclick="openH('${hh.pid}')">${getP(hh.pid).name}</div><div class="alloc-bar-bg"><div class="alloc-bar-fill" style="width:${pct}%;background:${brandOf(hh.pid).bg}"></div></div><div style="width:54px;text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums">${y}%</div></div>`;
+  });
+  h+='</div>';
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Distribusi bulanan per portofolio (Rp juta)</span></div><table class="tbl"><thead><tr><th>Portofolio</th>';
+  cols.forEach(b=>{ h+=`<th style="text-align:right">${b.split(' ')[0]}</th>`; });
+  h+='<th style="text-align:right">Tren</th></tr></thead><tbody>';
+  if(!cols.length){
+    h+='<tr><td colspan="2" style="text-align:center;padding:28px;color:var(--text-tertiary);font-style:italic">Tidak ada periode pada rentang ini.</td></tr>';
+  } else {
+    holdings.forEach(hh=>{
+      h+=`<tr><td style="cursor:pointer;font-weight:600;color:var(--navy)" onclick="openH('${hh.pid}')">${getP(hh.pid).name}</td>`;
+      const vals=cols.map(b=>distOf(hh.pid,b));
+      vals.forEach((v,i)=>{ const held=distStatus(hh.pid,cols[i])==='Ditahan'; h+=`<td style="text-align:right">${held?'<span class="neg">ditahan</span>':rpj(v)}</td>`; });
+      const up=vals[vals.length-1]>=vals[0];
+      h+=`<td style="text-align:right">${up?'<span class="pos">↑</span>':'<span class="neg">↓</span>'}</td></tr>`;
+    });
+    h+='<tr class="total-row"><td>Total</td>';
+    cols.forEach(b=>{ h+=`<td style="text-align:right">${rpj(monthDistTotal(b))}</td>`; });
+    h+='<td></td></tr>';
+  }
+  h+='</tbody></table></div>';
+  return h;
+}
+
+function pageLaporanGlobal(){
+  const fp=ST.lapPid||'';
+  let rows=[];
+  holdings.forEach(hh=>PERIODS.forEach(p=>{
+    if(!reportSent(hh.pid,p)) return;
+    rows.push({pid:hh.pid, period:p, ts:(MONTHLY_ROWS.find(r=>r.kode===KODE[hh.pid]&&r.bulan===p)||{}).ts||0});
+  }));
+  rows.sort((a,b)=> b.ts-a.ts || a.pid.localeCompare(b.pid));
+  if(fp) rows=rows.filter(r=>r.pid===fp);
+  const unread=rows.filter(r=>!reportIsRead(r.pid,r.period)).length;
+
+  let h='';
+  h+='<div class="filter-row" style="align-items:center">';
+  h+='<select class="filter-select" onchange="setLapPid(this.value)"><option value="">Semua portofolio</option>';
+  holdings.forEach(hh=>{ h+=`<option value="${hh.pid}"${fp===hh.pid?' selected':''}>${getP(hh.pid).name}</option>`; });
+  h+='</select>';
+  h+=`<span class="row-count">${rows.length} laporan · <span style="color:var(--text-warning)">${unread} belum dibaca</span></span>`;
+  h+='<div style="flex:1"></div>';
+  if(unread>0) h+='<button class="btn-sm" onclick="markAllRead()"><i class="ti ti-checks" style="font-size:12px"></i>Tandai semua dibaca</button>';
+  h+='</div>';
+
+  h+='<div class="card" style="padding:6px 0">';
+  rows.forEach(r=>{
+    const p=getP(r.pid), b=brandOf(r.pid), read=reportIsRead(r.pid,r.period);
+    h+=`<div class="inv-row" style="padding:11px 18px;cursor:pointer" onclick="openReport('${r.pid}','${r.period}')">`;
+    h+=`<div class="hold-logo" style="width:34px;height:34px;font-size:11px;background:${logoBg(b)};color:${b.text};overflow:hidden">${logoInner(b)}</div>`;
+    h+=`<div style="flex:1"><div style="font-size:13px;font-weight:500">Laporan ${r.period} — ${p.name}</div><div style="font-size:11px;color:var(--text-tertiary)">Diterbitkan 1 ${r.period} · porsi ${getH(r.pid).porsi}%</div></div>`;
+    h+=`<span class="pill ${read?'pill-read':'pill-unread'}">${read?'Sudah dibaca':'Belum dibaca'}</span>`;
+    h+=`<button class="btn-sm" style="margin-left:8px" onclick="event.stopPropagation();openPnL('${r.pid}','${r.period}')"><i class="ti ti-chart-bar" style="font-size:11px"></i>P&L</button>`;
+    h+=`<i class="ti ti-chevron-right" style="font-size:14px;color:var(--text-tertiary);margin-left:8px"></i></div>`;
+  });
+  h+='</div>';
+  return h;
+}
+
+function pageDokumen(){
+  const fp=ST.dokPid||'', ft=ST.dokTipe||'';
+  let docs=documents.filter(d=>(!fp||d.pid===fp||d.pid==='all')&&(!ft||d.tipe===ft));
+  const tipeList=[...new Set(documents.map(d=>d.tipe))];
+  let h='<div class="filter-row">';
+  h+='<select class="filter-select" onchange="setDokPid(this.value)"><option value="">Semua portofolio</option>';
+  holdings.forEach(hh=>{ h+=`<option value="${hh.pid}"${fp===hh.pid?' selected':''}>${getP(hh.pid).name}</option>`; });
+  h+='</select>';
+  h+='<select class="filter-select" onchange="setDokTipe(this.value)"><option value="">Semua tipe</option>';
+  tipeList.forEach(t=>{ h+=`<option value="${t}"${ft===t?' selected':''}>${t}</option>`; });
+  h+='</select>';
+  h+=`<span class="row-count">${docs.length} dokumen</span></div>`;
+
+  const tipeIcon={Kontrak:'ti-file-certificate',Sertifikat:'ti-certificate',Jaminan:'ti-shield-lock',Pajak:'ti-receipt-tax',Statement:'ti-file-invoice',Bukti:'ti-file-download'};
+  h+='<div class="card" style="padding:6px 18px">';
+  if(!docs.length){ h+='<div style="padding:28px;text-align:center;color:var(--text-tertiary);font-size:13px">Tidak ada dokumen.</div>'; }
+  docs.forEach(d=>{
+    const portLabel=d.pid==='all'?'Semua portofolio':getP(d.pid).name;
+    h+=`<div class="doc-row"><div class="doc-ico"><i class="ti ${tipeIcon[d.tipe]||'ti-file'}"></i></div><div style="flex:1"><div style="font-size:13px;font-weight:500">${d.nama}</div><div style="font-size:11px;color:var(--text-tertiary)">${portLabel} · ${d.tgl} · ${d.size}</div></div><span class="badge-tag badge-gray">${d.tipe}</span><button class="btn-sm" style="margin-left:10px" onclick="toast('Mengunduh ${d.nama}…')"><i class="ti ti-download" style="font-size:12px"></i>Unduh</button></div>`;
+  });
+  h+='</div>';
+  return h;
+}
+
+function pageKontrakGlobal(){
+  let h='<div class="info-bar"><div class="info-bar-title"><i class="ti ti-calendar-event" style="font-size:15px"></i>Status kontrak seluruh investasi</div>Pantau masa berlaku tiap perjanjian investasi. Portofolio dengan sisa < 90 hari memerlukan keputusan renewal.</div>';
+  const kritis=holdings.some(hh=>getP(hh.pid).contractDays<90);
+  if(kritis) h+='<div class="alert-bar"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i><div><strong>Nexavar Capital — 45 hari tersisa.</strong> Pengelola akan menghubungi Anda untuk keputusan: perpanjang, restrukturisasi, atau exit.</div></div>';
+
+  h+='<div class="card"><table class="tbl"><thead><tr><th>Portofolio</th><th>Mulai</th><th>Berakhir</th><th style="text-align:right">Sisa</th><th>Status</th><th></th></tr></thead><tbody>';
+  holdings.map(hh=>({hh,p:getP(hh.pid)})).sort((a,b)=>a.p.contractDays-b.p.contractDays).forEach(({hh,p})=>{
+    const sev=p.contractDays<90?'c':p.contractDays<180?'w':'s';
+    const col=sev==='c'?'#DC2626':sev==='w'?'#D97706':'#059669', bg=sev==='c'?'#FEF2F2':sev==='w'?'#FFFBEB':'#ECFDF5', lbl=sev==='c'?'Kritis':sev==='w'?'Segera':'Aman';
+    h+=`<tr><td style="cursor:pointer" onclick="openH('${hh.pid}')"><div style="font-weight:600;color:var(--navy)">${p.name}</div><div style="font-size:11px;color:var(--text-tertiary);font-family:monospace">${p.kode}</div></td>`;
+    h+=`<td class="muted">${p.kontrakMulai}</td><td>${p.kontrakSelesai}</td>`;
+    h+=`<td style="text-align:right;color:${col};font-weight:600">${p.contractDays}h</td>`;
+    h+=`<td><span class="pill" style="background:${bg};color:${col}">${lbl}</span></td>`;
+    h+=`<td style="text-align:right"><button class="btn-sm" onclick="openH('${hh.pid}')">Detail kontrak</button></td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
+
+function pageProfil(){
+  let h='<div class="card"><div class="card-hdr"><span class="card-title">Profil investor</span></div>';
+  h+='<div class="form-grid">';
+  h+=`<div class="form-field"><label class="form-label">Nama lengkap</label><input class="form-input" value="${ME.name}"></div>`;
+  h+=`<div class="form-field"><label class="form-label">Tipe investor</label><input class="form-input" value="${ME.tipe}" readonly></div>`;
+  h+=`<div class="form-field"><label class="form-label">Email</label><input class="form-input" value="${ME.email}"></div>`;
+  h+=`<div class="form-field"><label class="form-label">Telepon</label><input class="form-input" value="${ME.phone}"></div>`;
+  h+=`<div class="form-field"><label class="form-label">NPWP</label><input class="form-input" value="${ME.npwp}"></div>`;
+  h+=`<div class="form-field"><label class="form-label">Bergabung sejak</label><input class="form-input" value="${ME.joinDate}" readonly></div>`;
+  h+='</div><div class="btn-row"><button class="btn btn-primary" onclick="toast(\'Profil disimpan\')">Simpan perubahan</button></div></div>';
+
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Rekening penerima distribusi</span></div>';
+  h+='<div class="form-grid">';
+  h+=`<div class="form-field"><label class="form-label">Bank</label><input class="form-input" value="${ME.bank.bank}"></div>`;
+  h+=`<div class="form-field"><label class="form-label">Nomor rekening</label><input class="form-input" value="${ME.bank.no}" readonly></div>`;
+  h+=`<div class="form-field"><label class="form-label">Atas nama</label><input class="form-input" value="${ME.bank.atasNama}" readonly></div>`;
+  h+='</div>';
+  h+='<div class="notif-bar" style="margin-bottom:0;margin-top:6px"><i class="ti ti-shield-lock" style="font-size:15px;flex-shrink:0"></i>Perubahan rekening memerlukan verifikasi pengelola untuk keamanan distribusi Anda.</div>';
+  h+='</div>';
+
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Notifikasi</span></div>';
+  [['Laporan bulanan terbit',true],['Distribusi ditransfer',true],['Perubahan status portofolio',true],['Pengingat renewal kontrak',true]].forEach(([lbl,on])=>{
+    h+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-light)"><span style="font-size:13px">${lbl}</span><span class="pill ${on?'pill-paid':'pill-pending'}">${on?'Aktif':'Nonaktif'}</span></div>`;
+  });
+  h+='</div>';
+  return h;
+}
+
+// ============================================================
+// PAGES — PER HOLDING
+// ============================================================
+function pageHOverview(){
+  const p=curP(), hh=curH(), b=brandOf(p.id);
+  const isC=p.health==='Siaga 2'||p.health==='Siaga 3', isW=p.health==='Siaga 1';
+  let h='';
+  if(isC) h+=`<div class="alert-bar"><i class="ti ti-circle-x" style="font-size:15px;flex-shrink:0"></i><div><strong>Status ${p.health}</strong><br>${p.healthReasons.join(' · ')}</div></div>`;
+  else if(isW) h+=`<div class="notif-bar"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i><div><strong>Status ${p.health}</strong><br>${p.healthReasons.join(' · ')}</div></div>`;
+
+  const lp=latestPeriod();
+  const okt=lp?distOf(p.id,lp):0, oktStatus=lp?distStatus(p.id,lp):'—';
+  const _annRow=MONTHLY_ROWS.find(r=>r.kode===KODE[p.id]&&r.bulan===lp); const annY=_annRow?(parseFloat(_annRow.yield)||0).toFixed(1):'—';
+  h+='<div class="kpi-grid">';
+  h+=`<div class="kpi-card"><div class="kpi-label">Nilai investasi saya</div><div class="kpi-value">${rp(hh.nominal)}</div><div class="kpi-delta delta-neu">Porsi ${hh.porsi}%</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">Total diterima</div><div class="kpi-value">${rp(hh.totalReceived)}</div><div class="kpi-delta delta-up">ROI ${(hh.totalReceived/hh.nominal*100).toFixed(1)}%</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">Distribusi ${lp||'—'}</div><div class="kpi-value" style="font-size:18px">${oktStatus==='Ditahan'?'<span class="delta-dn">Ditahan</span>':rpj(okt)}</div><div class="kpi-delta delta-neu">${oktStatus}</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">Yield (p.a.)</div><div class="kpi-value">${annY}%</div><div class="kpi-delta delta-neu">${p.health==='Sehat'?'di atas target':'pantau'}</div></div>`;
+  h+='</div>';
+
+  function infoField(label,value,accent){ return `<div style="display:flex;flex-direction:column;gap:3px"><div style="font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">${label}</div><div style="font-size:13px;font-weight:500;color:${accent||'var(--text-primary)'}">${value}</div></div>`; }
+  h+=`<div class="card" style="padding:14px 18px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border-light)"><div class="hold-logo" style="background:${logoBg(b)};color:${b.text};overflow:hidden">${logoInner(b)}</div><div><div style="font-size:15px;font-weight:700">${p.name}</div><div style="font-size:11px;color:var(--text-tertiary)">${p.pt}</div></div><div style="margin-left:auto;display:flex;gap:6px"><span class="badge-tag badge-navy">${p.industri}</span><span class="badge-tag badge-gray">${p.tahap}</span></div></div>`;
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px 20px;padding-bottom:12px;border-bottom:1px solid var(--border-light);margin-bottom:12px">';
+  h+=infoField('Kode brand',`<span style="font-family:monospace;font-size:12px;background:var(--bg-secondary);padding:2px 7px;border-radius:5px;border:1px solid var(--border)">${p.kode}</span>`);
+  h+=infoField('Total nilai perusahaan',p.investasiTotal);
+  h+=infoField('Investasi saya',`${rp(hh.nominal)} (${hh.porsi}%)`);
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px 20px;padding-bottom:12px;border-bottom:1px solid var(--border-light);margin-bottom:12px">';
+  h+=infoField('Mulai kontrak',p.kontrakMulai);
+  h+=infoField('Selesai kontrak',p.kontrakSelesai);
+  h+=infoField('Sisa kontrak',`<span style="color:${p.contractDays<90?'var(--text-danger)':'var(--text-primary)'}">${p.contractDays} hari</span>`);
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px 20px">';
+  h+=infoField('Saya bergabung',hh.masuk);
+  h+=infoField('Durasi operasional',`Bln ke-${hh.bulanKe} dari ${p.durTotal}`);
+  h+=infoField('Pengembalian pokok',p.pengembalianPokok?'<span style="color:#059669;font-weight:600">Ada</span>':'<span style="color:var(--text-secondary)">Tidak ada</span>');
+  h+='</div></div>';
+
+  const vals=[...PERIODS].reverse().map(bm=>distOf(p.id,bm));
+  const labels=[...PERIODS].reverse().map(bm=>bm.split(' ')[0]);
+  h+=`<div class="card"><div class="card-hdr"><span class="card-title">Return saya — 4 bulan terakhir</span><span class="card-sub">Rp juta</span></div><div class="chart-wrap">${lineSVG(vals,labels,b.bg)}</div></div>`;
+  return h;
+}
+
+function pageHDistribusi(){
+  const p=curP(), hh=curH();
+  const sk=bhKontrak[p.id]||{};
+  let h='';
+  if(sk.skema){
+    h+=`<div class="info-bar"><div class="info-bar-title"><i class="ti ti-file-certificate" style="font-size:15px;flex-shrink:0"></i>Skema bagi hasil — sesuai kontrak Anda</div><div class="info-bar-grid">`;
+    h+=`<div class="info-bar-item"><span class="info-bar-lbl">Skema</span><span class="info-bar-val">${sk.skema}</span></div>`;
+    h+=`<div class="info-bar-item"><span class="info-bar-lbl">Basis perhitungan</span><span class="info-bar-val">${sk.basis}</span></div>`;
+    h+=`<div class="info-bar-item"><span class="info-bar-lbl">Frekuensi distribusi</span><span class="info-bar-val">${sk.frekuensi}</span></div>`;
+    h+=`<div class="info-bar-item"><span class="info-bar-lbl">Minimum / jaminan</span><span class="info-bar-val">${sk.minimum}</span></div>`;
+    if(sk.cap&&sk.cap!=='Tidak ada') h+=`<div class="info-bar-item"><span class="info-bar-lbl">Cap / batas atas</span><span class="info-bar-val">${sk.cap}</span></div>`;
+    h+='</div>';
+    if(sk.catatan) h+=`<div class="info-bar-note"><i class="ti ti-info-circle" style="margin-right:5px"></i>${sk.catatan}</div>`;
+    if(sk.referensi) h+=`<div style="font-size:11px;color:#3B82F6;margin-top:5px"><i class="ti ti-paperclip" style="margin-right:4px"></i>${sk.referensi}</div>`;
+    h+='</div>';
+  }
+  const totRec=hh.totalReceived;
+  const avgMonthly=(PERIODS.reduce((s,b)=>s+distOf(p.id,b),0))/PERIODS.length;
+  const annROI=(avgMonthly*12/hh.nominal*100).toFixed(1);
+  h+='<div class="kpi-grid">';
+  h+=`<div class="kpi-card"><div class="kpi-label">Total diterima</div><div class="kpi-value">${rp(totRec)}</div><div class="kpi-delta delta-up">Sejak ${hh.masuk}</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">Rata-rata / bulan</div><div class="kpi-value">${rpj(Math.round(avgMonthly*10)/10)}</div><div class="kpi-delta delta-neu">4 bln terakhir</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">ROI annualised</div><div class="kpi-value">${annROI}%</div><div class="kpi-delta delta-neu">dari nominal pokok</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">Porsi kepemilikan</div><div class="kpi-value">${hh.porsi}%</div><div class="kpi-delta delta-neu">${rp(hh.nominal)} pokok</div></div>`;
+  h+='</div>';
+
+  if(latestPeriod() && distStatus(p.id,latestPeriod())==='Ditahan') h+=`<div class="alert-bar"><i class="ti ti-coin-off" style="font-size:15px;flex-shrink:0"></i><div><strong>Distribusi ${latestPeriod()} ditahan.</strong> Sesuai ketentuan kontrak, distribusi ditangguhkan ke periode berikutnya. Pengelola sedang menindaklanjuti.</div></div>`;
+
+  h+=`<div class="card"><div class="card-hdr"><span class="card-title">Riwayat distribusi</span><span class="card-sub">${p.name}</span></div><table class="tbl"><thead><tr><th>Periode</th><th style="text-align:right">Yield</th><th style="text-align:right">Porsi</th><th style="text-align:right">Distribusi</th><th>Tanggal transfer</th><th>Status</th><th></th></tr></thead><tbody>`;
+  PERIODS.forEach(b=>{
+    const status=distStatus(p.id,b), jt=distOf(p.id,b);
+    const sc=status==='Dibayar'?'pill-paid':status==='Diproses'?'pill-proc':'pill-hold';
+    const yld=(MONTHLY_ROWS.find(r=>r.kode===KODE[p.id]&&r.bulan===b)||{}).yield||'0%';
+    const nm=NEXT_MONTH[b]; const tgl=!nm?'—':status==='Dibayar'?('5 '+nm):status==='Diproses'?('Estimasi 5 '+nm):'—';
+    const proof=status==='Dibayar'?`<button class="btn-sm" onclick="openProof('${p.id}','${b}')"><i class="ti ti-file-download" style="font-size:11px"></i>Bukti</button>`:'';
+    h+=`<tr><td><span class="badge-tag badge-gray">${b}</span></td><td style="text-align:right;font-weight:600;color:var(--navy)">${yld}</td><td style="text-align:right" class="muted">${hh.porsi}%</td><td style="text-align:right;font-weight:600">${status==='Ditahan'?'<span class="neg">—</span>':rpj(jt)}</td><td class="muted">${tgl}</td><td><span class="pill ${sc}">${status}</span></td><td style="text-align:right">${proof}</td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
+
+function pageHPerforma(){
+  const p=curP();
+  const isC=p.health==='Siaga 2'||p.health==='Siaga 3', isW=p.health==='Siaga 1';
+  const revPlan=[2.3,2.4,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.0];
+  const ra=isC?revPlan.map(v=>v*0.55):isW?revPlan.map(v=>v*0.85):revPlan.map((v,i)=>v*(0.97+i*0.005));
+  const s=ST.hPerfStart, e=ST.hPerfEnd;
+  const optS=months.map((m,i)=>`<option value="${i}"${i===s?' selected':''}>${m}</option>`).join('');
+  const optE=months.map((m,i)=>`<option value="${i}"${i===e?' selected':''}>${m}</option>`).join('');
+  let h='<div class="info-bar"><div class="info-bar-title"><i class="ti ti-trending-up" style="font-size:15px"></i>Performa perusahaan</div>Data kinerja diterbitkan oleh pengelola Arunami. Distribusi Anda dihitung dari kinerja ini sesuai skema bagi hasil.</div>';
+  h+=`<div class="card"><div class="card-hdr"><span class="card-title">Revenue — aktual vs proyeksi</span><div style="display:flex;align-items:center;gap:5px"><select class="filter-select" onchange="setHPerfStart(+this.value)">${optS}</select><span style="font-size:11px;color:var(--text-tertiary)">—</span><select class="filter-select" onchange="setHPerfEnd(+this.value)">${optE}</select></div></div><div class="chart-wrap">${miniSVG(ra.slice(s,e+1),revPlan.slice(s,e+1),months.slice(s,e+1),'#2563EB','#9CA3AF')}</div><div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:#2563EB"></div>Aktual</div><div class="legend-item"><div class="legend-dot" style="background:#9CA3AF;opacity:0.6"></div>Proyeksi</div></div></div>`;
+
+  const npPlan=revPlan.map(v=>+(v*0.12).toFixed(2));
+  const na=isC?npPlan.map((v,i)=>+(v*(0.30-i*0.025)).toFixed(2)):isW?npPlan.map(v=>+(v*0.72).toFixed(2)):npPlan.map((v,i)=>+(v*(0.94+i*0.012)).toFixed(2));
+  h+=`<div class="card"><div class="card-hdr"><span class="card-title">Net profit — aktual vs proyeksi</span><span class="card-sub">mengikuti rentang periode di atas · Rp M</span></div><div class="chart-wrap">${miniSVG(na.slice(s,e+1),npPlan.slice(s,e+1),months.slice(s,e+1),'#059669','#9CA3AF')}</div><div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:#059669"></div>Aktual</div><div class="legend-item"><div class="legend-dot" style="background:#9CA3AF;opacity:0.6"></div>Proyeksi</div></div></div>`;
+
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Kinerja bulanan</span></div><table class="tbl"><thead><tr><th>Periode</th><th style="text-align:right">Revenue</th><th style="text-align:right">Net profit</th><th style="text-align:right">Yield</th><th style="text-align:right">Return saya</th><th></th></tr></thead><tbody>';
+  PERIODS.forEach(b=>{
+    const row=MONTHLY_ROWS.find(r=>r.kode===KODE[p.id]&&r.bulan===b);
+    const jt=distOf(p.id,b), held=distStatus(p.id,b)==='Ditahan';
+    h+=`<tr><td><span class="badge-tag badge-gray">${b}</span></td><td style="text-align:right">IDR ${row.rev}</td><td style="text-align:right">${row.np?'IDR '+row.np:'<span class="muted">N/A</span>'}</td><td style="text-align:right;font-weight:600;color:var(--navy)">${row.yield}</td><td style="text-align:right;font-weight:600">${held?'<span class="neg">ditahan</span>':rpj(jt)}</td><td style="text-align:right"><button class="btn-sm" onclick="openPnL('${p.id}','${b}')"><i class="ti ti-chart-bar" style="font-size:11px"></i>P&L</button></td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
+
+function pageHCovenants(){
+  const p=curP();
+  const cvs=covenants[p.id]||[], mls=milestones[p.id]||[];
+  const fail=cvs.filter(c=>c.hasil==='Gagal').length;
+  let h='<div class="info-bar" style="margin-bottom:14px"><i class="ti ti-eye" style="margin-right:5px"></i>Tampilan ini bersifat <strong>read-only</strong> — indikator kinerja dikelola oleh tim Arunami. Hubungi pengelola jika ada pertanyaan.</div>';
+  if(fail>0) h+=`<div class="alert-bar"><i class="ti ti-shield-x" style="font-size:15px;flex-shrink:0;margin-top:1px"></i><div><strong>${fail} covenant gagal</strong> — mempengaruhi status kesehatan portofolio dan dapat berdampak pada distribusi.</div></div>`;
+
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Covenants</span></div><table class="tbl"><thead><tr><th>Covenant</th><th>Periode</th><th>Wajib</th><th>Aktual</th><th>Hasil</th></tr></thead><tbody>';
+  cvs.forEach(c=>{
+    const pass=c.hasil==='Pass';
+    h+=`<tr><td style="font-weight:500">${c.covenant}</td><td class="muted">${c.periode}</td><td class="muted">${c.wajib}</td><td>${c.aktual}</td><td><span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;background:${pass?'#ECFDF5':'#FEF2F2'};color:${pass?'#059669':'#DC2626'}">${c.hasil}</span></td></tr>`;
+  });
+  h+='</tbody></table></div>';
+
+  const sm={'on-track':{label:'On Track',color:'#059669',bg:'#ECFDF5'},'achieved':{label:'Achieved',color:'#2563EB',bg:'#EFF6FF'},'delayed':{label:'Delayed',color:'#D97706',bg:'#FFFBEB'},'missed':{label:'Missed',color:'#DC2626',bg:'#FEF2F2'},'pending':{label:'Pending',color:'#6B7280',bg:'#F9FAFB'}};
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Milestones</span></div><table class="tbl"><thead><tr><th>Judul</th><th>Target</th><th>Tanggal target</th><th>Status</th></tr></thead><tbody>';
+  mls.forEach(m=>{ const s=sm[m.status]||sm.pending; h+=`<tr><td style="font-weight:500">${m.title}</td><td class="muted">${m.target}</td><td class="muted">${m.targetDate}</td><td><span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;background:${s.bg};color:${s.color}">${s.label}</span></td></tr>`; });
+  h+='</tbody></table></div>';
+  return h;
+}
+
+function pageHLaporan(){
+  const p=curP(), hh=curH();
+  let periods=PERIODS.filter(b=>reportSent(p.id,b));
+  if(!periods.length){
+    return '<div class="ph-card"><div class="ph-icon"><i class="ti ti-file-description"></i></div><div class="ph-title">Belum ada laporan</div><div class="ph-desc">Laporan untuk portofolio ini belum diterbitkan oleh pengelola.</div></div>';
+  }
+  const sel=ST.hLapPeriod && periods.includes(ST.hLapPeriod)?ST.hLapPeriod:periods[0];
+  const opts=periods.map(b=>`<option value="${b}"${b===sel?' selected':''}>${b}</option>`).join('');
+  let h=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:13px;font-weight:600;color:var(--text-secondary)">Laporan terbit untuk Anda</span><div style="display:flex;align-items:center;gap:8px"><button class="btn-sm" onclick="openPnL('${p.id}','${sel}')"><i class="ti ti-chart-bar" style="font-size:11px"></i>Lihat P&L</button><select class="filter-select" onchange="setHLapPeriod(this.value)">${opts}</select></div></div>`;
+  h+='<div class="card">'+reportBodyHTML(p.id,sel,hh)+'</div>';
+  return h;
+}
+
+function reportBodyHTML(pid, period, hh){
+  const p=getP(pid);
+  const dist=distOf(pid,period), status=distStatus(pid,period);
+  const row=MONTHLY_ROWS.find(r=>r.kode===KODE[pid]&&r.bulan===period);
+  reportRead[`${pid}__${period}`]=true; // viewing marks read
+  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border-light)"><div><div style="font-size:15px;font-weight:700">Laporan Portofolio — ${period}</div><div style="font-size:12px;color:var(--text-tertiary)">${p.name} · diterbitkan 1 ${period} oleh Arunami</div></div><button class="btn-sm" onclick="toast('Mengunduh laporan ${period}…')"><i class="ti ti-download" style="font-size:12px"></i>Unduh PDF</button></div>`;
+  h+=`<div style="font-size:13px;color:var(--text-secondary);line-height:1.8">Yth. ${ME.name},<br><br>Berikut ringkasan kinerja portofolio Anda di <strong>${p.name}</strong> untuk periode ${period}.<br><br></div>`;
+  h+='<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">';
+  h+=`<div class="kpi-card"><div class="kpi-label">Revenue perusahaan</div><div class="kpi-value" style="font-size:17px">IDR ${row.rev}</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">Yield</div><div class="kpi-value" style="font-size:17px">${row.yield}</div></div>`;
+  h+=`<div class="kpi-card"><div class="kpi-label">Distribusi Anda</div><div class="kpi-value" style="font-size:17px">${status==='Ditahan'?'<span class="delta-dn">Ditahan</span>':rpj(dist)}</div></div>`;
+  h+='</div>';
+  h+=`<div style="font-size:13px;color:var(--text-secondary);line-height:1.8">Porsi kepemilikan Anda <strong>${hh.porsi}%</strong> ${status==='Dibayar'?`menghasilkan distribusi bersih <strong>${rpj(dist)}</strong> yang telah ditransfer ke rekening terdaftar pada 5 ${NEXT_MONTH[period]}.`:status==='Diproses'?`menghasilkan distribusi <strong>${rpj(dist)}</strong> yang sedang diproses dan akan ditransfer paling lambat 5 ${NEXT_MONTH[period]}.`:'untuk periode ini ditahan sesuai ketentuan kontrak.'}`;
+  if(p.health!=='Sehat') h+=`<br><br><span style="color:var(--text-warning)"><i class="ti ti-alert-triangle" style="margin-right:4px"></i>Catatan pengelola: ${p.healthReasons[0]}.</span>`;
+  h+=`<br><br>Hormat kami,<br>Tim Arunami</div>`;
+  h+=`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:12px"><div style="font-size:12px;color:var(--text-secondary)"><i class="ti ti-chart-bar" style="margin-right:4px;font-size:13px"></i>Rekam jejak keuangan periode ini tersedia dalam laporan P&L Aktual</div><button class="btn-navy-sm" onclick="openPnL('${pid}','${period}')"><i class="ti ti-table-column" style="font-size:11px"></i>Lihat P&L Aktual</button></div>`;
+  return h;
+}
+
+function pageHKontrak(){
+  const p=curP(), hh=curH(), kritis=p.contractDays<90;
+  let h='';
+  if(kritis) h+=`<div class="alert-bar"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i><div><strong>${p.contractDays} hari tersisa.</strong> Pengelola akan menghubungi Anda untuk keputusan renewal.</div></div>`;
+  h+=`<div class="card"><div class="card-hdr"><span class="card-title">Kontrak ${p.name}</span></div>`;
+  h+=`<div class="rl-bar"><div class="rl-segment" style="flex:${kritis?3:1};background:#FEE2E2;color:#DC2626">< 3 bln</div><div class="rl-segment" style="flex:3;background:#FEF3C7;color:#D97706">3–6 bln</div><div class="rl-segment" style="flex:5;background:#ECFDF5;color:#059669">> 6 bln</div></div>`;
+  const contracts=[
+    {nama:'Perjanjian investasi utama',mulai:p.kontrakMulai,habis:p.kontrakSelesai,sisa:p.contractDays,sev:p.contractDays<90?'c':p.contractDays<180?'w':'s'},
+    {nama:'Addendum bagi hasil',mulai:'Jul 2022',habis:'Des 2025',sisa:420,sev:'s'},
+  ];
+  h+='<table class="tbl" style="margin-top:8px"><thead><tr><th>Dokumen kontrak</th><th>Mulai</th><th>Berakhir</th><th style="text-align:right">Sisa</th><th>Status</th><th></th></tr></thead><tbody>';
+  contracts.forEach(c=>{
+    const col=c.sev==='c'?'#DC2626':c.sev==='w'?'#D97706':'#059669', bg=c.sev==='c'?'#FEF2F2':c.sev==='w'?'#FFFBEB':'#ECFDF5', lbl=c.sev==='c'?'Kritis':c.sev==='w'?'Segera':'Aman';
+    h+=`<tr><td style="font-weight:500">${c.nama}</td><td class="muted">${c.mulai}</td><td>${c.habis}</td><td style="text-align:right;color:${col};font-weight:500">${c.sisa}h</td><td><span class="pill" style="background:${bg};color:${col}">${lbl}</span></td><td style="text-align:right"><button class="btn-sm" onclick="toast('Membuka dokumen…')">Lihat</button></td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="card"><div class="card-hdr"><span class="card-title">Ketentuan investasi saya</span></div><div class="form-grid">';
+  const t=[['Nominal investasi',rp(hh.nominal)],['Porsi kepemilikan',hh.porsi+'%'],['Tanggal masuk',hh.masuk],['Skema bagi hasil',bhKontrak[p.id].skema],['Frekuensi distribusi',bhKontrak[p.id].frekuensi],['Pengembalian pokok',p.pengembalianPokok?'Ada':'Tidak ada']];
+  t.forEach(([l,v])=>{ h+=`<div class="form-field"><label class="form-label">${l}</label><input class="form-input" value="${v}" readonly></div>`; });
+  h+='</div></div>';
+  return h;
+}
+
+function pageHDokumen(){
+  const p=curP();
+  const docs=documents.filter(d=>d.pid===p.id||d.pid==='all');
+  const tipeIcon={Kontrak:'ti-file-certificate',Sertifikat:'ti-certificate',Jaminan:'ti-shield-lock',Pajak:'ti-receipt-tax',Statement:'ti-file-invoice',Bukti:'ti-file-download'};
+  let h='<div class="card" style="padding:6px 18px">';
+  if(!docs.length){ h+='<div style="padding:28px;text-align:center;color:var(--text-tertiary);font-size:13px">Belum ada dokumen untuk portofolio ini.</div>'; }
+  docs.forEach(d=>{
+    const portLabel=d.pid==='all'?'Semua portofolio':getP(d.pid).name;
+    h+=`<div class="doc-row"><div class="doc-ico"><i class="ti ${tipeIcon[d.tipe]||'ti-file'}"></i></div><div style="flex:1"><div style="font-size:13px;font-weight:500">${d.nama}</div><div style="font-size:11px;color:var(--text-tertiary)">${portLabel} · ${d.tgl} · ${d.size}</div></div><span class="badge-tag badge-gray">${d.tipe}</span><button class="btn-sm" style="margin-left:10px" onclick="toast('Mengunduh ${d.nama}…')"><i class="ti ti-download" style="font-size:12px"></i>Unduh</button></div>`;
+  });
+  h+='</div>';
+  return h;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderContent(){
+  const c=document.getElementById('content'); c.scrollTop=0;
+  if(ST.level==='global'){
+    const map={overview:pageDashboard,holdings:pageHoldings,distribusi:pageDistribusiGlobal,performa:pagePerformaGlobal,laporan:pageLaporanGlobal,dokumen:pageDokumen,kontrak:pageKontrakGlobal,profil:pageProfil};
+    c.innerHTML=(map[ST.page]||pageDashboard)();
+    return;
+  }
+  const map={ov:pageHOverview,bh:pageHDistribusi,perf:pageHPerforma,cov:pageHCovenants,lap:pageHLaporan,kon:pageHKontrak,dok:pageHDokumen};
+  c.innerHTML=(map[ST.page]||pageHOverview)();
+}
+function render(){ renderSidebar(); renderTopbar(); renderContent(); }
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navG(id){ ST={...ST,level:'global',page:id,pid:null}; render(); }
+function navL2(id){ ST={...ST,level:'holding',page:id}; render(); }
+function openH(pid){ ST={...ST,level:'holding',page:'ov',pid}; render(); }
+
+// ============================================================
+// STATE SETTERS
+// ============================================================
+function setHoldSearch(v){ ST.holdSearch=v; renderContent(); }
+function setHoldStatus(v){ ST.holdStatus=v; renderContent(); }
+function setDistPid(v){ ST.distPid=v; renderContent(); }
+function setDistFrom(v){ ST.distFrom=v; renderContent(); }
+function setDistTo(v){ ST.distTo=v; renderContent(); }
+function setDistStatus(v){ ST.distStatus=v; renderContent(); }
+function setPerfFrom(v){ ST.perfFrom=v; renderContent(); }
+function setPerfTo(v){ ST.perfTo=v; renderContent(); }
+function setLapPid(v){ ST.lapPid=v; renderContent(); }
+function setDokPid(v){ ST.dokPid=v; renderContent(); }
+function setDokTipe(v){ ST.dokTipe=v; renderContent(); }
+function setAllocView(v){ ST.allocView=v; renderContent(); }
+function setHPerfStart(v){ ST.hPerfStart=Math.min(v,ST.hPerfEnd); renderContent(); }
+function setHPerfEnd(v){ ST.hPerfEnd=Math.max(v,ST.hPerfStart); renderContent(); }
+function setHLapPeriod(v){ ST.hLapPeriod=v; render(); }
+
+function markAllRead(){ const lp=ST.lapPid; holdings.forEach(h=>PERIODS.forEach(p=>{ if(lp&&h.pid!==lp) return; if(reportSent(h.pid,p)) reportRead[`${h.pid}__${p}`]=true; })); render(); }
+
+function openReport(pid,period){
+  const hh=getH(pid);
+  _showModal(`<div style="max-height:70vh;overflow-y:auto">${reportBodyHTML(pid,period,hh)}</div><div class="btn-row"><button class="btn btn-primary" onclick="closeModal()">Tutup</button></div>`, true);
+  renderSidebar(); // update unread badge
+}
+
+function openProof(pid,bulan){
+  const r=allDistRecords().find(x=>x.pid===pid&&x.bulan===bulan); const p=getP(pid);
+  const jt=r?r.jt:0; const file=r&&r.bukti;
+  _showModal(`<div class="modal-title">Bukti transfer distribusi</div>
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:13px;line-height:2">
+      <div style="display:flex;justify-content:space-between"><span class="muted">Portofolio</span><strong>${p?p.name:pid}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span class="muted">Periode</span><strong>${bulan}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span class="muted">Jumlah</span><strong>${rpj(jt)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span class="muted">Diteruskan</span><strong>${r?r.tgl:'—'}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span class="muted">Rekening</span><strong>${ME.bank.bank} ${ME.bank.no}</strong></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="muted">Status</span><span class="pill pill-paid">Berhasil</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px"><span class="muted">File bukti</span><strong style="font-family:monospace;font-size:11px;text-align:right;word-break:break-all">${file||'—'}</strong></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="toast('Mengunduh ${file||'bukti'}…');closeModal()"><i class="ti ti-download" style="font-size:14px"></i>Unduh bukti</button><button class="btn btn-secondary" onclick="closeModal()">Tutup</button></div>`);
+}
+
+let _pnlSt={pid:'',period:'',compare:''};
+
+function openPnL(pid, period, compare){
+  _pnlSt={pid, period, compare:compare||''};
+  _showModal(_pnlHtml(), true);
+}
+function _setPnlPeriod(v){ _pnlSt.period=v; document.getElementById('modal-box').innerHTML=_pnlHtml(); }
+function _setPnlCompare(v){ _pnlSt.compare=v; document.getElementById('modal-box').innerHTML=_pnlHtml(); }
+
+function _pnlHtml(){
+  const {pid, period, compare}=_pnlSt;
+  const p=getP(pid), b=brandOf(pid);
+  const pnl=(PNL_DATA[pid]||{})[period];
+  const pnlC=compare?(PNL_DATA[pid]||{})[compare]:null;
+  if(!pnl) return '<div style="padding:24px;color:var(--text-secondary)">Data P&L belum tersedia untuk periode ini.</div>';
+
+  const avail=Object.keys(PNL_DATA[pid]||{});
+  const lK=pnl.rev-pnl.hpp, ebd=lK-pnl.opex, eb=ebd-pnl.da, pt=eb-pnl.bunga;
+  const mK=(lK/pnl.rev*100).toFixed(1), mEbd=(ebd/pnl.rev*100).toFixed(1), mN=(pnl.labaBersih/pnl.rev*100).toFixed(1);
+
+  let cV=null;
+  if(pnlC){
+    const lKc=pnlC.rev-pnlC.hpp, ebdc=lKc-pnlC.opex, ebc=ebdc-pnlC.da, ptc=ebc-pnlC.bunga;
+    cV={labaKotor:lKc, ebitda:ebdc, ebit:ebc, preTax:ptc,
+        mK:(lKc/pnlC.rev*100).toFixed(1), mEbd:(ebdc/pnlC.rev*100).toFixed(1), mN:(pnlC.labaBersih/pnlC.rev*100).toFixed(1)};
+  }
+
+  function fmtP(v){
+    if(v===null||v===undefined) return '<span class="muted">—</span>';
+    const abs=Math.abs(v), neg=v<0;
+    const s=abs>=1000?(abs/1000).toFixed(2)+' M':Math.round(abs).toLocaleString('id-ID')+' jt';
+    return neg?`<span style="color:#DC2626">(IDR ${s})</span>`:`IDR ${s}`;
+  }
+  function fmtD(a, bc){
+    if(bc===null||bc===undefined) return '';
+    const d=a-bc, abs=Math.abs(d);
+    if(d===0) return '<span style="color:var(--text-tertiary)">—</span>';
+    const s=abs>=1000?(abs/1000).toFixed(2)+' M':Math.round(abs).toLocaleString('id-ID')+' jt';
+    const col=d>0?'#059669':'#DC2626', sym=d>0?'▲':'▼';
+    return `<span style="color:${col};font-size:12px">${sym} IDR ${s}</span>`;
+  }
+  function matchV(list, nama){ const x=(list||[]).find(i=>i.nama===nama); return x!=null?-x.nilai:null; }
+
+  const ncols=cV?4:2;
+  function sep(label){
+    return `<tr><td colspan="${ncols}" style="padding:8px 10px 2px;font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.07em;border-top:1px solid var(--border-light)">${label}</td></tr>`;
+  }
+  function prow(label, val, valC, bold, isTotal, annot, annotC){
+    const bw=bold?'font-weight:600':'', bg=isTotal?'background:var(--bg-secondary)':'';
+    const profitLine=label.includes('Laba')||label.includes('EBIT');
+    function colOf(v){ return isTotal&&v<0?'color:#DC2626':isTotal&&v>0&&profitLine?'color:#059669':''; }
+    let h=`<tr style="${bg}"><td style="font-size:13px;${bw};${colOf(val)};padding:5px 10px">${label}`;
+    if(annot) h+=`<span style="font-size:10px;font-weight:400;color:var(--text-tertiary);margin-left:5px">${annot}</span>`;
+    h+=`</td><td style="text-align:right;${bw};${colOf(val)};padding:5px 10px;font-size:13px;font-variant-numeric:tabular-nums">${fmtP(val)}</td>`;
+    if(cV){
+      h+=`<td style="text-align:right;${bw};${colOf(valC)};padding:5px 10px;font-size:13px;font-variant-numeric:tabular-nums">${fmtP(valC)}`;
+      if(annotC) h+=`<span style="font-size:10px;font-weight:400;color:var(--text-tertiary);margin-left:4px">${annotC}</span>`;
+      h+=`</td><td style="text-align:right;padding:5px 10px">${fmtD(val,valC)}</td>`;
+    }
+    return h+'</tr>';
+  }
+  function subrow(label, val, valC){
+    let h=`<tr><td style="padding:3px 10px 3px 26px;font-size:12px;color:var(--text-secondary)">${label}</td><td style="text-align:right;padding:3px 10px;font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums">${fmtP(val)}</td>`;
+    if(cV) h+=`<td style="text-align:right;padding:3px 10px;font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums">${valC!=null?fmtP(valC):'<span class="muted">—</span>'}</td><td style="text-align:right;padding:3px 10px">${valC!=null?fmtD(val,valC):''}</td>`;
+    return h+'</tr>';
+  }
+
+  let tbl=`<table style="width:100%;border-collapse:collapse">`;
+  if(cV) tbl+=`<thead><tr><th style="padding:7px 10px;font-size:10px;color:var(--text-tertiary);font-weight:600;letter-spacing:0.05em;border-bottom:1px solid var(--border);text-transform:uppercase"></th><th style="text-align:right;padding:7px 10px;font-size:11px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border)">${period}</th><th style="text-align:right;padding:7px 10px;font-size:11px;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border)">${compare}</th><th style="text-align:right;padding:7px 10px;font-size:10px;color:var(--text-tertiary);font-weight:600;border-bottom:1px solid var(--border);text-transform:uppercase">Selisih</th></tr></thead>`;
+  tbl+='<tbody>';
+  tbl+=prow('Pendapatan', pnl.rev, pnlC?.rev, true, true);
+  tbl+=sep('Harga Pokok Penjualan (HPP)');
+  pnl.hppList.forEach(x=>tbl+=subrow(x.nama,-x.nilai,matchV(pnlC?.hppList,x.nama)));
+  tbl+=prow('Total HPP',-pnl.hpp,pnlC?-pnlC.hpp:null,true);
+  tbl+=prow('Laba Kotor',lK,cV?.labaKotor,true,true,mK+'%',cV?.mK+'%');
+  tbl+=sep('Beban Operasional');
+  pnl.opexList.forEach(x=>tbl+=subrow(x.nama,-x.nilai,matchV(pnlC?.opexList,x.nama)));
+  tbl+=prow('Total Beban Operasional',-pnl.opex,pnlC?-pnlC.opex:null,true);
+  tbl+=prow('EBITDA',ebd,cV?.ebitda,true,true,mEbd+'%',cV?.mEbd+'%');
+  tbl+=sep('');
+  tbl+=subrow('Depresiasi & Amortisasi',-pnl.da,pnlC?-pnlC.da:null);
+  tbl+=prow('EBIT (Laba Operasi)',eb,cV?.ebit,true,true);
+  tbl+=subrow('Beban Bunga & Keuangan',-pnl.bunga,pnlC?-pnlC.bunga:null);
+  tbl+=prow('Laba Sebelum Pajak',pt,cV?.preTax,true,true);
+  if(pnl.pajak>0||pnlC?.pajak>0) tbl+=subrow('Pajak Penghasilan (25%)',-(pnl.pajak||0),pnlC?-(pnlC.pajak||0):null);
+  tbl+=`<tr style="border-top:2px solid var(--border)"><td style="padding:9px 10px;font-size:14px;font-weight:700;color:${pnl.labaBersih>=0?'#059669':'#DC2626'}">Laba Bersih</td><td style="text-align:right;padding:9px 10px;font-size:14px;font-weight:700;color:${pnl.labaBersih>=0?'#059669':'#DC2626'};font-variant-numeric:tabular-nums">${fmtP(pnl.labaBersih)}<span style="font-size:10px;font-weight:400;color:var(--text-tertiary);margin-left:5px">${mN}%</span></td>`;
+  if(cV) tbl+=`<td style="text-align:right;padding:9px 10px;font-size:14px;font-weight:700;color:${pnlC.labaBersih>=0?'#059669':'#DC2626'};font-variant-numeric:tabular-nums">${fmtP(pnlC.labaBersih)}<span style="font-size:10px;font-weight:400;color:var(--text-tertiary);margin-left:4px">${cV.mN}%</span></td><td style="text-align:right;padding:9px 10px">${fmtD(pnl.labaBersih,pnlC.labaBersih)}</td>`;
+  tbl+='</tr></tbody></table>';
+
+  const alertNote=pnl.labaBersih<0||pnl.note.toLowerCase().includes('di bawah')||pnl.note.toLowerCase().includes('ditahan');
+  const periodOpts=avail.map(pp=>`<option value="${pp}"${pp===period?' selected':''}>${pp}</option>`).join('');
+  const cmpOpts='<option value="">— Tanpa pembanding —</option>'+avail.filter(pp=>pp!==period).map(pp=>`<option value="${pp}"${pp===compare?' selected':''}>${pp}</option>`).join('');
+
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border-light)">`;
+  html+=`<div style="display:flex;align-items:center;gap:10px"><div class="hold-logo" style="width:38px;height:38px;font-size:12px;background:${logoBg(b)};color:${b.text};overflow:hidden">${logoInner(b)}</div><div><div style="font-size:15px;font-weight:700">P&L Aktual — ${p.name}</div><div style="font-size:12px;color:var(--text-tertiary)">${p.pt}</div></div></div>`;
+  html+=`<button class="btn-sm" onclick="toast('Mengunduh P&L…')"><i class="ti ti-download" style="font-size:11px"></i>Unduh</button></div>`;
+  html+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">`;
+  html+=`<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:600;color:var(--text-secondary)">Periode:</span><select class="filter-select" onchange="_setPnlPeriod(this.value)">${periodOpts}</select></div>`;
+  html+=`<div style="display:flex;align-items:center;gap:6px"><i class="ti ti-arrows-diff" style="font-size:14px;color:var(--text-tertiary)"></i><span style="font-size:12px;color:var(--text-secondary)">Bandingkan dengan:</span><select class="filter-select" onchange="_setPnlCompare(this.value)">${cmpOpts}</select></div>`;
+  html+=`</div>`;
+  if(pnl.note) html+=`<div class="${alertNote?'notif-bar':'info-bar'}" style="margin-bottom:10px;font-size:12px"><i class="ti ti-${alertNote?'alert-triangle':'info-circle'}" style="font-size:14px;flex-shrink:0;margin-top:1px"></i><div>${pnl.note}</div></div>`;
+  html+=`<div style="max-height:50vh;overflow-y:auto;border:1px solid var(--border);border-radius:9px">${tbl}</div>`;
+  html+=`<div class="btn-row"><button class="btn btn-primary" onclick="closeModal()">Tutup</button></div>`;
+  return html;
+}
+
+// ============================================================
+// MODAL / TOAST
+// ============================================================
+function _showModal(html,wide){ const mb=document.getElementById('modal-box'); mb.innerHTML=html; mb.style.width=wide?'640px':'440px'; document.getElementById('modal').style.display='flex'; }
+function closeModal(e){ if(!e||e.target===document.getElementById('modal')) document.getElementById('modal').style.display='none'; }
+function toast(msg){
+  let t=document.getElementById('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast'; t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;z-index:400;box-shadow:0 8px 24px rgba(0,0,0,0.25);transition:opacity 0.3s'; document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity='0'; },1800);
+}
+
+// ============================================================
+// EXPOSE & INIT
+// ============================================================
+['navG','navL2','openH','setHoldSearch','setHoldStatus','setDistPid','setDistFrom','setDistTo','setDistStatus','setPerfFrom','setPerfTo','setLapPid','setDokPid','setDokTipe','setHPerfStart','setHPerfEnd','setHLapPeriod','setAllocView','markAllRead','openReport','openProof','openPnL','_setPnlPeriod','_setPnlCompare','closeModal','toast'].forEach(fn=>{ window[fn]=eval(fn); });
+
+render();
+</script>
+</body>
+</html>

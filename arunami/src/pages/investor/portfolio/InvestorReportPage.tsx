@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatPeriod } from '@/lib/dateUtils'
+import { markInvestorReportRead } from '@/lib/firestore'
 import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
 
 // Personal Reports (1-on-1 investor communications) are handled offline by
@@ -15,6 +16,13 @@ export default function InvestorReportPage() {
     () => publishedReports.find(r => r.period === selectedPeriod) ?? null,
     [publishedReports, selectedPeriod],
   )
+
+  // Opening a period's report marks it read for this investor.
+  useEffect(() => {
+    if (selected && !selected.isRead) {
+      markInvestorReportRead(selected.id).catch(err => console.error('markInvestorReportRead failed', err))
+    }
+  }, [selected])
 
   if (availablePeriods.length === 0) {
     return (

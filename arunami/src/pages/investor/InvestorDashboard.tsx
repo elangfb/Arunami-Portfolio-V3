@@ -49,6 +49,10 @@ export default function InvestorDashboard() {
     () => reports.some(r => r.scope === 'accumulated' || r.scope === 'all_time'),
     [reports],
   )
+  const unreadAllProjectReports = useMemo(
+    () => reports.filter(r => (r.scope === 'accumulated' || r.scope === 'all_time') && !r.isRead).length,
+    [reports],
+  )
 
   // Portfolios that have a published per-project report → show a quick link.
   const portfolioReportIds = useMemo(
@@ -142,7 +146,12 @@ export default function InvestorDashboard() {
                   <Layers className="h-5 w-5 text-[#1e5f3f]" />
                 </div>
                 <div>
-                  <p className="font-semibold">Laporan Saya</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">Laporan Saya</p>
+                    {unreadAllProjectReports > 0 && (
+                      <Badge variant="warning">{unreadAllProjectReports} baru</Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Ringkasan kinerja seluruh proyek — sepanjang waktu & per periode
                   </p>

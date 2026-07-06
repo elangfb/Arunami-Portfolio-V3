@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { brandOf } from '@/lib/portfolioName'
+import { CapTableFillBar } from '@/components/shared/CapTableFillBar'
 import { PlusCircle, Pencil, Trash2, UserPlus, Search, ChevronDown, X, Settings2, Archive, ArchiveRestore, Wrench } from 'lucide-react'
 import type { Portfolio, InvestorAllocation, AppUser } from '@/types'
 import { useAuthStore } from '@/store/authStore'
@@ -521,6 +522,12 @@ export default function AdminPortfolios() {
                                 ) : (
                                   <div className="p-4 space-y-4">
                                     {allocations.length > 0 && (
+                                      <CapTableFillBar
+                                        raised={allocations.reduce((s, a) => s + a.investedAmount, 0)}
+                                        target={p.investasiAwal}
+                                      />
+                                    )}
+                                    {allocations.length > 0 && (
                                       <div className="rounded-md border overflow-hidden">
                                         <table className="w-full text-sm">
                                           <thead className="bg-muted/50">
@@ -674,7 +681,16 @@ export default function AdminPortfolios() {
                                             type="number"
                                             placeholder="0"
                                             value={newAmount}
-                                            onChange={e => setNewAmount(e.target.value)}
+                                            onChange={e => {
+                                              const v = e.target.value
+                                              setNewAmount(v)
+                                              // Auto-derive ownership % = nominal ÷ target. Admin can still
+                                              // override the value in the Persentase field afterwards.
+                                              const amt = Number(v)
+                                              if (p.investasiAwal > 0 && Number.isFinite(amt) && amt > 0) {
+                                                setNewPercent(((amt / p.investasiAwal) * 100).toFixed(2))
+                                              }
+                                            }}
                                           />
                                         </div>
                                         <div className="space-y-1">
@@ -685,6 +701,9 @@ export default function AdminPortfolios() {
                                             value={newPercent}
                                             onChange={e => setNewPercent(e.target.value)}
                                           />
+                                          {p.investasiAwal > 0 && (
+                                            <p className="text-[11px] text-muted-foreground">Otomatis dari nominal ÷ target</p>
+                                          )}
                                         </div>
                                       </div>
                                       {availableInvestors.length === 0 && (

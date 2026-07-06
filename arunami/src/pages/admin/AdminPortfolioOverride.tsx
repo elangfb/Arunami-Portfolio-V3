@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import OverrideSection from '@/components/admin/OverrideSection'
 import { useAuthStore } from '@/store/authStore'
 import { brandOf } from '@/lib/portfolioName'
+import { CapTableFillBar } from '@/components/shared/CapTableFillBar'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { formatPeriod } from '@/lib/dateUtils'
 import { ArrowLeft, AlertTriangle, Pencil, Trash2, UserPlus } from 'lucide-react'
@@ -497,6 +498,13 @@ function AllocationsSection({ portfolio, allocations, investors, onSaved, logOve
           <Label className="text-xs">Alasan Override * <span className="font-normal text-muted-foreground">(berlaku untuk aksi tambah/edit/hapus di bawah)</span></Label>
           <Textarea rows={2} placeholder="Contoh: koreksi persentase kepemilikan investor X..." value={reason} onChange={e => setReason(e.target.value)} />
         </div>
+
+        {allocations.length > 0 && (
+          <CapTableFillBar
+            raised={allocations.reduce((s, a) => s + a.investedAmount, 0)}
+            target={portfolio.investasiAwal}
+          />
+        )}
 
         {allocations.length > 0 ? (
           <div className="rounded-md border overflow-hidden">

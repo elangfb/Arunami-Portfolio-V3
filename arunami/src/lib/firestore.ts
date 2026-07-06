@@ -753,6 +753,33 @@ export async function getPublishedInvestorReports(
 }
 
 /**
+ * Flip a report to read for its owning investor. Field-scoped write (only
+ * isRead/readAt) so the investor-side firestore rule can permit it without
+ * exposing the rest of the report doc to investor edits. Idempotent.
+ */
+export async function markInvestorReportRead(reportId: string): Promise<void> {
+  await setDoc(
+    doc(db, 'investorReports', reportId),
+    { isRead: true, readAt: serverTimestamp() },
+    { merge: true },
+  )
+}
+
+/** Mark several reports read in one batch (powers "Tandai semua dibaca"). */
+export async function markInvestorReportsRead(reportIds: string[]): Promise<void> {
+  if (reportIds.length === 0) return
+  const batch = writeBatch(db)
+  for (const id of reportIds) {
+    batch.set(
+      doc(db, 'investorReports', id),
+      { isRead: true, readAt: serverTimestamp() },
+      { merge: true },
+    )
+  }
+  await batch.commit()
+}
+
+/**
  * Upsert a draft investor report for a single (portfolio × investor × period).
  * Writes to BOTH the nested portfolio subcollection (fast listing for analyst)
  * AND the top-level `investorReports` collection (fast query for investor).
@@ -772,6 +799,8 @@ export async function upsertInvestorReportDraft(data: {
     ...data,
     reportType: data.reportType ?? 'monthly',
     status: 'draft' as const,
+    // A new/revised draft is content the investor hasn't seen → mark unread.
+    isRead: false,
     updatedAt: serverTimestamp(),
   }
   const batch = writeBatch(db)
@@ -917,6 +946,8 @@ export async function publishAccumulatedReport(params: {
       scope: 'accumulated' as const,
       status: 'published' as const,
       htmlContent: params.htmlContent,
+      // Freshly (re)published content re-alerts the investor as unread.
+      isRead: false,
       publishedAt: serverTimestamp(),
       publishedBy: params.publishedBy,
       updatedAt: serverTimestamp(),
@@ -971,6 +1002,8 @@ export async function publishAllTimeReport(params: {
       scope: 'all_time' as const,
       status: 'published' as const,
       htmlContent: params.htmlContent,
+      // Freshly (re)published content re-alerts the investor as unread.
+      isRead: false,
       coverageFirst: params.coverageFirst ?? null,
       coverageLatest: params.coverageLatest ?? null,
       publishedAt: serverTimestamp(),
@@ -1425,6 +1458,19 @@ export async function getAdminOverridesForTarget(
     where('scope', '==', scope),
     where('targetId', '==', targetId),
   ))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as AdminOverrideLog)
+    .sort((a, b) => (b.changedAt?.seconds ?? 0) - (a.changedAt?.seconds ?? 0))
+}
+
+/**
+ * Full override trail across every target, newest first — powers the admin
+ * audit-log viewer. Admin-only (see firestore.rules: /adminOverrides allows
+ * read/list only to admins). The collection holds one entry per manual admin
+ * correction, so an unfiltered read is intentional here.
+ */
+export async function getAllAdminOverrides(): Promise<AdminOverrideLog[]> {
+  const snap = await getDocs(collection(db, 'adminOverrides'))
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }) as AdminOverrideLog)
     .sort((a, b) => (b.changedAt?.seconds ?? 0) - (a.changedAt?.seconds ?? 0))

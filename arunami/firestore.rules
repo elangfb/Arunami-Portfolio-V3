@@ -168,6 +168,11 @@ service cloud.firestore {
       // Staff publish per-project reports; Investor Relations publishes the
       // accumulated (all-projects) report.
       allow create, update: if isStaff() || isInvestorRelation();
+      // An investor may flip ONLY their own read-state (isRead/readAt) on their
+      // own report — no other field may change through this path.
+      allow update: if isInvestor()
+        && resource.data.investorUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
       allow delete: if isAdmin();
     }
 

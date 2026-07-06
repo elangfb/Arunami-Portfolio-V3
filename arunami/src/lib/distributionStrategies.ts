@@ -12,6 +12,12 @@ export interface DistributionResult {
   perInvestorAmount: number
   grossInvestorAmount: number
   arunamiFeeAmount: number
+  /**
+   * Optional social-fund (dana sosial) deducted from this investor's share, in
+   * addition to the Arunami fee: net = gross − fee − social. Absent/0 unless the
+   * caller passes `socialFundPercent`. Applied uniformly across all strategies.
+   */
+  socialFundAmount?: number
   isFeeExempt: boolean
   roiPercent: number
   annualRoiPercent: number
@@ -42,6 +48,12 @@ export interface DistributionInput {
    * Optional; when omitted falls back to single-period match using reportData.period.
    */
   scheduleMonths?: string[]
+  /**
+   * Optional dana-sosial deduction as a % of the investor's gross share, applied
+   * on top of the Arunami fee. Omit/0 to disable (default). Ad-hoc per calc — not
+   * persisted in portfolio config.
+   */
+  socialFundPercent?: number
 }
 
 export interface DistributionStrategy {
@@ -417,6 +429,32 @@ export const DISTRIBUTION_STRATEGIES: Record<ReturnModelType, DistributionStrate
   custom: customStrategy,
 }
 
+/**
+ * Deduct an optional dana-sosial (% of the investor's gross share) from a
+ * computed result, in addition to the Arunami fee, and re-derive ROI. Pure —
+ * returns the same object unchanged when no social fund applies.
+ */
+function applySocialFund(result: DistributionResult, input: DistributionInput): DistributionResult {
+  const pct = input.socialFundPercent ?? 0
+  if (!(pct > 0) || result.grossInvestorAmount === 0) return result
+
+  const socialFundAmount = result.grossInvestorAmount * (pct / 100)
+  const perInvestorAmount = result.perInvestorAmount - socialFundAmount
+  const invested = input.allocation.investedAmount
+  const months = input.monthsInPeriod ?? 1
+  const roiPercent = invested > 0 ? (perInvestorAmount / invested) * 100 : result.roiPercent
+  const annualRoiPercent = invested > 0 ? (roiPercent / months) * 12 : result.annualRoiPercent
+
+  return {
+    ...result,
+    perInvestorAmount,
+    socialFundAmount,
+    roiPercent,
+    annualRoiPercent,
+    breakdown: { ...result.breakdown, socialFundAmount },
+  }
+}
+
 export function calculateDistribution(input: DistributionInput): DistributionResult {
   // Grace period overrides the configured return model. A project that has not
   // produced PnL yet pays only its grace return — a fixed yield on principal,
@@ -432,7 +470,7 @@ export function calculateDistribution(input: DistributionInput): DistributionRes
         fixedYieldPercent: grace.fixedYieldPercent ?? 0,
         principalReference: grace.principalReference ?? 'invested_amount',
       }
-      return fixedYieldStrategy.calculate({ ...input, config: graceConfig })
+      return applySocialFund(fixedYieldStrategy.calculate({ ...input, config: graceConfig }), input)
     }
     return emptyResult('Grace Period — Tanpa Payout')
   }
@@ -440,7 +478,7 @@ export function calculateDistribution(input: DistributionInput): DistributionRes
   const strategy =
     DISTRIBUTION_STRATEGIES[input.config.type] ??
     DISTRIBUTION_STRATEGIES.net_profit_share
-  return strategy.calculate(input)
+  return applySocialFund(strategy.calculate(input), input)
 }
 
 /** True when a grace-period portfolio still pays investors (fixed yield). */
