@@ -8,12 +8,13 @@ import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { brandOf, makeBrandResolver } from '@/lib/portfolioName'
 import { ownershipFraction } from '@/lib/distributionStrategies'
+import { contractStatus } from '@/lib/contracts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight, Wallet } from 'lucide-react'
+import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight, Wallet, FileClock } from 'lucide-react'
 import TransferProofNotificationBanner from '@/components/investor/TransferProofNotificationBanner'
 import { useTransferProofNotifications } from '@/components/investor/useTransferProofNotifications'
 import TransferProofHistoryList from '@/components/investor/TransferProofHistoryList'
@@ -53,6 +54,15 @@ export default function InvestorDashboard() {
   const unreadAllProjectReports = useMemo(
     () => reports.filter(r => (r.scope === 'accumulated' || r.scope === 'all_time') && !r.isRead).length,
     [reports],
+  )
+  // Holdings whose contract expires within 90 days (renewal-soon).
+  const renewalSoonCount = useMemo(
+    () => portfolios.filter(p => contractStatus(p.contractStart, p.contractEnd).severity === 'kritis').length,
+    [portfolios],
+  )
+  const hasContracts = useMemo(
+    () => portfolios.some(p => p.contractEnd),
+    [portfolios],
   )
 
   // Portfolios that have a published per-project report → show a quick link.
@@ -156,6 +166,31 @@ export default function InvestorDashboard() {
                   <p className="text-xs text-muted-foreground">
                     Ringkasan kinerja seluruh proyek — sepanjang waktu & per periode
                   </p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+            </CardContent>
+          </Card>
+        )}
+
+        {hasContracts && (
+          <Card
+            className="cursor-pointer transition-shadow hover:shadow-md"
+            onClick={() => navigate('/investor/contracts')}
+          >
+            <CardContent className="flex items-center justify-between gap-4 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1e5f3f]/10">
+                  <FileClock className="h-5 w-5 text-[#1e5f3f]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">Kontrak & Perpanjangan</p>
+                    {renewalSoonCount > 0 && (
+                      <Badge variant="danger">{renewalSoonCount} segera berakhir</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Masa berlaku kontrak setiap portofolio Anda</p>
                 </div>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />

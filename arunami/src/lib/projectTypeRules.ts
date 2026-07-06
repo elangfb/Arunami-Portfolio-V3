@@ -21,4 +21,4 @@ export function isFixedReturnModel(returnModel?: ReturnModelType | null): boolea
  * Investor sub-routes that should remain visible for fixed-return projects.
  * Everything else (overview/revenue/costs/returns/management/notes) is hidden.
  */
-export const FIXED_RETURN_VISIBLE_ROUTES = new Set(['report', 'resume'])
+export const FIXED_RETURN_VISIBLE_ROUTES = new Set(['report', 'resume', 'contract'])

@@ -135,6 +135,16 @@ service cloud.firestore {
         allow write: if canWritePortfolio(portfolioId);
       }
 
+      // Milestones & Covenants — BA-PM CRUD, investors read-only
+      match /milestones/{milestoneId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+      match /covenants/{covenantId} {
+        allow read: if canReadPortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
       // Per-investor draft + published reports (nested mirror)
       match /investorReports/{reportId} {
         allow read: if isStaff() ||

@@ -23,6 +23,7 @@ import PortfolioSetupWizard from '@/pages/admin/setup/PortfolioSetupWizard'
 
 // Analyst
 import AnalystDashboard from '@/pages/analyst/AnalystDashboard'
+import AnalystRenewals from '@/pages/analyst/AnalystRenewals'
 import AnalystPortfolioLayout from '@/pages/analyst/portfolio/AnalystPortfolioLayout'
 import OverviewPage from '@/pages/analyst/portfolio/OverviewPage'
 import PnLPage from '@/pages/analyst/portfolio/PnLPage'
@@ -33,13 +34,18 @@ import InvestorsPage from '@/pages/analyst/portfolio/InvestorsPage'
 import ManagementPage from '@/pages/analyst/portfolio/ManagementPage'
 import PublishingPage from '@/pages/analyst/portfolio/PublishingPage'
 import NotesPage from '@/pages/analyst/portfolio/NotesPage'
+import MilestonesPage from '@/pages/analyst/portfolio/MilestonesPage'
+import CovenantsPage from '@/pages/analyst/portfolio/CovenantsPage'
 import ProfitSharingPage from '@/pages/analyst/portfolio/ProfitSharingPage'
 
 // Investor
 import InvestorDashboard from '@/pages/investor/InvestorDashboard'
 import InvestorReportsPage from '@/pages/investor/InvestorReportsPage'
+import InvestorContractsPage from '@/pages/investor/InvestorContractsPage'
 import InvestorPortfolioLayout from '@/pages/investor/portfolio/InvestorPortfolioLayout'
 import InvestorOverviewPage from '@/pages/investor/portfolio/InvestorOverviewPage'
+import InvestorContractPage from '@/pages/investor/portfolio/InvestorContractPage'
+import InvestorGovernancePage from '@/pages/investor/portfolio/InvestorGovernancePage'
 import InvestorReturnsPage from '@/pages/investor/portfolio/InvestorReturnsPage'
 import InvestorBagiHasilResumePage from '@/pages/investor/portfolio/InvestorBagiHasilResumePage'
 import InvestorReportPage from '@/pages/investor/portfolio/InvestorReportPage'
@@ -105,6 +111,14 @@ export default function App() {
             }
           />
           <Route
+            path="/analyst/renewals"
+            element={
+              <AuthGuard allowedRoles={['admin', 'analyst']}>
+                <AnalystRenewals />
+              </AuthGuard>
+            }
+          />
+          <Route
             path="/analyst/portfolios/:id"
             element={
               <AuthGuard allowedRoles={['admin', 'analyst']}>
@@ -121,6 +135,8 @@ export default function App() {
             <Route path="investors" element={<InvestorsPage />} />
             <Route path="management" element={<ManagementPage />} />
             <Route path="notes" element={<NotesPage />} />
+            <Route path="milestones" element={<MilestonesPage />} />
+            <Route path="covenants" element={<CovenantsPage />} />
             <Route path="publishing" element={<PublishingPage />} />
             <Route path="settings/profit-sharing" element={<ProfitSharingPage />} />
           </Route>
@@ -158,6 +174,14 @@ export default function App() {
             }
           />
           <Route
+            path="/investor/contracts"
+            element={
+              <AuthGuard allowedRoles={['investor']}>
+                <InvestorContractsPage />
+              </AuthGuard>
+            }
+          />
+          <Route
             path="/investor/portfolios/:id"
             element={
               <AuthGuard allowedRoles={['investor']}>
@@ -174,6 +198,8 @@ export default function App() {
             <Route path="management" element={<InvestorManagementPage />} />
             <Route path="notes" element={<InvestorNotesPage />} />
             <Route path="report" element={<InvestorReportPage />} />
+            <Route path="contract" element={<InvestorContractPage />} />
+            <Route path="governance" element={<InvestorGovernancePage />} />
           </Route>
 
           {/* Catch-all */}

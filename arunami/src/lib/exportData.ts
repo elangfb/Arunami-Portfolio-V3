@@ -1,16 +1,20 @@
 import {
   getAllUsers, getAllPortfolios, getAllAllocations,
   getPortfolioConfig, getFinancialData, getReports, getHealthRules,
+  getMilestones, getCovenants,
 } from './firestore'
 import type {
   AppUser, Portfolio, InvestorAllocation,
   PortfolioConfig, FinancialData, PortfolioReport, HealthRules,
+  Milestone, Covenant,
 } from '@/types'
 
 export interface PortfolioExport extends Portfolio {
   config: PortfolioConfig | null
   financialData: FinancialData | null
   reports: { pnl: PortfolioReport[]; projection: PortfolioReport[] }
+  milestones: Milestone[]
+  covenants: Covenant[]
 }
 
 export interface AdminExport {
@@ -39,16 +43,18 @@ export async function buildAdminExport(): Promise<AdminExport> {
   const enrichedPortfolios = await Promise.all(
     portfolios.map(async (p): Promise<PortfolioExport> => {
       try {
-        const [config, financialData, pnl, projection] = await Promise.all([
+        const [config, financialData, pnl, projection, milestones, covenants] = await Promise.all([
           getPortfolioConfig(p.id),
           getFinancialData(p.id),
           getReports(p.id, 'pnl'),
           getReports(p.id, 'projection'),
+          getMilestones(p.id),
+          getCovenants(p.id),
         ])
-        return { ...p, config, financialData, reports: { pnl, projection } }
+        return { ...p, config, financialData, reports: { pnl, projection }, milestones, covenants }
       } catch (err) {
         console.error(`Failed to export portfolio ${p.id} (${p.code})`, err)
-        return { ...p, config: null, financialData: null, reports: { pnl: [], projection: [] } }
+        return { ...p, config: null, financialData: null, reports: { pnl: [], projection: [] }, milestones: [], covenants: [] }
       }
     }),
   )

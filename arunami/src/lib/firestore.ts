@@ -17,6 +17,7 @@ import type {
   InvestorTransferProof, InvestorNotification, BagiHasilManualEntry,
   AdminOverrideScope, AdminOverrideLog,
   HealthRules, HealthLevel,
+  Milestone, Covenant,
 } from '@/types'
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -394,6 +395,60 @@ export async function saveNote(portfolioId: string, note: Omit<Note, 'id' | 'cre
 
 export async function deleteNote(portfolioId: string, id: string) {
   await deleteDoc(doc(db, 'portfolios', portfolioId, 'notes', id))
+}
+
+// ─── Milestones (per-portfolio governance) ────────────────────────────────
+
+export async function getMilestones(portfolioId: string): Promise<Milestone[]> {
+  const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'milestones'))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Milestone)
+}
+
+export async function saveMilestone(portfolioId: string, data: Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>) {
+  const ref = await addDoc(collection(db, 'portfolios', portfolioId, 'milestones'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function updateMilestone(portfolioId: string, id: string, data: Partial<Omit<Milestone, 'id' | 'createdAt'>>) {
+  await updateDoc(doc(db, 'portfolios', portfolioId, 'milestones', id), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function deleteMilestone(portfolioId: string, id: string) {
+  await deleteDoc(doc(db, 'portfolios', portfolioId, 'milestones', id))
+}
+
+// ─── Covenants (per-portfolio compliance) ─────────────────────────────────
+
+export async function getCovenants(portfolioId: string): Promise<Covenant[]> {
+  const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'covenants'))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Covenant)
+}
+
+export async function saveCovenant(portfolioId: string, data: Omit<Covenant, 'id' | 'createdAt' | 'updatedAt'>) {
+  const ref = await addDoc(collection(db, 'portfolios', portfolioId, 'covenants'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function updateCovenant(portfolioId: string, id: string, data: Partial<Omit<Covenant, 'id' | 'createdAt'>>) {
+  await updateDoc(doc(db, 'portfolios', portfolioId, 'covenants', id), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function deleteCovenant(portfolioId: string, id: string) {
+  await deleteDoc(doc(db, 'portfolios', portfolioId, 'covenants', id))
 }
 
 // ─── Transfer Proofs ──────────────────────────────────────────────────────

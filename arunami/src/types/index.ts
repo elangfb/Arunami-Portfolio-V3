@@ -249,6 +249,16 @@ export interface Portfolio {
   /** Soft-archive flag (DF-04). Archived portfolios are hidden from active lists but kept for audit. */
   archived?: boolean
   archivedAt?: Timestamp
+  // ─── Contract & renewal (Phase 2) ────────────────────────────────────────
+  // Investment-contract span (YYYY-MM-DD). Powers the renewal pipeline, expiry
+  // severity badges (Kritis/Segera/Aman), and duration progress bars. Optional —
+  // older portfolios have none, and helpers treat that as "Tanpa Kontrak".
+  /** Contract start date (YYYY-MM-DD). */
+  contractStart?: string
+  /** Contract end / expiry date (YYYY-MM-DD). */
+  contractEnd?: string
+  /** Operational start date, for the operational-duration display (YYYY-MM-DD). */
+  operationalStart?: string
   // ─── Wanprestasi / health (Phase 1) ──────────────────────────────────────
   // Manual inputs the analyst sets in the Wanprestasi modal, plus the derived
   // level denormalized onto the portfolio so list views can show a badge
@@ -634,6 +644,45 @@ export interface Note {
   attachments: NoteAttachment[]
   createdBy: string
   createdAt: Timestamp
+}
+
+// ─── Milestones & Covenants (Phase 4, per-portfolio governance) ───────────
+//
+// Subcollections /portfolios/{id}/milestones and /portfolios/{id}/covenants.
+// BA-PM (analyst) does CRUD; investors read-only. A failed covenant raises a
+// red alert; a delayed/missed milestone is surfaced with a status badge.
+
+export type MilestoneStatus = 'pending' | 'on_track' | 'achieved' | 'delayed' | 'missed'
+
+export interface Milestone {
+  id: string
+  title: string
+  /** What "done" looks like (kriteria keberhasilan). */
+  successCriteria: string
+  /** Target completion date (YYYY-MM-DD). */
+  targetDate: string
+  status: MilestoneStatus
+  /** Free-text name of who last updated it. */
+  updatedBy: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export type CovenantResult = 'pass' | 'fail'
+
+export interface Covenant {
+  id: string
+  name: string
+  /** Required threshold (free text, e.g. "DSCR ≥ 1.2x"). */
+  requirement: string
+  /** Actual measured value (free text). */
+  actual: string
+  /** Period the check applies to (e.g. "2026-Q1" or a label). */
+  period: string
+  result: CovenantResult
+  updatedBy: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
 }
 
 // ─── Investor Allocations ─────────────────────────────────────────────────

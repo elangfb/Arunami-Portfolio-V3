@@ -32,6 +32,8 @@ const portfolioSchema = z.object({
   periode: z.string().min(1, 'Periode wajib diisi'),
   investasiAwal: z.coerce.number().min(0, 'Investasi awal tidak valid'),
   description: z.string().optional(),
+  contractStart: z.string().optional(),
+  contractEnd: z.string().optional(),
 })
 
 type PortfolioFormData = z.infer<typeof portfolioSchema>
@@ -140,6 +142,8 @@ export default function AdminPortfolios() {
       periode: p.periode,
       investasiAwal: p.investasiAwal,
       description: p.description,
+      contractStart: p.contractStart ?? '',
+      contractEnd: p.contractEnd ?? '',
     })
     setEditOpen(true)
   }
@@ -831,6 +835,16 @@ export default function AdminPortfolios() {
             <div className="space-y-2">
               <Label>Investasi Awal (IDR)</Label>
               <Input type="number" placeholder="0" {...editForm.register('investasiAwal')} />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Mulai Kontrak</Label>
+                <Input type="date" {...editForm.register('contractStart')} />
+              </div>
+              <div className="space-y-2">
+                <Label>Akhir Kontrak</Label>
+                <Input type="date" {...editForm.register('contractEnd')} />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Deskripsi</Label>

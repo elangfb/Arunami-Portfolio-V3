@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { HealthBadge } from '@/components/shared/HealthBadge'
-import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
+import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 type SortKey = 'name' | 'code' | 'stage' | 'periode' | 'industryType' | 'investasiAwal' | 'investors'
@@ -87,6 +87,9 @@ export default function AnalystDashboard() {
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden text-sm text-muted-foreground sm:inline">Halo, {user?.displayName}</span>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/analyst/renewals')}>
+              <FileClock className="mr-1 h-4 w-4" />Perpanjangan Kontrak
+            </Button>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="mr-1 h-4 w-4" />Keluar
             </Button>

@@ -107,6 +107,17 @@ export default function StepBasicInfo({ form }: Props) {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="contractStart">Mulai Kontrak</Label>
+            <Input id="contractStart" type="date" {...register('contractStart')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contractEnd">Akhir Kontrak</Label>
+            <Input id="contractEnd" type="date" {...register('contractEnd')} />
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="description">Deskripsi</Label>
           <Textarea

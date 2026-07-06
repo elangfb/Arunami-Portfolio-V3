@@ -12,7 +12,7 @@ import type { Portfolio } from '@/types'
 import {
   TrendingUp, LayoutDashboard, FileText, BarChart2,
   DollarSign, Users, ClipboardList, StickyNote, Send,
-  ChevronLeft, LogOut, PieChart, Scale,
+  ChevronLeft, LogOut, PieChart, Scale, Target, ShieldCheck,
 } from 'lucide-react'
 
 // Tabs hidden while a portfolio is in grace period: the PnL/Projection uploads
@@ -44,6 +44,8 @@ const navGroups = [
     items: [
       { to: 'management', label: 'Portfolio Management', icon: ClipboardList },
       { to: 'notes', label: 'Arunami Notes', icon: StickyNote },
+      { to: 'milestones', label: 'Milestones', icon: Target },
+      { to: 'covenants', label: 'Covenants', icon: ShieldCheck },
     ],
   },
   {

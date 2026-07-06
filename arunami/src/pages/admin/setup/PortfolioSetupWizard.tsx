@@ -70,6 +70,8 @@ const wizardSchema = z.object({
   periode: z.string().min(1, 'Periode wajib diisi'),
   investasiAwal: z.number().min(0, 'Total investasi minimal 0'),
   description: z.string().optional().default(''),
+  contractStart: z.string().optional().default(''),
+  contractEnd: z.string().optional().default(''),
 
   // Hidden presets
   revenueCategories: z.array(revenueCategorySchema).min(1),
@@ -224,6 +226,8 @@ export default function PortfolioSetupWizard() {
       periode: '',
       investasiAwal: 0,
       description: '',
+      contractStart: '',
+      contractEnd: '',
       revenueCategories: INDUSTRY_PRESETS.retail.revenueCategories,
       kpiMetrics: INDUSTRY_PRESETS.retail.kpiMetrics,
       returnModel: 'net_profit_share',
@@ -336,6 +340,8 @@ export default function PortfolioSetupWizard() {
         graceConfig,
         assignedInvestors: [],
         assignedAnalysts: [],
+        ...(data.contractStart ? { contractStart: data.contractStart } : {}),
+        ...(data.contractEnd ? { contractEnd: data.contractEnd } : {}),
       })
 
       const investorConfig = buildInvestorConfig(data)
