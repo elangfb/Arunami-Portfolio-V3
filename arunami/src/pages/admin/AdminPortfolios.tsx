@@ -8,7 +8,10 @@ import {
   getAllPortfolios, getAllUsers, updatePortfolio, deletePortfolio,
   archivePortfolio, unarchivePortfolio,
   getAllocationsForPortfolio, createAllocation, updateAllocation, deleteAllocation,
+  getSystemSettings,
 } from '@/lib/firestore'
+import { KycBadge } from '@/components/shared/KycBadge'
+import { isKycEligible } from '@/lib/kyc'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -67,6 +70,9 @@ export default function AdminPortfolios() {
   const [editPercent, setEditPercent] = useState('')
 
   const [showArchived, setShowArchived] = useState(false)
+  // Phase 6: when the platform setting requires it, only KYC-verified investors
+  // may be added to a cap table.
+  const [requireKyc, setRequireKyc] = useState(false)
 
   // Search states
   const [portfolioSearch, setPortfolioSearch] = useState('')
@@ -97,6 +103,7 @@ export default function AdminPortfolios() {
     setInvestors(users.filter(u => u.role === 'investor'))
     setAnalysts(users.filter(u => u.role === 'analyst'))
     setLoading(false)
+    getSystemSettings().then(s => setRequireKyc(s.requireKycForAllocation)).catch(() => {})
   }
 
   useEffect(() => { fetchData() }, [])
@@ -230,8 +237,15 @@ export default function AdminPortfolios() {
   }
 
   const availableInvestors = investors.filter(
-    inv => !allocations.some(a => a.investorUid === inv.uid),
+    inv => !allocations.some(a => a.investorUid === inv.uid)
+      // Phase 6 KYC gate: hide unverified investors when the platform requires it.
+      && (!requireKyc || isKycEligible(inv.kycStatus)),
   )
+  const kycHiddenCount = requireKyc
+    ? investors.filter(
+        inv => !allocations.some(a => a.investorUid === inv.uid) && !isKycEligible(inv.kycStatus),
+      ).length
+    : 0
 
   const filteredPortfolios = portfolios.filter(p => {
     const q = portfolioSearch.toLowerCase()
@@ -669,7 +683,10 @@ export default function AdminPortfolios() {
                                                         className="px-3 py-2 text-sm hover:bg-muted/50 cursor-pointer"
                                                         onClick={() => { setNewInvestorUid(inv.uid); setInvestorDropdownOpen(false); setInvestorSearch('') }}
                                                       >
-                                                        <p className="font-medium truncate">{inv.displayName}</p>
+                                                        <div className="flex items-center justify-between gap-2">
+                                                          <p className="font-medium truncate">{inv.displayName}</p>
+                                                          <KycBadge status={inv.kycStatus} className="shrink-0" />
+                                                        </div>
                                                         <p className="text-xs text-muted-foreground truncate">{inv.email}</p>
                                                       </li>
                                                     ))
@@ -712,6 +729,11 @@ export default function AdminPortfolios() {
                                       </div>
                                       {availableInvestors.length === 0 && (
                                         <p className="text-xs text-muted-foreground">Semua investor sudah memiliki alokasi di portofolio ini.</p>
+                                      )}
+                                      {kycHiddenCount > 0 && (
+                                        <p className="text-xs text-amber-600">
+                                          {kycHiddenCount} investor disembunyikan karena belum terverifikasi KYC (wajib sesuai Pengaturan Sistem).
+                                        </p>
                                       )}
                                       <div className="flex justify-end">
                                         <Button size="sm" onClick={handleAddAllocation} disabled={!newInvestorUid}>

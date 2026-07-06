@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getAllUsers, getAllPortfolios } from '@/lib/firestore'
+import { getAllUsers, getAllPortfolios, getAllAllocations, getDistributionBatches } from '@/lib/firestore'
 import { buildAdminExport, downloadJson } from '@/lib/exportData'
+import { kycStatusOf } from '@/lib/kyc'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { HEALTH_LEVELS } from '@/lib/health'
-import { Users, Briefcase, UserCheck, BarChart2, Download } from 'lucide-react'
-import type { AppUser, Portfolio } from '@/types'
+import {
+  Users, Briefcase, UserCheck, BarChart2, Download,
+  ShieldCheck, Banknote, ChevronRight, CheckCircle2, ClipboardList,
+} from 'lucide-react'
+import type { AppUser, Portfolio, InvestorAllocation, DistributionBatch } from '@/types'
 
 export default function AdminDashboard() {
+  const navigate = useNavigate()
   const [users, setUsers] = useState<AppUser[]>([])
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
+  const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
+  const [batches, setBatches] = useState<DistributionBatch[]>([])
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
 
@@ -31,15 +39,53 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
-    Promise.all([getAllUsers(), getAllPortfolios()]).then(([u, p]) => {
-      setUsers(u)
-      setPortfolios(p)
-      setLoading(false)
-    })
+    Promise.all([getAllUsers(), getAllPortfolios(), getAllAllocations(), getDistributionBatches()])
+      .then(([u, p, a, b]) => {
+        setUsers(u)
+        setPortfolios(p)
+        setAllocations(a)
+        setBatches(b)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
 
   const analysts = users.filter(u => u.role === 'analyst')
   const investors = users.filter(u => u.role === 'investor')
+
+  // Additive operational task queue — actionable counts deep-linked to their page.
+  const allocatedUids = new Set(allocations.map(a => a.investorUid))
+  const tasks = [
+    {
+      key: 'kyc',
+      label: 'Investor menunggu verifikasi KYC',
+      icon: ShieldCheck,
+      count: investors.filter(u => !u.archived && kycStatusOf(u.kycStatus) === 'pending').length,
+      to: '/admin/kyc',
+    },
+    {
+      key: 'batches',
+      label: 'Batch distribusi perlu diproses',
+      icon: Banknote,
+      count: batches.filter(b => b.status !== 'completed' && b.lines.some(l => l.status === 'pending')).length,
+      to: '/admin/distributions',
+    },
+    {
+      key: 'analyst',
+      label: 'Portofolio tanpa analis',
+      icon: Briefcase,
+      count: portfolios.filter(p => (p.assignedAnalysts?.length ?? 0) === 0).length,
+      to: '/admin/portfolios',
+    },
+    {
+      key: 'alloc',
+      label: 'Investor tanpa alokasi',
+      icon: UserCheck,
+      count: investors.filter(u => !u.archived && !allocatedUids.has(u.uid)).length,
+      to: '/admin/investors',
+    },
+  ]
+  const openTasks = tasks.filter(t => t.count > 0)
 
   const healthCounts = HEALTH_LEVELS.map(level => ({
     level,
@@ -106,6 +152,44 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && (
+        <Card className="mt-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ClipboardList className="h-4 w-4 text-[#38a169]" />
+              Perlu Tindak Lanjut
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {openTasks.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                Semua beres — tidak ada tugas tertunda.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {openTasks.map(({ key, label, icon: Icon, count, to }) => (
+                  <button
+                    key={key}
+                    onClick={() => navigate(to)}
+                    className="flex w-full items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted/40"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <span className="flex-1 text-sm font-medium">{label}</span>
+                    <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
+                      {count}
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

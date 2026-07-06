@@ -14,7 +14,7 @@ import type { Portfolio, PortfolioConfig, InvestorReportDoc } from '@/types'
 import {
   TrendingUp, LayoutDashboard, TrendingDown, BarChart2,
   DollarSign, ClipboardList, StickyNote, FileText,
-  ChevronLeft, LogOut, Wallet, FileClock, ShieldCheck,
+  ChevronLeft, LogOut, Wallet, FileClock, ShieldCheck, FolderOpen,
 } from 'lucide-react'
 
 export type InvestorReportTypeFilter = 'monthly' | 'quarterly'
@@ -57,6 +57,7 @@ const navGroups = [
       { to: 'resume', label: 'Resume Bagi Hasil', icon: Wallet },
       { to: 'report', label: 'Laporan Investor', icon: FileText },
       { to: 'contract', label: 'Kontrak', icon: FileClock },
+      { to: 'documents', label: 'Dokumen', icon: FolderOpen },
     ],
   },
 ]

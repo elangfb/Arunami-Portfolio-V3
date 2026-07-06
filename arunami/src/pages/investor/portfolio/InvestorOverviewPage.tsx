@@ -6,9 +6,11 @@ import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { HealthBadge } from '@/components/shared/HealthBadge'
+import { PnLComparisonModal } from '@/components/investor/PnLComparisonModal'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { DollarSign, TrendingUp, BarChart2, PieChart } from 'lucide-react'
+import { DollarSign, TrendingUp, BarChart2, PieChart, GitCompare } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
 import type { FinancialData, InvestorAllocation, PortfolioConfig } from '@/types'
 import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
@@ -34,6 +36,8 @@ export default function InvestorOverviewPage() {
       setLoading(false)
     })
   }, [portfolioId, user])
+
+  const [compareOpen, setCompareOpen] = useState(false)
 
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
   if (!data) return <div className="p-8 text-muted-foreground">Data belum tersedia.</div>
@@ -88,13 +92,22 @@ export default function InvestorOverviewPage() {
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold">Overview Portofolio</h2>
-        {portfolio?.healthLevel && portfolio.healthLevel !== 'sehat' && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Status</span>
-            <HealthBadge level={portfolio.healthLevel} reasons={portfolio.healthReasons} size="md" />
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {portfolio?.healthLevel && portfolio.healthLevel !== 'sehat' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Status</span>
+              <HealthBadge level={portfolio.healthLevel} reasons={portfolio.healthReasons} size="md" />
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setCompareOpen(true)}>
+            <GitCompare className="mr-1 h-4 w-4" />Bandingkan P&L
+          </Button>
+        </div>
       </div>
+
+      {portfolioId && (
+        <PnLComparisonModal portfolioId={portfolioId} open={compareOpen} onClose={() => setCompareOpen(false)} />
+      )}
 
       {/* My Allocation Card */}
       {allocation && myResult && (

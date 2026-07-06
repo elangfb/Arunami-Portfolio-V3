@@ -1,7 +1,7 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, deleteField, query, where, serverTimestamp,
-  writeBatch,
+  writeBatch, Timestamp,
 } from 'firebase/firestore'
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { createUserWithEmailAndPassword, signOut } from 'firebase/auth'
@@ -18,6 +18,9 @@ import type {
   AdminOverrideScope, AdminOverrideLog,
   HealthRules, HealthLevel,
   Milestone, Covenant,
+  KycDocument, KycStatus, InvestorType, KycDocSlot,
+  Announcement, LibraryDocument, DocumentCategory,
+  SystemSettings, DistributionBatch, DistributionBatchLine, BatchStatus,
 } from '@/types'
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
@@ -78,6 +81,18 @@ export async function createUser(
 }
 
 export async function updateUser(uid: string, data: Partial<Pick<AppUser, 'displayName' | 'role' | 'isArunamiTeam'>>) {
+  await updateDoc(doc(db, 'users', uid), data)
+}
+
+/**
+ * Investor self-service profile update (Phase 7). Only the profile/preference
+ * fields an investor is allowed to edit on their OWN user doc — the matching
+ * firestore rule rejects any other key, so this is safe to call client-side.
+ */
+export async function updateInvestorProfile(
+  uid: string,
+  data: Partial<Pick<AppUser, 'phone' | 'bankName' | 'bankAccountNumber' | 'bankAccountHolder' | 'notifyByEmail'>>,
+) {
   await updateDoc(doc(db, 'users', uid), data)
 }
 
@@ -1575,4 +1590,280 @@ export async function updatePortfolioHealth(
     healthComputedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
+}
+
+// ─── KYC Verification (Phase 6) ───────────────────────────────────────────
+//
+// KYC state lives on the investor's user doc (admin-only write per firestore
+// rules). Documents upload to Storage under kyc/<uid>/; only metadata persists.
+
+const ALLOWED_KYC_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']
+const MAX_KYC_BYTES = 8 * 1024 * 1024
+
+/** Upload one KYC document and return its metadata (does not write the user doc). */
+export async function uploadKycDocument(
+  uid: string,
+  slot: KycDocSlot,
+  file: File,
+): Promise<KycDocument> {
+  if (!ALLOWED_KYC_TYPES.includes(file.type)) {
+    throw new Error('Tipe file tidak didukung. Gunakan PNG, JPG, WEBP, atau PDF.')
+  }
+  if (file.size > MAX_KYC_BYTES) {
+    throw new Error('Ukuran file melebihi 8 MB.')
+  }
+  const ext = extOf(file.type, file.name)
+  const path = `kyc/${uid}/${slot}-${Date.now()}.${ext}`
+  const ref = storageRef(storage, path)
+  await uploadBytes(ref, file, { contentType: file.type })
+  const fileUrl = await getDownloadURL(ref)
+  return {
+    slot,
+    fileName: file.name,
+    fileUrl,
+    storagePath: path,
+    // Firestore forbids serverTimestamp() inside array elements — use a client
+    // Timestamp (this is embedded in the kycDocuments array, not a doc field).
+    uploadedAt: Timestamp.now(),
+  }
+}
+
+export interface SaveKycReviewInput {
+  uid: string
+  status: KycStatus
+  investorType?: InvestorType
+  npwp?: string
+  documents: KycDocument[]
+  reviewedBy: string
+  reviewedByName: string
+  rejectionReason?: string
+}
+
+/** Persist a KYC review (status + type + docs) onto the investor's user doc. */
+export async function saveKycReview(input: SaveKycReviewInput): Promise<void> {
+  const patch: Record<string, unknown> = {
+    kycStatus: input.status,
+    kycDocuments: input.documents,
+    kycReviewedBy: input.reviewedBy,
+    kycReviewedByName: input.reviewedByName,
+    kycReviewedAt: serverTimestamp(),
+  }
+  patch.investorType = input.investorType ?? deleteField()
+  patch.npwp = input.npwp?.trim() ? input.npwp.trim() : deleteField()
+  patch.kycRejectionReason =
+    input.status === 'rejected' && input.rejectionReason?.trim()
+      ? input.rejectionReason.trim()
+      : deleteField()
+  await updateDoc(doc(db, 'users', input.uid), patch)
+}
+
+// ─── Announcements (Phase 6) ──────────────────────────────────────────────
+
+export async function getAnnouncements(): Promise<Announcement[]> {
+  const snap = await getDocs(collection(db, 'announcements'))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as Announcement)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+}
+
+export async function saveAnnouncement(
+  data: Omit<Announcement, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'announcements'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function updateAnnouncement(
+  id: string,
+  patch: Partial<Pick<Announcement, 'title' | 'body' | 'audience' | 'active'>>,
+): Promise<void> {
+  await updateDoc(doc(db, 'announcements', id), { ...patch, updatedAt: serverTimestamp() })
+}
+
+export async function deleteAnnouncement(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'announcements', id))
+}
+
+// ─── Documents Library (Phase 6) ──────────────────────────────────────────
+
+const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+
+export async function getAllDocuments(): Promise<LibraryDocument[]> {
+  const snap = await getDocs(collection(db, 'documents'))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as LibraryDocument)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+}
+
+export interface UploadDocumentInput {
+  portfolioId: string | null
+  portfolioName: string
+  title: string
+  category: DocumentCategory
+  version: string
+  file: File
+  uploadedBy: string
+  uploadedByName: string
+}
+
+export async function uploadDocument(input: UploadDocumentInput): Promise<string> {
+  if (input.file.size > MAX_DOCUMENT_BYTES) {
+    throw new Error('Ukuran file melebihi 20 MB.')
+  }
+  const safeSegment = (input.portfolioId ?? 'platform').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const path = `documents/${safeSegment}/${Date.now()}-${input.file.name}`
+  const ref = storageRef(storage, path)
+  await uploadBytes(ref, input.file, { contentType: input.file.type })
+  const fileUrl = await getDownloadURL(ref)
+  try {
+    const docRef = await addDoc(collection(db, 'documents'), {
+      portfolioId: input.portfolioId,
+      portfolioName: input.portfolioName,
+      title: input.title.trim(),
+      category: input.category,
+      fileName: input.file.name,
+      fileUrl,
+      storagePath: path,
+      fileSize: input.file.size,
+      version: input.version.trim(),
+      uploadedBy: input.uploadedBy,
+      uploadedByName: input.uploadedByName,
+      createdAt: serverTimestamp(),
+    })
+    return docRef.id
+  } catch (e) {
+    // DF-12 pattern: clean up the just-uploaded file if the doc write fails.
+    try { await deleteObject(storageRef(storage, path)) } catch { /* noop */ }
+    throw e
+  }
+}
+
+export async function deleteDocument(docRow: LibraryDocument): Promise<void> {
+  await deleteDoc(doc(db, 'documents', docRow.id))
+  if (docRow.storagePath) {
+    try { await deleteObject(storageRef(storage, docRow.storagePath)) } catch { /* noop */ }
+  }
+}
+
+/**
+ * Documents an investor may read: those attached to portfolios they hold.
+ * Queried by `portfolioId in [...]` (Firestore caps `in` at 30 ids, so chunk).
+ * Returns newest-first. Platform-wide (portfolioId === null) docs are not
+ * surfaced to investors.
+ */
+export async function getDocumentsForPortfolios(portfolioIds: string[]): Promise<LibraryDocument[]> {
+  if (portfolioIds.length === 0) return []
+  const chunks: string[][] = []
+  for (let i = 0; i < portfolioIds.length; i += 30) chunks.push(portfolioIds.slice(i, i + 30))
+  const results = await Promise.all(
+    chunks.map(async ids => {
+      const snap = await getDocs(query(collection(db, 'documents'), where('portfolioId', 'in', ids)))
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }) as LibraryDocument)
+    }),
+  )
+  return results.flat().sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+}
+
+// ─── System Settings (Phase 6) ────────────────────────────────────────────
+
+export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
+  brandName: 'ARUNAMI',
+  supportEmail: '',
+  requireKycForAllocation: false,
+  allowInvestorSelfRegister: false,
+  maintenanceMode: false,
+  defaultArunamiFeePercent: 10,
+}
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  const snap = await getDoc(doc(db, 'appConfig', 'system'))
+  if (!snap.exists()) return DEFAULT_SYSTEM_SETTINGS
+  return { ...DEFAULT_SYSTEM_SETTINGS, ...(snap.data() as Partial<SystemSettings>) }
+}
+
+export async function saveSystemSettings(
+  settings: Omit<SystemSettings, 'updatedAt' | 'updatedBy'>,
+  updatedBy: string,
+): Promise<void> {
+  await setDoc(
+    doc(db, 'appConfig', 'system'),
+    { ...settings, updatedBy, updatedAt: serverTimestamp() },
+    { merge: true },
+  )
+}
+
+// ─── Distribution Batches (Phase 6, payout state machine) ─────────────────
+
+/** Derive batch-level status from its lines. */
+export function deriveBatchStatus(lines: DistributionBatchLine[]): BatchStatus {
+  if (lines.length === 0) return 'draft'
+  if (lines.every(l => l.status === 'forwarded' || l.status === 'held')) return 'completed'
+  if (lines.some(l => l.status !== 'pending')) return 'processing'
+  return 'draft'
+}
+
+export async function getDistributionBatches(): Promise<DistributionBatch[]> {
+  const snap = await getDocs(collection(db, 'distributionBatches'))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as DistributionBatch)
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+}
+
+export interface CreateDistributionBatchInput {
+  portfolioId: string
+  portfolioName: string
+  period: string
+  returnModelLabel: string
+  driverAmount: number
+  lines: DistributionBatchLine[]
+  createdBy: string
+  createdByName: string
+}
+
+export async function createDistributionBatch(
+  input: CreateDistributionBatchInput,
+): Promise<string> {
+  // One batch per (portfolio × period): deterministic id blocks duplicates.
+  const id = `${input.portfolioId}_${input.period}`
+  const existing = await getDoc(doc(db, 'distributionBatches', id))
+  if (existing.exists()) {
+    throw new Error(`Batch untuk periode ${input.period} sudah ada.`)
+  }
+  const totalNet = input.lines.reduce((s, l) => s + l.netAmount, 0)
+  await setDoc(doc(db, 'distributionBatches', id), {
+    portfolioId: input.portfolioId,
+    portfolioName: input.portfolioName,
+    period: input.period,
+    returnModelLabel: input.returnModelLabel,
+    driverAmount: input.driverAmount,
+    totalNet,
+    status: 'draft' as BatchStatus,
+    lines: input.lines,
+    createdBy: input.createdBy,
+    createdByName: input.createdByName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return id
+}
+
+/** Replace a batch's lines (used when advancing/holding a line) and re-derive status. */
+export async function updateDistributionBatchLines(
+  batchId: string,
+  lines: DistributionBatchLine[],
+): Promise<void> {
+  await updateDoc(doc(db, 'distributionBatches', batchId), {
+    lines,
+    totalNet: lines.reduce((s, l) => s + l.netAmount, 0),
+    status: deriveBatchStatus(lines),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function deleteDistributionBatch(batchId: string): Promise<void> {
+  await deleteDoc(doc(db, 'distributionBatches', batchId))
 }

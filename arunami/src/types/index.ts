@@ -201,6 +201,24 @@ export interface PortfolioConfig {
   createdAt: Timestamp
 }
 
+// ─── KYC (Phase 6, investor verification) ─────────────────────────────────
+//
+// KYC state lives on the investor's user doc (admin-only write). An investor is
+// `verified` before they can be selected into a cap table (gated in the
+// allocation editor). Documents are uploaded to Storage; only metadata persists.
+
+export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected'
+export type InvestorType = 'individu' | 'institusi'
+export type KycDocSlot = 'ktp' | 'npwp' | 'bank'
+
+export interface KycDocument {
+  slot: KycDocSlot
+  fileName: string
+  fileUrl: string
+  storagePath: string
+  uploadedAt: Timestamp
+}
+
 export interface AppUser {
   uid: string
   email: string
@@ -210,9 +228,37 @@ export interface AppUser {
   /** Soft-archive flag (DF-04). Archived users are hidden from active lists but kept for audit. */
   archived?: boolean
   archivedAt?: Timestamp
+  // ─── KYC (Phase 6) — only meaningful for role === 'investor' ─────────────
+  /** Verification status. Absent = 'unverified' (backwards-compatible). */
+  kycStatus?: KycStatus
+  /** Individu / Institusi classification captured at registration or review. */
+  investorType?: InvestorType
+  /** NPWP (tax id) number, free text. */
+  npwp?: string
+  /** Uploaded KYC document metadata (KTP / NPWP / bank statement). */
+  kycDocuments?: KycDocument[]
+  kycReviewedBy?: string
+  kycReviewedByName?: string
+  kycReviewedAt?: Timestamp
+  /** Reason captured when an admin rejects a KYC submission. */
+  kycRejectionReason?: string
+  // ─── Investor profile & preferences (Phase 7) — self-editable ────────────
+  // An investor may edit ONLY these fields on their own user doc (see
+  // firestore.rules). Everything else stays admin-only.
+  phone?: string
+  bankName?: string
+  bankAccountNumber?: string
+  bankAccountHolder?: string
+  /** Opt-in to email notifications (display/pref only; no mailer wired yet). */
+  notifyByEmail?: boolean
   createdBy: string
   createdAt: Timestamp
 }
+
+/** Fields an investor may self-edit on their own user doc (Phase 7). */
+export const INVESTOR_EDITABLE_PROFILE_KEYS = [
+  'phone', 'bankName', 'bankAccountNumber', 'bankAccountHolder', 'notifyByEmail',
+] as const
 
 // ─── Portfolio ─────────────────────────────────────────────────────────────
 
@@ -906,4 +952,123 @@ export interface AdminOverrideLog {
   changedByUid: string
   changedByName: string
   changedAt: Timestamp
+}
+
+// ─── Announcements (Phase 6, role-targeted broadcast) ─────────────────────
+//
+// Top-level collection: /announcements/{id}. Admin authors a broadcast for one
+// role (or everyone). Targeted roles read active announcements on their
+// dashboard via a constrained query. Admin-only write; staff/IR/investor read.
+
+export type AnnouncementAudience = 'all' | 'investor' | 'analyst' | 'investor_relation'
+
+export interface Announcement {
+  id: string
+  title: string
+  body: string
+  audience: AnnouncementAudience
+  /** Inactive announcements are retained but hidden from the audience banners. */
+  active: boolean
+  createdBy: string
+  createdByName: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+// ─── Documents Library (Phase 6, contracts & files) ───────────────────────
+//
+// Top-level collection: /documents/{id}. Real file uploads (Storage) grouped by
+// portfolio + category. Admin manages; staff/IR read all, investors read only
+// documents for portfolios they hold (Phase 7 surfaces the investor side).
+// Named LibraryDocument to avoid clashing with the DOM `Document` global.
+
+export type DocumentCategory = 'kontrak' | 'laporan' | 'legal' | 'lainnya'
+
+export interface LibraryDocument {
+  id: string
+  /** Owning portfolio, or null for a platform-wide document. */
+  portfolioId: string | null
+  portfolioName: string
+  title: string
+  category: DocumentCategory
+  fileName: string
+  fileUrl: string
+  storagePath: string
+  fileSize: number
+  /** Free-text version label (e.g. "v1", "2026-final"). */
+  version: string
+  uploadedBy: string
+  uploadedByName: string
+  createdAt: Timestamp
+}
+
+// ─── System Settings (Phase 6, persisted admin config) ────────────────────
+//
+// Single doc /appConfig/system. Persisted platform toggles/branding (the
+// prototype's non-persistent stubs). Staff read; admin writes.
+
+export interface SystemSettings {
+  brandName: string
+  supportEmail: string
+  /** Gate cap-table selection to KYC-verified investors only. */
+  requireKycForAllocation: boolean
+  allowInvestorSelfRegister: boolean
+  maintenanceMode: boolean
+  /** Default Arunami fee % pre-filled in the setup wizard. */
+  defaultArunamiFeePercent: number
+  updatedAt?: Timestamp
+  updatedBy?: string
+}
+
+// ─── Distribution Batches (Phase 6, payout state machine) ─────────────────
+//
+// Top-level collection: /distributionBatches/{id}. An admin creates a batch for
+// a (portfolio × period); per-investor payout lines are computed from the
+// distribution engine. Each line advances through a state machine mirroring the
+// prototype: Perlu diproses → Dilaporkan → Diteruskan, with Ditahan (held) as a
+// hold state. Integrates with — does not replace — the IR transfer-proof step.
+
+/**
+ * Per-investor payout line status:
+ * - `pending`   → Perlu diproses (freshly computed, not yet actioned)
+ * - `reported`  → Dilaporkan (payout reported/approved internally)
+ * - `forwarded` → Diteruskan (transfer sent to the investor)
+ * - `held`      → Ditahan (withheld — dispute, missing KYC, etc.)
+ */
+export type BatchLineStatus = 'pending' | 'reported' | 'forwarded' | 'held'
+
+export interface DistributionBatchLine {
+  investorUid: string
+  investorName: string
+  ownershipPercent: number
+  grossAmount: number
+  feeAmount: number
+  netAmount: number
+  status: BatchLineStatus
+  /** Reason captured when a line is put on hold. */
+  heldReason?: string
+}
+
+/** Batch-level status derived from its lines: draft until any line advances,
+ *  completed once every line is forwarded or held, else processing. */
+export type BatchStatus = 'draft' | 'processing' | 'completed'
+
+export interface DistributionBatch {
+  id: string
+  portfolioId: string
+  portfolioName: string
+  /** "YYYY-MM". */
+  period: string
+  /** Distribution model label at compute time (e.g. "Net Profit Share"). */
+  returnModelLabel: string
+  /** Net profit (or driver amount) the payouts were computed from. */
+  driverAmount: number
+  /** Sum of all line netAmounts. */
+  totalNet: number
+  status: BatchStatus
+  lines: DistributionBatchLine[]
+  createdBy: string
+  createdByName: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
 }

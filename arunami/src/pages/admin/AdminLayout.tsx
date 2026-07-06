@@ -3,11 +3,15 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
 import { auth } from '@/lib/firebase'
-import { getAllPortfolios, getAllUsers, getAllAllocations } from '@/lib/firestore'
+import { getAllPortfolios, getAllUsers, getAllAllocations, getDistributionBatches } from '@/lib/firestore'
+import { kycStatusOf } from '@/lib/kyc'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
-import { LayoutDashboard, Users, Briefcase, TrendingUp, LogOut, UserCheck, ScrollText, ShieldAlert } from 'lucide-react'
+import {
+  LayoutDashboard, Users, Briefcase, TrendingUp, LogOut, UserCheck, ScrollText, ShieldAlert,
+  ShieldCheck, Banknote, FolderOpen, Megaphone, Coins, Settings,
+} from 'lucide-react'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
@@ -15,14 +19,22 @@ export default function AdminLayout() {
   // Live "unfinished setup" attention counts surfaced as sidebar badges.
   const [noAnalystCount, setNoAnalystCount] = useState(0)
   const [unallocatedInvestorCount, setUnallocatedInvestorCount] = useState(0)
+  const [pendingKycCount, setPendingKycCount] = useState(0)
+  const [batchesToProcessCount, setBatchesToProcessCount] = useState(0)
 
   useEffect(() => {
-    Promise.all([getAllPortfolios(), getAllUsers(), getAllAllocations()])
-      .then(([portfolios, users, allocations]) => {
+    Promise.all([getAllPortfolios(), getAllUsers(), getAllAllocations(), getDistributionBatches()])
+      .then(([portfolios, users, allocations, batches]) => {
         setNoAnalystCount(portfolios.filter(p => (p.assignedAnalysts?.length ?? 0) === 0).length)
         const allocatedUids = new Set(allocations.map(a => a.investorUid))
         setUnallocatedInvestorCount(
           users.filter(u => u.role === 'investor' && !u.archived && !allocatedUids.has(u.uid)).length,
+        )
+        setPendingKycCount(
+          users.filter(u => u.role === 'investor' && !u.archived && kycStatusOf(u.kycStatus) === 'pending').length,
+        )
+        setBatchesToProcessCount(
+          batches.filter(b => b.status !== 'completed' && b.lines.some(l => l.status === 'pending')).length,
         )
       })
       .catch(err => console.error('Failed to load admin badge counts', err))
@@ -33,8 +45,14 @@ export default function AdminLayout() {
     { to: '/admin/users', label: 'Pengguna', icon: Users, badge: 0 },
     { to: '/admin/portfolios', label: 'Portofolio', icon: Briefcase, badge: noAnalystCount },
     { to: '/admin/investors', label: 'Investor', icon: UserCheck, badge: unallocatedInvestorCount },
+    { to: '/admin/kyc', label: 'Verifikasi KYC', icon: ShieldCheck, badge: pendingKycCount },
+    { to: '/admin/distributions', label: 'Distribusi', icon: Banknote, badge: batchesToProcessCount },
+    { to: '/admin/documents', label: 'Dokumen', icon: FolderOpen, badge: 0 },
+    { to: '/admin/announcements', label: 'Pengumuman', icon: Megaphone, badge: 0 },
+    { to: '/admin/platform-fees', label: 'Biaya Platform', icon: Coins, badge: 0 },
     { to: '/admin/health-rules', label: 'Kesehatan', icon: ShieldAlert, badge: 0 },
     { to: '/admin/audit-log', label: 'Log Audit', icon: ScrollText, badge: 0 },
+    { to: '/admin/settings', label: 'Pengaturan', icon: Settings, badge: 0 },
   ]
 
   const handleLogout = async () => {

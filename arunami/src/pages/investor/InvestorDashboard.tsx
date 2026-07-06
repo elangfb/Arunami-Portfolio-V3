@@ -13,12 +13,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { HealthBadge } from '@/components/shared/HealthBadge'
+import { AnnouncementsBanner } from '@/components/shared/AnnouncementsBanner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight, Wallet, FileClock } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts'
+import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight, Wallet, FileClock, BarChart3, FolderOpen, User, AlertTriangle } from 'lucide-react'
+import { HEALTH_LABELS } from '@/lib/health'
 import TransferProofNotificationBanner from '@/components/investor/TransferProofNotificationBanner'
 import { useTransferProofNotifications } from '@/components/investor/useTransferProofNotifications'
 import TransferProofHistoryList from '@/components/investor/TransferProofHistoryList'
 import type { Portfolio, InvestorAllocation, InvestorReportDoc } from '@/types'
+
+const DONUT_COLORS = ['#1e5f3f', '#38a169', '#3182ce', '#d69e2e', '#805ad5', '#dd6b20', '#319795', '#e53e3e']
 
 export default function InvestorDashboard() {
   const navigate = useNavigate()
@@ -76,6 +81,18 @@ export default function InvestorDashboard() {
   const totalBagiHasil = useMemo(() => notifications.reduce((s, n) => s + n.amount, 0), [notifications])
   const totalInvested = useMemo(() => allocations.reduce((s, a) => s + a.investedAmount, 0), [allocations])
 
+  // Allocation donut (by invested amount) + holdings needing attention (health).
+  const allocationDonut = useMemo(
+    () => allocations
+      .filter(a => a.investedAmount > 0)
+      .map(a => ({ name: portfolios.find(p => p.id === a.portfolioId)?.brandName || a.portfolioName, value: a.investedAmount })),
+    [allocations, portfolios],
+  )
+  const healthAlerts = useMemo(
+    () => portfolios.filter(p => (p.healthLevel ?? 'sehat') !== 'sehat'),
+    [portfolios],
+  )
+
   const handleLogout = async () => {
     await signOut(auth); setUser(null)
     navigate('/login', { replace: true })
@@ -102,6 +119,23 @@ export default function InvestorDashboard() {
       </header>
 
       <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <AnnouncementsBanner role="investor" />
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/investor/distributions')}>
+            <Wallet className="mr-1 h-4 w-4" />Distribusi
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/investor/performance')}>
+            <BarChart3 className="mr-1 h-4 w-4" />Kinerja
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/investor/documents')}>
+            <FolderOpen className="mr-1 h-4 w-4" />Dokumen
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/investor/profile')}>
+            <User className="mr-1 h-4 w-4" />Profil
+          </Button>
+        </div>
+
         {/* Bukti transfer alerts — only visible while uncleared ones exist. */}
         <TransferProofNotificationBanner
           notifications={notifications}
@@ -143,6 +177,59 @@ export default function InvestorDashboard() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Allocation mix + holdings needing attention (additive enrichments). */}
+        {!loading && (allocationDonut.length > 0 || healthAlerts.length > 0) && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {allocationDonut.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Komposisi Alokasi</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={allocationDonut} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                        {allocationDonut.map((_, i) => <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />)}
+                      </Pie>
+                      <RTooltip formatter={v => formatCurrencyExact(v as number)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                    {allocationDonut.map((d, i) => (
+                      <div key={d.name} className="flex items-center gap-1.5 text-xs">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                        <span className="text-muted-foreground">{d.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {healthAlerts.length > 0 && (
+              <Card className="border-amber-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />Perlu Perhatian
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {healthAlerts.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => navigate(`/investor/portfolios/${p.id}/overview`)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border p-2.5 text-left hover:bg-muted/40"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{brandOf(p)}</p>
+                        <p className="text-xs text-muted-foreground">{HEALTH_LABELS[p.healthLevel ?? 'sehat']}</p>
+                      </div>
+                      <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
         {/* All-projects reports live on the dedicated "My Report" page. */}

@@ -90,7 +90,13 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if canViewInvestorDomain() || (isSignedIn() && request.auth.uid == uid);
       allow list: if canViewInvestorDomain();
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+      // Admin edits anything; a signed-in user may edit ONLY their own
+      // profile/preference fields (Phase 7) — no role/KYC/archive escalation.
+      allow update: if isAdmin()
+        || (isSignedIn() && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['phone', 'bankName', 'bankAccountNumber', 'bankAccountHolder', 'notifyByEmail']));
     }
 
     // ─── Portfolios + nested collections ─────────────────────────────────
@@ -260,7 +266,35 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // ─── App-wide config (e.g. wanprestasi/health thresholds) ────────────
+    // ─── Announcements (role-targeted broadcast) ─────────────────────────
+    // Admin authors; any signed-in user may read/list (audience filtering is
+    // client-side and the content is non-sensitive broadcast material).
+    match /announcements/{announcementId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Documents Library (contracts & files) ───────────────────────────
+    // Admin manages; staff + IR read all. Investors read documents for the
+    // portfolios they hold (Phase 7) — the client constrains the list query by
+    // `where('portfolioId','in', theirPortfolioIds)`; the per-doc read rule
+    // enforces membership (mirrors the investorTransferProofs access model).
+    match /documents/{documentId} {
+      allow read: if canViewInvestorDomain()
+        || (isInvestor() && resource.data.portfolioId != null && isAssignedInvestorOf(resource.data.portfolioId));
+      allow list: if canViewInvestorDomain()
+        || (isInvestor() && request.query.limit <= 200);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Distribution Batches (payout state machine) ─────────────────────
+    // Admin creates & advances batches; staff + IR read for visibility.
+    match /distributionBatches/{batchId} {
+      allow read, list: if canViewInvestorDomain();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── App-wide config (health thresholds, system settings) ────────────
     // Staff read (analysts compute health client-side); only admin writes.
     match /appConfig/{docId} {
       allow read: if isStaff();

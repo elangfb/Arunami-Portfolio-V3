@@ -19,6 +19,12 @@ import AdminPortfolioOverride from '@/pages/admin/AdminPortfolioOverride'
 import AdminInvestorOverride from '@/pages/admin/AdminInvestorOverride'
 import AdminAuditLog from '@/pages/admin/AdminAuditLog'
 import AdminHealthRules from '@/pages/admin/AdminHealthRules'
+import AdminKyc from '@/pages/admin/AdminKyc'
+import AdminPlatformFees from '@/pages/admin/AdminPlatformFees'
+import AdminAnnouncements from '@/pages/admin/AdminAnnouncements'
+import AdminSettings from '@/pages/admin/AdminSettings'
+import AdminDocuments from '@/pages/admin/AdminDocuments'
+import AdminDistributions from '@/pages/admin/AdminDistributions'
 import PortfolioSetupWizard from '@/pages/admin/setup/PortfolioSetupWizard'
 
 // Analyst
@@ -45,7 +51,12 @@ import ProfitSharingPage from '@/pages/analyst/portfolio/ProfitSharingPage'
 import InvestorDashboard from '@/pages/investor/InvestorDashboard'
 import InvestorReportsPage from '@/pages/investor/InvestorReportsPage'
 import InvestorContractsPage from '@/pages/investor/InvestorContractsPage'
+import InvestorDistributionsPage from '@/pages/investor/InvestorDistributionsPage'
+import InvestorPerformancePage from '@/pages/investor/InvestorPerformancePage'
+import InvestorDocumentsPage from '@/pages/investor/InvestorDocumentsPage'
+import InvestorProfilePage from '@/pages/investor/InvestorProfilePage'
 import InvestorPortfolioLayout from '@/pages/investor/portfolio/InvestorPortfolioLayout'
+import InvestorHoldingDocumentsPage from '@/pages/investor/portfolio/InvestorHoldingDocumentsPage'
 import InvestorOverviewPage from '@/pages/investor/portfolio/InvestorOverviewPage'
 import InvestorContractPage from '@/pages/investor/portfolio/InvestorContractPage'
 import InvestorGovernancePage from '@/pages/investor/portfolio/InvestorGovernancePage'
@@ -102,6 +113,12 @@ export default function App() {
             <Route path="investors/:uid/override" element={<AdminInvestorOverride />} />
             <Route path="audit-log" element={<AdminAuditLog />} />
             <Route path="health-rules" element={<AdminHealthRules />} />
+            <Route path="kyc" element={<AdminKyc />} />
+            <Route path="distributions" element={<AdminDistributions />} />
+            <Route path="documents" element={<AdminDocuments />} />
+            <Route path="announcements" element={<AdminAnnouncements />} />
+            <Route path="platform-fees" element={<AdminPlatformFees />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
 
           {/* Analyst routes */}
@@ -209,6 +226,38 @@ export default function App() {
             }
           />
           <Route
+            path="/investor/distributions"
+            element={
+              <AuthGuard allowedRoles={['investor']}>
+                <InvestorDistributionsPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/investor/performance"
+            element={
+              <AuthGuard allowedRoles={['investor']}>
+                <InvestorPerformancePage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/investor/documents"
+            element={
+              <AuthGuard allowedRoles={['investor']}>
+                <InvestorDocumentsPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/investor/profile"
+            element={
+              <AuthGuard allowedRoles={['investor']}>
+                <InvestorProfilePage />
+              </AuthGuard>
+            }
+          />
+          <Route
             path="/investor/portfolios/:id"
             element={
               <AuthGuard allowedRoles={['investor']}>
@@ -227,6 +276,7 @@ export default function App() {
             <Route path="report" element={<InvestorReportPage />} />
             <Route path="contract" element={<InvestorContractPage />} />
             <Route path="governance" element={<InvestorGovernancePage />} />
+            <Route path="documents" element={<InvestorHoldingDocumentsPage />} />
           </Route>
 
           {/* Catch-all */}

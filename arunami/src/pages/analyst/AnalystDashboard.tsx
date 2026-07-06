@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { HealthBadge } from '@/components/shared/HealthBadge'
+import { AnnouncementsBanner } from '@/components/shared/AnnouncementsBanner'
 import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock, LayoutDashboard, Table2, BarChart3 } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
@@ -95,6 +96,7 @@ export default function AnalystDashboard() {
       </header>
 
       <main className="p-4 sm:p-6 lg:p-8">
+        <AnnouncementsBanner role="analyst" />
         <div className="mb-4 flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/analyst/overview')}>
             <LayoutDashboard className="mr-1 h-4 w-4" />Ringkasan Global
