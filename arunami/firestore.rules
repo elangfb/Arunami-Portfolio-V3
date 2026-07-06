@@ -249,5 +249,12 @@ service cloud.firestore {
       allow create: if isAdmin();
       allow update, delete: if false;
     }
+
+    // ─── App-wide config (e.g. wanprestasi/health thresholds) ────────────
+    // Staff read (analysts compute health client-side); only admin writes.
+    match /appConfig/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
   }
 }

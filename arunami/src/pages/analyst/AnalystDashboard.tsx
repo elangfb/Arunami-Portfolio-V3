@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { HealthBadge } from '@/components/shared/HealthBadge'
 import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
@@ -147,7 +148,10 @@ export default function AnalystDashboard() {
                     <span className="font-semibold text-[#1e5f3f]">{formatCurrencyCompact(p.investasiAwal)}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{p.assignedInvestors.length} investor</span>
+                    <div className="flex items-center gap-2">
+                      <span>{p.assignedInvestors.length} investor</span>
+                      <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
+                    </div>
                     {p.isGracePeriod
                       ? <Badge variant="warning">Grace · {p.graceConfig?.returnMode === 'fixed_yield' ? 'Yield' : 'Tanpa payout'}</Badge>
                       : <span>—</span>}
@@ -170,6 +174,7 @@ export default function AnalystDashboard() {
                     <th className="cursor-pointer select-none text-left px-3 py-3 font-medium" onClick={() => toggleSort('industryType')}>Industri<SortIcon col="industryType" /></th>
                     <th className="cursor-pointer select-none text-right px-3 py-3 font-medium" onClick={() => toggleSort('investasiAwal')}>Investasi Awal<SortIcon col="investasiAwal" /></th>
                     <th className="cursor-pointer select-none text-center px-3 py-3 font-medium" onClick={() => toggleSort('investors')}>Investor<SortIcon col="investors" /></th>
+                    <th className="text-center px-3 py-3 font-medium">Kesehatan</th>
                     <th className="text-center px-3 py-3 font-medium">Grace Period</th>
                   </tr>
                 </thead>
@@ -199,6 +204,9 @@ export default function AnalystDashboard() {
                       </td>
                       <td className="px-3 py-3 align-middle text-center">
                         {p.assignedInvestors.length}
+                      </td>
+                      <td className="px-3 py-3 align-middle text-center">
+                        <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
                       </td>
                       <td className="px-3 py-3 align-middle text-center">
                         {p.isGracePeriod

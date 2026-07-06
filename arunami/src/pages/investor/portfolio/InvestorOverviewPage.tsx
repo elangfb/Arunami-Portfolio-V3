@@ -6,6 +6,7 @@ import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { HealthBadge } from '@/components/shared/HealthBadge'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DollarSign, TrendingUp, BarChart2, PieChart } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
@@ -85,7 +86,15 @@ export default function InvestorOverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <h2 className="text-xl font-bold">Overview Portofolio</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-bold">Overview Portofolio</h2>
+        {portfolio?.healthLevel && portfolio.healthLevel !== 'sehat' && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Status</span>
+            <HealthBadge level={portfolio.healthLevel} reasons={portfolio.healthReasons} size="md" />
+          </div>
+        )}
+      </div>
 
       {/* My Allocation Card */}
       {allocation && myResult && (

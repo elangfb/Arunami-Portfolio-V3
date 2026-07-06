@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { getFinancialData, getReports } from '@/lib/firestore'
+import { toast } from 'sonner'
+import { getFinancialData, getReports, getHealthRules, updatePortfolioHealth } from '@/lib/firestore'
+import { computeHealth, DEFAULT_HEALTH_RULES, HEALTH_SOP } from '@/lib/health'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent, calcMoM } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { HealthBadge } from '@/components/shared/HealthBadge'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
@@ -10,7 +17,7 @@ import {
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2, AlertTriangle } from 'lucide-react'
 import { formatPeriod, previousPeriod } from '@/lib/dateUtils'
 import { buildThreeColRows } from '@/lib/reportHtml'
-import type { FinancialData, Portfolio, PnLExtractedData, ProjectionExtractedData, PortfolioReport } from '@/types'
+import type { FinancialData, Portfolio, PnLExtractedData, ProjectionExtractedData, PortfolioReport, HealthRules } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -22,10 +29,50 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true)
   const [pnlReports, setPnlReports] = useState<PortfolioReport[]>([])
   const [projReports, setProjReports] = useState<PortfolioReport[]>([])
+  // Wanprestasi / health
+  const [rules, setRules] = useState<HealthRules>(DEFAULT_HEALTH_RULES)
+  const [latenessDays, setLatenessDays] = useState(0)
+  const [lastContactDate, setLastContactDate] = useState('')
+  const [wanprestasiOpen, setWanprestasiOpen] = useState(false)
+  const [savingHealth, setSavingHealth] = useState(false)
 
   useEffect(() => {
     if (portfolioId) getFinancialData(portfolioId).then(d => { setData(d); setLoading(false) })
   }, [portfolioId])
+
+  useEffect(() => { getHealthRules().then(setRules).catch(() => {}) }, [])
+
+  useEffect(() => {
+    setLatenessDays(portfolio?.latenessDays ?? 0)
+    setLastContactDate(portfolio?.lastContactDate ?? '')
+  }, [portfolio])
+
+  // Live health — recomputed from the manual inputs + PnL-vs-projection series.
+  const health = useMemo(
+    () => computeHealth({ latenessDays, lastContactDate, profitData: data?.profitData, rules }),
+    [latenessDays, lastContactDate, data, rules],
+  )
+
+  const saveWanprestasi = async () => {
+    if (!portfolioId) return
+    setSavingHealth(true)
+    try {
+      const result = computeHealth({ latenessDays, lastContactDate, profitData: data?.profitData, rules })
+      await updatePortfolioHealth(portfolioId, {
+        latenessDays,
+        lastContactDate,
+        healthLevel: result.level,
+        healthReasons: result.reasons,
+      })
+      toast.success('Status wanprestasi diperbarui')
+      setWanprestasiOpen(false)
+    } catch (err) {
+      console.error('Failed to update health', err)
+      toast.error('Gagal memperbarui status')
+    } finally {
+      setSavingHealth(false)
+    }
+  }
 
   useEffect(() => {
     if (!portfolioId) return
@@ -143,6 +190,22 @@ export default function OverviewPage() {
     <div className="p-4 sm:p-6 space-y-6">
       <h2 className="text-xl font-bold">Overview Portofolio</h2>
 
+      {/* Wanprestasi / health banner */}
+      <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <HealthBadge level={health.level} reasons={health.reasons} size="md" />
+          <div>
+            <p className="text-sm font-medium">Status Wanprestasi</p>
+            <p className="text-xs text-muted-foreground">
+              {health.reasons.length ? health.reasons.join(' · ') : 'Semua sinyal dalam batas aman'}
+            </p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setWanprestasiOpen(true)} className="shrink-0">
+          Update
+        </Button>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpis.map(({ label, value, change, icon: Icon }) => (
@@ -252,6 +315,112 @@ export default function OverviewPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Wanprestasi SOP monitor */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm">Monitor Wanprestasi (SOP)</CardTitle>
+          <HealthBadge level={health.level} reasons={health.reasons} />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Keterlambatan</p>
+              <p className="text-lg font-bold">{health.signals.latenessDays} hari</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Tanpa Komunikasi</p>
+              <p className="text-lg font-bold">
+                {health.signals.silenceDays != null ? `${health.signals.silenceDays} hari` : '—'}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Bulan &lt; 80% Target</p>
+              <p className="text-lg font-bold">{health.signals.underTargetMonths}</p>
+            </div>
+          </div>
+
+          {health.level !== 'sehat' && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-medium text-amber-900">{HEALTH_SOP[health.level].phase}</p>
+              <p className="text-xs text-amber-700">{HEALTH_SOP[health.level].action}</p>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Laba Bersih vs Target (6 bulan terakhir)</p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="py-2 text-left font-medium">Bulan</th>
+                  <th className="py-2 text-right font-medium">Target</th>
+                  <th className="py-2 text-right font-medium">Aktual</th>
+                  <th className="py-2 text-right font-medium">% Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.profitData.filter(r => r.aktual !== 0).slice(-6).map(r => {
+                  const pct = r.proyeksi > 0 ? (r.aktual / r.proyeksi) * 100 : null
+                  const under = pct !== null && pct < 80
+                  return (
+                    <tr key={r.month} className="border-b last:border-0">
+                      <td className="py-2">{formatPeriod(r.month)}</td>
+                      <td className="py-2 text-right">{formatCurrencyCompact(r.proyeksi)}</td>
+                      <td className="py-2 text-right">{formatCurrencyCompact(r.aktual)}</td>
+                      <td className={`py-2 text-right ${under ? 'font-medium text-red-500' : ''}`}>
+                        {pct !== null ? `${pct.toFixed(0)}%` : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Wanprestasi update modal */}
+      <Dialog open={wanprestasiOpen} onOpenChange={setWanprestasiOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Update Status Wanprestasi</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Keterlambatan pembayaran/laporan (hari)</Label>
+              <Input
+                type="number"
+                value={latenessDays}
+                onChange={e => setLatenessDays(Number(e.target.value) || 0)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Tanggal kontak terakhir</Label>
+              <Input
+                type="date"
+                value={lastContactDate}
+                onChange={e => setLastContactDate(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Performa laba bersih (&lt; 80% target) dihitung otomatis dari data PnL vs proyeksi.
+            </p>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Hasil perhitungan</p>
+              <div className="mt-1 flex items-center gap-2">
+                <HealthBadge level={health.level} />
+                <span className="text-xs text-muted-foreground">
+                  {health.reasons.length ? health.reasons.join(' · ') : 'Semua sinyal dalam batas aman'}
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setWanprestasiOpen(false)}>Batal</Button>
+              <Button onClick={saveWanprestasi} disabled={savingHealth}>
+                {savingHealth ? 'Menyimpan…' : 'Simpan'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

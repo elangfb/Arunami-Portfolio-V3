@@ -7,7 +7,7 @@ import { getAllPortfolios, getAllUsers, getAllAllocations } from '@/lib/firestor
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
-import { LayoutDashboard, Users, Briefcase, TrendingUp, LogOut, UserCheck, ScrollText } from 'lucide-react'
+import { LayoutDashboard, Users, Briefcase, TrendingUp, LogOut, UserCheck, ScrollText, ShieldAlert } from 'lucide-react'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
@@ -33,6 +33,7 @@ export default function AdminLayout() {
     { to: '/admin/users', label: 'Pengguna', icon: Users, badge: 0 },
     { to: '/admin/portfolios', label: 'Portofolio', icon: Briefcase, badge: noAnalystCount },
     { to: '/admin/investors', label: 'Investor', icon: UserCheck, badge: unallocatedInvestorCount },
+    { to: '/admin/health-rules', label: 'Kesehatan', icon: ShieldAlert, badge: 0 },
     { to: '/admin/audit-log', label: 'Log Audit', icon: ScrollText, badge: 0 },
   ]
 

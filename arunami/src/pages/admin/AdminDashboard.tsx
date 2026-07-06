@@ -4,6 +4,8 @@ import { getAllUsers, getAllPortfolios } from '@/lib/firestore'
 import { buildAdminExport, downloadJson } from '@/lib/exportData'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { HealthBadge } from '@/components/shared/HealthBadge'
+import { HEALTH_LEVELS } from '@/lib/health'
 import { Users, Briefcase, UserCheck, BarChart2, Download } from 'lucide-react'
 import type { AppUser, Portfolio } from '@/types'
 
@@ -38,6 +40,11 @@ export default function AdminDashboard() {
 
   const analysts = users.filter(u => u.role === 'analyst')
   const investors = users.filter(u => u.role === 'investor')
+
+  const healthCounts = HEALTH_LEVELS.map(level => ({
+    level,
+    count: portfolios.filter(p => (p.healthLevel ?? 'sehat') === level).length,
+  }))
 
   const stats = [
     { label: 'Total Pengguna', value: users.length, icon: Users, color: 'text-blue-600' },
@@ -83,6 +90,24 @@ export default function AdminDashboard() {
             </Card>
           ))}
         </div>
+      )}
+
+      {!loading && portfolios.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Distribusi Kesehatan Portofolio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {healthCounts.map(({ level, count }) => (
+                <div key={level} className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <HealthBadge level={level} />
+                  <span className="text-lg font-bold">{count}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">

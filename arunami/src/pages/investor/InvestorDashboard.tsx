@@ -11,6 +11,7 @@ import { ownershipFraction } from '@/lib/distributionStrategies'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { HealthBadge } from '@/components/shared/HealthBadge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { TrendingUp, LogOut, Briefcase, FileText, Layers, ChevronRight, Wallet } from 'lucide-react'
 import TransferProofNotificationBanner from '@/components/investor/TransferProofNotificationBanner'
@@ -198,7 +199,10 @@ export default function InvestorDashboard() {
                         )}
                         <p className="text-xs text-muted-foreground">{p.code} · {p.stage}</p>
                       </div>
-                      <span className="text-xs bg-[#1e5f3f]/10 text-[#1e5f3f] rounded-full px-2 py-0.5 font-medium">{p.periode}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-xs bg-[#1e5f3f]/10 text-[#1e5f3f] rounded-full px-2 py-0.5 font-medium">{p.periode}</span>
+                        <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2 flex-1 flex flex-col">

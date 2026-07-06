@@ -18,6 +18,7 @@ import AdminInvestorDetail from '@/pages/admin/AdminInvestorDetail'
 import AdminPortfolioOverride from '@/pages/admin/AdminPortfolioOverride'
 import AdminInvestorOverride from '@/pages/admin/AdminInvestorOverride'
 import AdminAuditLog from '@/pages/admin/AdminAuditLog'
+import AdminHealthRules from '@/pages/admin/AdminHealthRules'
 import PortfolioSetupWizard from '@/pages/admin/setup/PortfolioSetupWizard'
 
 // Analyst
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="investors/:uid" element={<AdminInvestorDetail />} />
             <Route path="investors/:uid/override" element={<AdminInvestorOverride />} />
             <Route path="audit-log" element={<AdminAuditLog />} />
+            <Route path="health-rules" element={<AdminHealthRules />} />
           </Route>
 
           {/* Analyst routes */}

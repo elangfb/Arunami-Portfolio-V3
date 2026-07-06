@@ -4,6 +4,36 @@ import type { Timestamp } from 'firebase/firestore'
 
 export type UserRole = 'admin' | 'analyst' | 'investor' | 'investor_relation'
 
+// ─── Health / Wanprestasi (Siaga) ─────────────────────────────────────────
+
+/** Portfolio health, least → most severe. `sehat` = healthy, `siaga_1` = enforcement. */
+export type HealthLevel = 'sehat' | 'siaga_3' | 'siaga_2' | 'siaga_1'
+
+/**
+ * Per-signal Siaga thresholds. Each is the minimum value that triggers the
+ * corresponding level; `siaga1` is the most severe (highest) breakpoint.
+ */
+export interface HealthThreshold {
+  siaga3: number
+  siaga2: number
+  siaga1: number
+}
+
+/**
+ * Global wanprestasi thresholds — a single admin-owned config doc
+ * (/appConfig/health). Drives the health-derivation engine (see lib/health.ts).
+ */
+export interface HealthRules {
+  /** Days a payment/report is late. */
+  latenessDays: HealthThreshold
+  /** Days of communication silence (last contact → today). */
+  silenceDays: HealthThreshold
+  /** Consecutive months where net profit < 80% of the projection target. */
+  underTargetMonths: HealthThreshold
+  updatedAt?: Timestamp
+  updatedBy?: string
+}
+
 // ─── Portfolio Configuration ──────────────────────────────────────────────
 
 export type IndustryType = 'retail' | 'saas' | 'fnb' | 'jasa' | 'manufaktur' | 'lainnya'
@@ -219,6 +249,19 @@ export interface Portfolio {
   /** Soft-archive flag (DF-04). Archived portfolios are hidden from active lists but kept for audit. */
   archived?: boolean
   archivedAt?: Timestamp
+  // ─── Wanprestasi / health (Phase 1) ──────────────────────────────────────
+  // Manual inputs the analyst sets in the Wanprestasi modal, plus the derived
+  // level denormalized onto the portfolio so list views can show a badge
+  // without loading each portfolio's financial data. Recomputed on modal save.
+  /** Days a payment/report is currently late (manual input). */
+  latenessDays?: number
+  /** Last date the analyst had contact with the company (YYYY-MM-DD). */
+  lastContactDate?: string
+  /** Derived Siaga level (defaults to 'sehat' when absent). */
+  healthLevel?: HealthLevel
+  /** Human-readable reasons behind the current level. */
+  healthReasons?: string[]
+  healthComputedAt?: Timestamp
   createdAt: Timestamp
   updatedAt: Timestamp
 }

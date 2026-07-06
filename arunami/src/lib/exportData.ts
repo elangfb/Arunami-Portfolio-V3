@@ -1,10 +1,10 @@
 import {
   getAllUsers, getAllPortfolios, getAllAllocations,
-  getPortfolioConfig, getFinancialData, getReports,
+  getPortfolioConfig, getFinancialData, getReports, getHealthRules,
 } from './firestore'
 import type {
   AppUser, Portfolio, InvestorAllocation,
-  PortfolioConfig, FinancialData, PortfolioReport,
+  PortfolioConfig, FinancialData, PortfolioReport, HealthRules,
 } from '@/types'
 
 export interface PortfolioExport extends Portfolio {
@@ -20,6 +20,7 @@ export interface AdminExport {
   investors: AppUser[]
   allocations: InvestorAllocation[]
   portfolios: PortfolioExport[]
+  healthRules: HealthRules
 }
 
 /**
@@ -28,10 +29,11 @@ export interface AdminExport {
  * does not abort the whole export.
  */
 export async function buildAdminExport(): Promise<AdminExport> {
-  const [users, portfolios, allocations] = await Promise.all([
+  const [users, portfolios, allocations, healthRules] = await Promise.all([
     getAllUsers(),
     getAllPortfolios(),
     getAllAllocations(),
+    getHealthRules(),
   ])
 
   const enrichedPortfolios = await Promise.all(
@@ -58,6 +60,7 @@ export async function buildAdminExport(): Promise<AdminExport> {
     investors: users.filter(u => u.role === 'investor'),
     allocations,
     portfolios: enrichedPortfolios,
+    healthRules,
   }
 }
 

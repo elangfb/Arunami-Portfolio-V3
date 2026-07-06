@@ -16,9 +16,11 @@ import type {
   InvestorConfigUnion, ConfigChangeKind, ReturnModelType,
   InvestorTransferProof, InvestorNotification, BagiHasilManualEntry,
   AdminOverrideScope, AdminOverrideLog,
+  HealthRules, HealthLevel,
 } from '@/types'
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
+import { DEFAULT_HEALTH_RULES } from '@/lib/health'
 
 // ─── Users ────────────────────────────────────────────────────────────────
 
@@ -1474,4 +1476,48 @@ export async function getAllAdminOverrides(): Promise<AdminOverrideLog[]> {
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }) as AdminOverrideLog)
     .sort((a, b) => (b.changedAt?.seconds ?? 0) - (a.changedAt?.seconds ?? 0))
+}
+
+// ─── Health / Wanprestasi (Siaga) ─────────────────────────────────────────
+//
+// Global thresholds live in a single admin-owned doc /appConfig/health. The
+// derived per-portfolio level is denormalized onto the portfolio doc (see
+// updatePortfolioHealth) so list views read a cheap `healthLevel` field.
+
+export async function getHealthRules(): Promise<HealthRules> {
+  const snap = await getDoc(doc(db, 'appConfig', 'health'))
+  if (!snap.exists()) return DEFAULT_HEALTH_RULES
+  return { ...DEFAULT_HEALTH_RULES, ...(snap.data() as Partial<HealthRules>) }
+}
+
+export async function saveHealthRules(
+  rules: Pick<HealthRules, 'latenessDays' | 'silenceDays' | 'underTargetMonths'>,
+  updatedBy: string,
+): Promise<void> {
+  await setDoc(
+    doc(db, 'appConfig', 'health'),
+    { ...rules, updatedBy, updatedAt: serverTimestamp() },
+    { merge: true },
+  )
+}
+
+/**
+ * Persist the analyst's manual wanprestasi inputs plus the freshly derived
+ * level/reasons onto the portfolio. Kept out of the typed `updatePortfolio`
+ * path so `serverTimestamp()` doesn't fight the `Partial<Portfolio>` types.
+ */
+export async function updatePortfolioHealth(
+  portfolioId: string,
+  fields: {
+    latenessDays: number
+    lastContactDate: string
+    healthLevel: HealthLevel
+    healthReasons: string[]
+  },
+): Promise<void> {
+  await updateDoc(doc(db, 'portfolios', portfolioId), {
+    ...fields,
+    healthComputedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
 }
