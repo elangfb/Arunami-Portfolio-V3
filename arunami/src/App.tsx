@@ -24,6 +24,9 @@ import PortfolioSetupWizard from '@/pages/admin/setup/PortfolioSetupWizard'
 // Analyst
 import AnalystDashboard from '@/pages/analyst/AnalystDashboard'
 import AnalystRenewals from '@/pages/analyst/AnalystRenewals'
+import AnalystOverview from '@/pages/analyst/AnalystOverview'
+import AnalystMonthly from '@/pages/analyst/AnalystMonthly'
+import AnalystBenchmarking from '@/pages/analyst/AnalystBenchmarking'
 import AnalystPortfolioLayout from '@/pages/analyst/portfolio/AnalystPortfolioLayout'
 import OverviewPage from '@/pages/analyst/portfolio/OverviewPage'
 import PnLPage from '@/pages/analyst/portfolio/PnLPage'
@@ -115,6 +118,30 @@ export default function App() {
             element={
               <AuthGuard allowedRoles={['admin', 'analyst']}>
                 <AnalystRenewals />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/analyst/overview"
+            element={
+              <AuthGuard allowedRoles={['admin', 'analyst']}>
+                <AnalystOverview />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/analyst/monthly"
+            element={
+              <AuthGuard allowedRoles={['admin', 'analyst']}>
+                <AnalystMonthly />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/analyst/benchmarking"
+            element={
+              <AuthGuard allowedRoles={['admin', 'analyst']}>
+                <AnalystBenchmarking />
               </AuthGuard>
             }
           />

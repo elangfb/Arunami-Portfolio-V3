@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { HealthBadge } from '@/components/shared/HealthBadge'
-import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock } from 'lucide-react'
+import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock, LayoutDashboard, Table2, BarChart3 } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 type SortKey = 'name' | 'code' | 'stage' | 'periode' | 'industryType' | 'investasiAwal' | 'investors'
@@ -87,9 +87,6 @@ export default function AnalystDashboard() {
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden text-sm text-muted-foreground sm:inline">Halo, {user?.displayName}</span>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/analyst/renewals')}>
-              <FileClock className="mr-1 h-4 w-4" />Perpanjangan Kontrak
-            </Button>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="mr-1 h-4 w-4" />Keluar
             </Button>
@@ -98,6 +95,21 @@ export default function AnalystDashboard() {
       </header>
 
       <main className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/overview')}>
+            <LayoutDashboard className="mr-1 h-4 w-4" />Ringkasan Global
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/monthly')}>
+            <Table2 className="mr-1 h-4 w-4" />Data Bulanan
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/benchmarking')}>
+            <BarChart3 className="mr-1 h-4 w-4" />Benchmarking
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/renewals')}>
+            <FileClock className="mr-1 h-4 w-4" />Perpanjangan Kontrak
+          </Button>
+        </div>
+
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Dashboard Analis</h1>
