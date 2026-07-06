@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { AnnouncementsBanner } from '@/components/shared/AnnouncementsBanner'
-import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock, LayoutDashboard, Table2, BarChart3 } from 'lucide-react'
+import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock, LayoutDashboard, Table2, BarChart3, Presentation, Mail, StickyNote } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 type SortKey = 'name' | 'code' | 'stage' | 'periode' | 'industryType' | 'investasiAwal' | 'investors'
@@ -109,6 +109,15 @@ export default function AnalystDashboard() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/analyst/renewals')}>
             <FileClock className="mr-1 h-4 w-4" />Perpanjangan Kontrak
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/engagement')}>
+            <Mail className="mr-1 h-4 w-4" />Engagement
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/notes')}>
+            <StickyNote className="mr-1 h-4 w-4" />Catatan Global
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/meeting')}>
+            <Presentation className="mr-1 h-4 w-4" />Mode Rapat
           </Button>
         </div>
 

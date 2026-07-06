@@ -33,6 +33,9 @@ import AnalystRenewals from '@/pages/analyst/AnalystRenewals'
 import AnalystOverview from '@/pages/analyst/AnalystOverview'
 import AnalystMonthly from '@/pages/analyst/AnalystMonthly'
 import AnalystBenchmarking from '@/pages/analyst/AnalystBenchmarking'
+import MeetingMode from '@/pages/analyst/MeetingMode'
+import AnalystEngagement from '@/pages/analyst/AnalystEngagement'
+import AnalystNotes from '@/pages/analyst/AnalystNotes'
 import AnalystPortfolioLayout from '@/pages/analyst/portfolio/AnalystPortfolioLayout'
 import OverviewPage from '@/pages/analyst/portfolio/OverviewPage'
 import PnLPage from '@/pages/analyst/portfolio/PnLPage'
@@ -159,6 +162,30 @@ export default function App() {
             element={
               <AuthGuard allowedRoles={['admin', 'analyst']}>
                 <AnalystBenchmarking />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/analyst/meeting"
+            element={
+              <AuthGuard allowedRoles={['admin', 'analyst']}>
+                <MeetingMode />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/analyst/engagement"
+            element={
+              <AuthGuard allowedRoles={['admin', 'analyst']}>
+                <AnalystEngagement />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/analyst/notes"
+            element={
+              <AuthGuard allowedRoles={['admin', 'analyst']}>
+                <AnalystNotes />
               </AuthGuard>
             }
           />

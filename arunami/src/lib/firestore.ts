@@ -812,6 +812,18 @@ export async function getInvestorReportsForPortfolio(
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorReportDoc)
 }
 
+/**
+ * Every per-investor report (draft + published, all periods) nested under a
+ * portfolio — powers the analyst Engagement view. Reads the nested subcollection
+ * (staff-readable) rather than the top-level mirror, which analysts can't list.
+ */
+export async function getAllInvestorReportsForPortfolio(
+  portfolioId: string,
+): Promise<InvestorReportDoc[]> {
+  const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'investorReports'))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as InvestorReportDoc)
+}
+
 export async function getPublishedInvestorReports(
   investorUid: string,
 ): Promise<InvestorReportDoc[]> {
