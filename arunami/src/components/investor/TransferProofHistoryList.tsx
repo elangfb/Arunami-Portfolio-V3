@@ -37,12 +37,14 @@ export default function TransferProofHistoryList({ notifications, resolveBrand }
           ) : (
             <div className="divide-y">
               {sorted.map(n => (
-                <div key={n.id} className="flex items-center gap-3 py-3">
-                  <button
-                    onClick={() => setPreviewing(n)}
-                    className="h-12 w-12 shrink-0 rounded border border-slate-200 overflow-hidden hover:opacity-90"
-                    aria-label="Lihat bukti"
-                  >
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => setPreviewing(n)}
+                  className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-slate-50"
+                  aria-label="Lihat bukti transfer"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-slate-200 overflow-hidden">
                     {isPdfProof(n.fileName ?? n.fileUrl) ? (
                       <span className="flex h-full w-full items-center justify-center bg-slate-100">
                         <FileText className="h-5 w-5 text-[#2563eb]" />
@@ -50,7 +52,7 @@ export default function TransferProofHistoryList({ notifications, resolveBrand }
                     ) : (
                       <img src={n.fileUrl} alt="" className="h-full w-full object-cover" />
                     )}
-                  </button>
+                  </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#0f172a] truncate">
                       {resolveBrand({ ptName: n.portfolioName })} · {periodLabel(n)}
@@ -69,7 +71,7 @@ export default function TransferProofHistoryList({ notifications, resolveBrand }
                       )}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

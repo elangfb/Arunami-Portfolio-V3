@@ -73,8 +73,13 @@ investorNotifications   → staff / IR create; investor may only flip {cleared, 
 ```
 
 `storage.rules` constrains the upload path to `transferProofs/{investorUid}/{reportId}/{fileName}`,
-caps at 5 MB, and restricts `contentType` to `image/*`. The investor can read
-files under their own `investorUid` prefix; staff / IR can read any.
+caps at 5 MB, and restricts `contentType` to `image/*` or `application/pdf`. The
+investor can read files under their own `investorUid` prefix; staff / IR can read any.
+
+> **Cross-service note:** the role checks read `users/{uid}` from Firestore. In
+> Storage rules this **must** use `firestore.get(/databases/(default)/documents/users/$(uid))`
+> — the bare `get(/databases/$(database)/...)` Firestore-rules syntax is invalid
+> in Storage rules and silently denies every upload.
 
 ## UI Flow
 
@@ -117,7 +122,7 @@ files under their own `investorUid` prefix; staff / IR can read any.
 - `src/pages/investor/InvestorDashboard.tsx` — mounted banner and history tab.
 
 ## Validation
-- File: PNG/JPG/JPEG/WEBP, ≤ 5 MB (enforced in both `react-dropzone` and `storage.rules`).
+- File: PNG/JPG/JPEG/WEBP/PDF, ≤ 5 MB (enforced in both `react-dropzone` and `storage.rules`).
 - Amount: positive number, required.
 - Notes: ≤ 280 chars, optional.
 - All form fields validated through `zod` via `@hookform/resolvers` (already installed).
