@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { History } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
 import type { EquityChangeEntry, ConfigChangeKind } from '@/types'
@@ -53,41 +54,41 @@ export default function HistorySection({ history }: { history: EquityChangeEntry
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-black">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-black">
-                  <th className="py-2 pr-3 font-medium">Tanggal</th>
-                  <th className="py-2 pr-3 font-medium">Jenis</th>
-                  <th className="py-2 pr-3 font-medium">Diubah Oleh</th>
-                  <th className="py-2 pr-3 font-medium">Dari → Menjadi</th>
-                  <th className="py-2 pr-3 font-medium">Berlaku</th>
-                  <th className="py-2 pr-3 font-medium">Alasan</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="text-black">
+              <TableHeader>
+                <TableRow className="text-left text-xs uppercase tracking-wide text-black">
+                  <TableHead className="py-2 pr-3 font-medium text-black">Tanggal</TableHead>
+                  <TableHead className="py-2 pr-3 font-medium text-black">Jenis</TableHead>
+                  <TableHead className="py-2 pr-3 font-medium text-black">Diubah Oleh</TableHead>
+                  <TableHead className="py-2 pr-3 font-medium text-black">Dari → Menjadi</TableHead>
+                  <TableHead className="py-2 pr-3 font-medium text-black">Berlaku</TableHead>
+                  <TableHead className="py-2 pr-3 font-medium text-black">Alasan</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {history.map(row => {
                   const change = renderChange(row)
                   return (
-                    <tr key={row.id} className="border-b last:border-0 align-top">
-                      <td className="py-3 pr-3 whitespace-nowrap">{formatDate(row.changedAt?.seconds)}</td>
-                      <td className="py-3 pr-3">
+                    <TableRow key={row.id} className="align-top">
+                      <TableCell className="py-3 pr-3 whitespace-nowrap">{formatDate(row.changedAt?.seconds)}</TableCell>
+                      <TableCell className="py-3 pr-3">
                         <Badge variant="outline" className="whitespace-nowrap">{change.label}</Badge>
-                      </td>
-                      <td className="py-3 pr-3">{row.changedByName}</td>
-                      <td className="py-3 pr-3 whitespace-nowrap font-mono text-xs">
+                      </TableCell>
+                      <TableCell className="py-3 pr-3">{row.changedByName}</TableCell>
+                      <TableCell className="py-3 pr-3 whitespace-nowrap font-mono text-xs">
                         {change.from} → <span className="font-semibold text-[#38a169]">{change.to}</span>
-                      </td>
-                      <td className="py-3 pr-3 whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="py-3 pr-3 whitespace-nowrap">
                         {row.effectiveFromPeriod ? formatPeriod(row.effectiveFromPeriod) : '-'}
-                      </td>
-                      <td className="py-3 pr-3">
+                      </TableCell>
+                      <TableCell className="py-3 pr-3">
                         <div className="text-black">{row.reasonNote || '-'}</div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </CardContent>

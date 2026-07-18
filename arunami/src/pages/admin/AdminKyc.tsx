@@ -18,6 +18,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
 import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from '@/components/ui/table'
+import {
   ShieldCheck, Search, Upload, FileText, ExternalLink, Check, X, Loader2,
 } from 'lucide-react'
 import type { AppUser, KycStatus, KycDocSlot, KycDocument, InvestorType } from '@/types'
@@ -91,37 +94,37 @@ export default function AdminKyc() {
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr className="border-b">
-                <th className="px-3 py-3 text-left font-medium">Investor</th>
-                <th className="px-3 py-3 text-left font-medium">Tipe</th>
-                <th className="px-3 py-3 text-center font-medium">Dokumen</th>
-                <th className="px-3 py-3 text-center font-medium">Status</th>
-                <th className="px-3 py-3 text-right font-medium w-24">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+          <Table className="text-sm">
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="px-3 py-3 text-left font-medium">Investor</TableHead>
+                <TableHead className="px-3 py-3 text-left font-medium">Tipe</TableHead>
+                <TableHead className="px-3 py-3 text-center font-medium">Dokumen</TableHead>
+                <TableHead className="px-3 py-3 text-center font-medium">Status</TableHead>
+                <TableHead className="px-3 py-3 text-right font-medium w-24">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y">
               {loading ? (
-                <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Memuat…</td></tr>
+                <TableRow><TableCell colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Memuat…</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Tidak ada investor yang cocok.</td></tr>
+                <TableRow><TableCell colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Tidak ada investor yang cocok.</TableCell></TableRow>
               ) : filtered.map(inv => (
-                <tr key={inv.uid} className="hover:bg-muted/30">
-                  <td className="px-3 py-2.5">
+                <TableRow key={inv.uid} className="hover:bg-muted/30">
+                  <TableCell className="px-3 py-2.5">
                     <div className="font-medium">{inv.displayName}</div>
                     <div className="text-xs text-muted-foreground">{inv.email}</div>
-                  </td>
-                  <td className="px-3 py-2.5 capitalize text-muted-foreground">{inv.investorType ?? '—'}</td>
-                  <td className="px-3 py-2.5 text-center text-muted-foreground">{inv.kycDocuments?.length ?? 0}/3</td>
-                  <td className="px-3 py-2.5 text-center"><KycBadge status={inv.kycStatus} /></td>
-                  <td className="px-3 py-2.5 text-right">
+                  </TableCell>
+                  <TableCell className="px-3 py-2.5 capitalize text-muted-foreground">{inv.investorType ?? '—'}</TableCell>
+                  <TableCell className="px-3 py-2.5 text-center text-muted-foreground">{inv.kycDocuments?.length ?? 0}/3</TableCell>
+                  <TableCell className="px-3 py-2.5 text-center"><KycBadge status={inv.kycStatus} /></TableCell>
+                  <TableCell className="px-3 py-2.5 text-right">
                     <Button size="sm" variant="outline" onClick={() => setReviewing(inv)}>Tinjau</Button>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </Card>
 

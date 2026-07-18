@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Plus, Pencil, Trash2, Target } from 'lucide-react'
 import type { Milestone, MilestoneStatus, Portfolio } from '@/types'
 
@@ -100,42 +101,40 @@ export default function MilestonesPage() {
         </div>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr className="border-b">
-                  <th className="px-3 py-3 text-left font-medium">Milestone</th>
-                  <th className="px-3 py-3 text-left font-medium">Target</th>
-                  <th className="px-3 py-3 text-center font-medium">Status</th>
-                  <th className="px-3 py-3 text-right font-medium w-20">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {items.map(m => (
-                  <tr key={m.id} className="hover:bg-muted/30">
-                    <td className="px-3 py-3">
-                      <p className="font-medium">{m.title}</p>
-                      {m.successCriteria && <p className="text-xs text-muted-foreground">{m.successCriteria}</p>}
-                    </td>
-                    <td className="px-3 py-3 text-muted-foreground">{m.targetDate || '—'}</td>
-                    <td className="px-3 py-3 text-center">
-                      <Badge variant={STATUS_VARIANT[m.status]}>{STATUS_LABEL[m.status]}</Badge>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(m)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove(m)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead>Milestone</TableHead>
+                <TableHead>Target</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right w-20">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map(m => (
+                <TableRow key={m.id} className="hover:bg-muted/30">
+                  <TableCell>
+                    <p className="font-medium">{m.title}</p>
+                    {m.successCriteria && <p className="text-xs text-muted-foreground">{m.successCriteria}</p>}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{m.targetDate || '—'}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant={STATUS_VARIANT[m.status]}>{STATUS_LABEL[m.status]}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(m)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove(m)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       )}
 

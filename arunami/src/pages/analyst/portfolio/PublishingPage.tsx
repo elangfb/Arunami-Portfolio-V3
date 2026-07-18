@@ -342,10 +342,11 @@ export default function PublishingPage() {
                     const isSelected = alloc.investorUid === selectedInvestorUid
                     return (
                       <li key={alloc.id}>
-                        <button
+                        <Button
+                          variant="ghost"
                           type="button"
                           onClick={() => setSelectedInvestorUid(alloc.investorUid)}
-                          className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/40 ${
+                          className={`h-auto w-full flex items-center justify-between gap-2 rounded-none px-4 py-3 text-left hover:bg-muted/40 ${
                             isSelected ? 'bg-muted/60' : ''
                           }`}
                         >
@@ -364,7 +365,7 @@ export default function PublishingPage() {
                           ) : (
                             <Badge variant="outline" className="shrink-0 text-muted-foreground">—</Badge>
                           )}
-                        </button>
+                        </Button>
                       </li>
                     )
                   })}

@@ -3,6 +3,8 @@ import { formatPeriod, addMonthOffset } from '@/lib/dateUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Loader2, CheckCircle2, ChevronDown, ChevronUp, Plus, X, Pencil, Check } from 'lucide-react'
 import type {
   ProjectionUploadPending,
@@ -583,12 +585,11 @@ export function ProjectionReviewTable({
       </div>
 
       <div className="rounded-lg border p-4 space-y-2">
-        <label className="text-sm font-medium">Asumsi</label>
-        <textarea
+        <Label className="text-sm font-medium">Asumsi</Label>
+        <Textarea
           value={data.assumptions ?? ''}
           onChange={e => handleAssumptionsChange(e.target.value)}
           rows={3}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           placeholder="Catatan asumsi proyeksi..."
         />
       </div>

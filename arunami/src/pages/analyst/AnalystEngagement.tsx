@@ -17,6 +17,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { TrendingUp, ArrowLeft, Mail, MailCheck, MailX, Send, Loader2 } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
@@ -160,42 +161,40 @@ export default function AnalystEngagement() {
             </div>
 
             <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr className="border-b">
-                      <th className="px-3 py-3 text-left font-medium">Investor</th>
-                      <th className="px-3 py-3 text-left font-medium">Portofolio</th>
-                      <th className="px-3 py-3 text-left font-medium">Periode</th>
-                      <th className="px-3 py-3 text-center font-medium">Status</th>
-                      <th className="px-3 py-3 text-right font-medium w-28">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filtered.length === 0 ? (
-                      <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Belum ada laporan investor.</td></tr>
-                    ) : filtered.map(r => (
-                      <tr key={r.key} className="hover:bg-muted/30">
-                        <td className="px-3 py-2.5 font-medium">{r.investorName}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{r.portfolioName}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{formatPeriod(r.period)}</td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_META[r.status].cls}`}>
-                            {STATUS_META[r.status].label}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          {r.status !== 'read' && (
-                            <Button size="sm" variant="outline" onClick={() => setReminder(r)}>
-                              <Send className="mr-1 h-3.5 w-3.5" />Ingatkan
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Investor</TableHead>
+                    <TableHead>Portofolio</TableHead>
+                    <TableHead>Periode</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right w-28">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Belum ada laporan investor.</TableCell></TableRow>
+                  ) : filtered.map(r => (
+                    <TableRow key={r.key} className="hover:bg-muted/30">
+                      <TableCell className="font-medium">{r.investorName}</TableCell>
+                      <TableCell className="text-muted-foreground">{r.portfolioName}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatPeriod(r.period)}</TableCell>
+                      <TableCell className="text-center">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_META[r.status].cls}`}>
+                          {STATUS_META[r.status].label}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {r.status !== 'read' && (
+                          <Button size="sm" variant="outline" onClick={() => setReminder(r)}>
+                            <Send className="mr-1 h-3.5 w-3.5" />Ingatkan
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
           </>
         )}

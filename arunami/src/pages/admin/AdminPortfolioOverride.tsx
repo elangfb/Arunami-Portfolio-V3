@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import OverrideSection from '@/components/admin/OverrideSection'
 import { useAuthStore } from '@/store/authStore'
 import { brandOf } from '@/lib/portfolioName'
@@ -508,36 +509,36 @@ function AllocationsSection({ portfolio, allocations, investors, onSaved, logOve
 
         {allocations.length > 0 ? (
           <div className="rounded-md border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left py-2 px-3 font-medium">Investor</th>
-                  <th className="text-right py-2 px-3 font-medium">Investasi</th>
-                  <th className="text-center py-2 px-3 font-medium">Persentase</th>
-                  <th className="text-right py-2 px-3 font-medium w-20">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+            <Table className="text-sm">
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead className="text-left py-2 px-3 font-medium">Investor</TableHead>
+                  <TableHead className="text-right py-2 px-3 font-medium">Investasi</TableHead>
+                  <TableHead className="text-center py-2 px-3 font-medium">Persentase</TableHead>
+                  <TableHead className="text-right py-2 px-3 font-medium w-20">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y">
                 {allocations.map(a => {
                   const editing = editId === a.id
                   const investorUser = investors.find(i => i.uid === a.investorUid)
                   return (
-                    <tr key={a.id} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3">
+                    <TableRow key={a.id} className="hover:bg-muted/30">
+                      <TableCell className="py-2.5 px-3">
                         <p className="font-medium">{investorUser?.displayName ?? a.investorName}</p>
                         <p className="text-xs text-muted-foreground">{investorUser?.email ?? a.investorEmail}</p>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3 text-right">
                         {editing
                           ? <Input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} className="h-8 w-32 text-right ml-auto" />
                           : formatCurrencyCompact(a.investedAmount)}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3 text-center">
                         {editing
                           ? <Input type="number" value={editPercent} onChange={e => setEditPercent(e.target.value)} className="h-8 w-20 text-center mx-auto" />
                           : (a.ownershipPercent != null ? `${a.ownershipPercent}%` : '—')}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3 text-right">
                         {editing ? (
                           <div className="flex justify-end gap-1">
                             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditId(null)} disabled={busy}>Batal</Button>
@@ -549,12 +550,12 @@ function AllocationsSection({ portfolio, allocations, investors, onSaved, logOve
                             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove(a)}><Trash2 className="h-3 w-3" /></Button>
                           </div>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         ) : (
           <p className="text-center text-xs text-muted-foreground py-2">Belum ada alokasi investor.</p>

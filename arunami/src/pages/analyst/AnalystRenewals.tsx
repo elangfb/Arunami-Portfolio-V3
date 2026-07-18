@@ -6,6 +6,7 @@ import { brandOf } from '@/lib/portfolioName'
 import { contractStatus, daysRemainingLabel, type ContractSeverity } from '@/lib/contracts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { ContractBadge, ContractDurationBar } from '@/components/shared/ContractStatus'
 import { TrendingUp, ArrowLeft, AlertTriangle, FileClock } from 'lucide-react'
 import type { Portfolio } from '@/types'
@@ -121,41 +122,39 @@ export default function AnalystRenewals() {
             )}
 
             <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr className="border-b">
-                      <th className="px-3 py-3 text-left font-medium">Portofolio</th>
-                      <th className="px-3 py-3 text-left font-medium">Mulai</th>
-                      <th className="px-3 py-3 text-left font-medium">Akhir</th>
-                      <th className="px-3 py-3 text-center font-medium">Status</th>
-                      <th className="px-3 py-3 text-left font-medium">Durasi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {rows.length === 0 ? (
-                      <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Belum ada portofolio.</td></tr>
-                    ) : rows.map(({ portfolio, severity }) => (
-                      <tr
-                        key={portfolio.id}
-                        className="cursor-pointer hover:bg-muted/30"
-                        onClick={() => navigate(`/analyst/portfolios/${portfolio.id}/overview`)}
-                      >
-                        <td className="px-3 py-3">
-                          <p className="font-medium">{brandOf(portfolio)}</p>
-                          <p className="text-xs text-muted-foreground">{portfolio.code}</p>
-                        </td>
-                        <td className="px-3 py-3 text-muted-foreground">{portfolio.contractStart || '—'}</td>
-                        <td className="px-3 py-3 text-muted-foreground">{portfolio.contractEnd || '—'}</td>
-                        <td className="px-3 py-3 text-center"><ContractBadge severity={severity} /></td>
-                        <td className="px-3 py-3">
-                          <ContractDurationBar start={portfolio.contractStart} end={portfolio.contractEnd} className="min-w-[140px]" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Portofolio</TableHead>
+                    <TableHead>Mulai</TableHead>
+                    <TableHead>Akhir</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead>Durasi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Belum ada portofolio.</TableCell></TableRow>
+                  ) : rows.map(({ portfolio, severity }) => (
+                    <TableRow
+                      key={portfolio.id}
+                      className="cursor-pointer hover:bg-muted/30"
+                      onClick={() => navigate(`/analyst/portfolios/${portfolio.id}/overview`)}
+                    >
+                      <TableCell>
+                        <p className="font-medium">{brandOf(portfolio)}</p>
+                        <p className="text-xs text-muted-foreground">{portfolio.code}</p>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{portfolio.contractStart || '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{portfolio.contractEnd || '—'}</TableCell>
+                      <TableCell className="text-center"><ContractBadge severity={severity} /></TableCell>
+                      <TableCell>
+                        <ContractDurationBar start={portfolio.contractStart} end={portfolio.contractEnd} className="min-w-[140px]" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
           </>
         )}

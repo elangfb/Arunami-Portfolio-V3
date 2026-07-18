@@ -11,6 +11,9 @@ import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from '@/components/ui/table'
 import { formatCurrencyExact } from '@/lib/utils'
 import { DISTRIBUTION_MODEL_OPTIONS } from '@/lib/distributionStrategies'
 import type { ReturnModelType, CustomVariableSource } from '@/types'
@@ -367,30 +370,30 @@ function FixedScheduleFields({ getValues, setValue, register }: any) {
       {/* Payment list */}
       {payments.length > 0 && (
         <div className="rounded-md border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="px-3 py-2 text-left">Periode</th>
-                <th className="px-3 py-2 text-left">Jumlah</th>
-                <th className="px-3 py-2 text-left">Label</th>
-                <th className="px-3 py-2 w-10" />
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="text-sm">
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="px-3 py-2 text-left">Periode</TableHead>
+                <TableHead className="px-3 py-2 text-left">Jumlah</TableHead>
+                <TableHead className="px-3 py-2 text-left">Label</TableHead>
+                <TableHead className="px-3 py-2 w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {payments.map((p: any) => (
-                <tr key={p.id} className="border-b last:border-0">
-                  <td className="px-3 py-2">{p.dueDate}</td>
-                  <td className="px-3 py-2">{formatCurrencyExact(p.amount)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{p.label ?? '-'}</td>
-                  <td className="px-3 py-2">
+                <TableRow key={p.id} className="last:border-0">
+                  <TableCell className="px-3 py-2">{p.dueDate}</TableCell>
+                  <TableCell className="px-3 py-2">{formatCurrencyExact(p.amount)}</TableCell>
+                  <TableCell className="px-3 py-2 text-muted-foreground">{p.label ?? '-'}</TableCell>
+                  <TableCell className="px-3 py-2">
                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removePayment(p.id)}>
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
 
@@ -493,34 +496,34 @@ function CustomFields({ getValues, setValue, register, errors }: any) {
       {/* Variable list */}
       {variables.length > 0 && (
         <div className="rounded-md border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="px-3 py-2 text-left">ID</th>
-                <th className="px-3 py-2 text-left">Nama</th>
-                <th className="px-3 py-2 text-left">Tipe</th>
-                <th className="px-3 py-2 text-left">Sumber</th>
-                <th className="px-3 py-2 w-10" />
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="text-sm">
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="px-3 py-2 text-left">ID</TableHead>
+                <TableHead className="px-3 py-2 text-left">Nama</TableHead>
+                <TableHead className="px-3 py-2 text-left">Tipe</TableHead>
+                <TableHead className="px-3 py-2 text-left">Sumber</TableHead>
+                <TableHead className="px-3 py-2 w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {variables.map((v: any) => (
-                <tr key={v.id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-mono text-xs">{v.id}</td>
-                  <td className="px-3 py-2">{v.name}</td>
-                  <td className="px-3 py-2">{v.type}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                <TableRow key={v.id} className="last:border-0">
+                  <TableCell className="px-3 py-2 font-mono text-xs">{v.id}</TableCell>
+                  <TableCell className="px-3 py-2">{v.name}</TableCell>
+                  <TableCell className="px-3 py-2">{v.type}</TableCell>
+                  <TableCell className="px-3 py-2 text-muted-foreground">
                     {VARIABLE_SOURCES.find(s => s.value === v.source)?.label}
-                  </td>
-                  <td className="px-3 py-2">
+                  </TableCell>
+                  <TableCell className="px-3 py-2">
                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeVariable(v.id)}>
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
 

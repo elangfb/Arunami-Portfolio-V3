@@ -13,6 +13,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { TrendingUp, ArrowLeft, StickyNote, ListChecks, History, Inbox } from 'lucide-react'
 import type { ActionStatus, ActionCategory, ConfigChangeKind } from '@/types'
 
@@ -156,36 +157,34 @@ export default function AnalystNotes() {
                 <Empty label="Tidak ada action item." />
               ) : (
                 <Card className="overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50">
-                        <tr className="border-b">
-                          <th className="px-3 py-2 text-left font-medium">Tindakan</th>
-                          <th className="px-3 py-2 text-left font-medium">Portofolio</th>
-                          <th className="px-3 py-2 text-left font-medium">Periode</th>
-                          <th className="px-3 py-2 text-left font-medium">Kategori</th>
-                          <th className="px-3 py-2 text-left font-medium">PJ</th>
-                          <th className="px-3 py-2 text-left font-medium">Tenggat</th>
-                          <th className="px-3 py-2 text-center font-medium">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {filteredActions.map(a => (
-                          <tr key={a.key} className="hover:bg-muted/30">
-                            <td className="px-3 py-2.5 font-medium">{a.title}</td>
-                            <td className="px-3 py-2.5 text-muted-foreground">{a.portfolioName}</td>
-                            <td className="px-3 py-2.5 text-muted-foreground">{a.period ? formatPeriod(a.period) : '—'}</td>
-                            <td className="px-3 py-2.5 text-muted-foreground">{ACTION_CATEGORY[a.category]}</td>
-                            <td className="px-3 py-2.5 text-muted-foreground">{a.assignee || '—'}</td>
-                            <td className="px-3 py-2.5 text-muted-foreground">{a.dueDate || '—'}</td>
-                            <td className="px-3 py-2.5 text-center">
-                              <Badge variant={ACTION_STATUS[a.status].variant}>{ACTION_STATUS[a.status].label}</Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead>Tindakan</TableHead>
+                        <TableHead>Portofolio</TableHead>
+                        <TableHead>Periode</TableHead>
+                        <TableHead>Kategori</TableHead>
+                        <TableHead>PJ</TableHead>
+                        <TableHead>Tenggat</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredActions.map(a => (
+                        <TableRow key={a.key} className="hover:bg-muted/30">
+                          <TableCell className="font-medium">{a.title}</TableCell>
+                          <TableCell className="text-muted-foreground">{a.portfolioName}</TableCell>
+                          <TableCell className="text-muted-foreground">{a.period ? formatPeriod(a.period) : '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">{ACTION_CATEGORY[a.category]}</TableCell>
+                          <TableCell className="text-muted-foreground">{a.assignee || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">{a.dueDate || '—'}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={ACTION_STATUS[a.status].variant}>{ACTION_STATUS[a.status].label}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </Card>
               )}
             </TabsContent>

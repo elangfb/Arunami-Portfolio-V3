@@ -7,6 +7,7 @@ import { brandOf } from '@/lib/portfolioName'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { ShieldAlert, Save } from 'lucide-react'
 import type { HealthRules, HealthThreshold, MonthlyDataPoint, Portfolio } from '@/types'
@@ -108,36 +109,36 @@ export default function AdminHealthRules() {
               <CardTitle className="text-base">Ambang Batas per Sinyal</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="py-2 text-left font-medium">Sinyal</th>
-                    <th className="py-2 text-center font-medium">Siaga 3</th>
-                    <th className="py-2 text-center font-medium">Siaga 2</th>
-                    <th className="py-2 text-center font-medium">Siaga 1</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="text-sm">
+                <TableHeader>
+                  <TableRow className="text-xs text-muted-foreground">
+                    <TableHead className="py-2 text-left font-medium">Sinyal</TableHead>
+                    <TableHead className="py-2 text-center font-medium">Siaga 3</TableHead>
+                    <TableHead className="py-2 text-center font-medium">Siaga 2</TableHead>
+                    <TableHead className="py-2 text-center font-medium">Siaga 1</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {SIGNALS.map(({ key, label, unit }) => (
-                    <tr key={key} className="border-b last:border-0">
-                      <td className="py-2 pr-3">
+                    <TableRow key={key} className="last:border-0">
+                      <TableCell className="py-2 pr-3">
                         <p className="font-medium">{label}</p>
                         <p className="text-xs text-muted-foreground">dalam {unit}</p>
-                      </td>
+                      </TableCell>
                       {(['siaga3', 'siaga2', 'siaga1'] as const).map(level => (
-                        <td key={level} className="px-2 py-2 text-center">
+                        <TableCell key={level} className="px-2 py-2 text-center">
                           <Input
                             type="number"
                             value={rules[key][level]}
                             onChange={e => setThreshold(key, level, e.target.value)}
                             className="mx-auto h-9 w-24 text-center"
                           />
-                        </td>
+                        </TableCell>
                       ))}
-                    </tr>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
               <div className="mt-4 flex justify-end">
                 <Button onClick={handleSave} disabled={saving}>
                   <Save className="mr-1 h-4 w-4" />
@@ -172,29 +173,29 @@ export default function AdminHealthRules() {
               {preview.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Belum ada portofolio aktif.</p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">Portofolio</th>
-                      <th className="px-3 py-2 text-center font-medium">Kesehatan</th>
-                      <th className="px-3 py-2 text-left font-medium">Alasan</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
+                <Table className="text-sm">
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="px-3 py-2 text-left font-medium">Portofolio</TableHead>
+                      <TableHead className="px-3 py-2 text-center font-medium">Kesehatan</TableHead>
+                      <TableHead className="px-3 py-2 text-left font-medium">Alasan</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y">
                     {preview.map(({ portfolio, level, reasons }) => (
-                      <tr key={portfolio.id}>
-                        <td className="px-3 py-2.5">
+                      <TableRow key={portfolio.id}>
+                        <TableCell className="px-3 py-2.5">
                           <p className="font-medium">{brandOf(portfolio)}</p>
                           <p className="text-xs text-muted-foreground">{portfolio.code}</p>
-                        </td>
-                        <td className="px-3 py-2.5 text-center"><HealthBadge level={level} reasons={reasons} /></td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                        </TableCell>
+                        <TableCell className="px-3 py-2.5 text-center"><HealthBadge level={level} reasons={reasons} /></TableCell>
+                        <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">
                           {reasons.length ? reasons.join(' · ') : 'Semua sinyal dalam batas aman'}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

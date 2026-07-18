@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { TrendingUp, ArrowLeft, BarChart3, Wallet, Percent } from 'lucide-react'
 import type { Portfolio, InvestorAllocation } from '@/types'
 
@@ -146,31 +147,31 @@ export default function InvestorPerformancePage() {
                 {matrix.periods.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">Belum ada distribusi.</p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                      <tr className="border-b">
-                        <th className="px-3 py-2 text-left font-medium">Periode</th>
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead>Periode</TableHead>
                         {holdings.map(h => (
-                          <th key={h.portfolio.id} className="px-3 py-2 text-right font-medium">{h.portfolio.brandName || h.portfolio.name}</th>
+                          <TableHead key={h.portfolio.id} className="text-right">{h.portfolio.brandName || h.portfolio.name}</TableHead>
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {matrix.periods.map(period => (
-                        <tr key={period} className="hover:bg-muted/30">
-                          <td className="px-3 py-2 font-medium">{formatPeriod(period)}</td>
+                        <TableRow key={period}>
+                          <TableCell className="font-medium">{formatPeriod(period)}</TableCell>
                           {holdings.map(h => {
                             const amt = matrix.byKey.get(`${h.portfolio.id}_${period}`) ?? 0
                             return (
-                              <td key={h.portfolio.id} className="px-3 py-2 text-right">
+                              <TableCell key={h.portfolio.id} className="text-right">
                                 {amt > 0 ? formatCurrencyExact(amt) : <span className="text-muted-foreground">—</span>}
-                              </td>
+                              </TableCell>
                             )
                           })}
-                        </tr>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>

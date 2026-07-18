@@ -6,6 +6,7 @@ import { unpublishAccumulatedReport, unpublishAllTimeReport } from '@/lib/firest
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Eye, Undo2 } from 'lucide-react'
 import type { BrandResolver } from '@/lib/portfolioName'
@@ -88,26 +89,26 @@ export default function InvestorReportHistory({ reports, resolveBrand, onChanged
             </p>
           ) : (
             <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-medium">Periode</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Tipe</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Portofolio</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Tanggal Terbit</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table className="text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Periode</TableHead>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Tipe</TableHead>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Portofolio</TableHead>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Tanggal Terbit</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y">
                   {reports.map(r => (
-                    <tr key={r.id} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3 font-medium">{reportPeriodLabel(r)}</td>
-                      <td className="py-2.5 px-3">
+                    <TableRow key={r.id} className="hover:bg-muted/30">
+                      <TableCell className="py-2.5 px-3 font-medium">{reportPeriodLabel(r)}</TableCell>
+                      <TableCell className="py-2.5 px-3">
                         <Badge variant="outline">{reportTypeLabel(r)}</Badge>
-                      </td>
-                      <td className="py-2.5 px-3">{reportScopeLabel(r, resolveBrand)}</td>
-                      <td className="py-2.5 px-3">{formatReportDate(r)}</td>
-                      <td className="py-2.5 px-3 text-right">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3">{reportScopeLabel(r, resolveBrand)}</TableCell>
+                      <TableCell className="py-2.5 px-3">{formatReportDate(r)}</TableCell>
+                      <TableCell className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" onClick={() => setViewReport(r)}>
                             <Eye className="mr-1.5 h-3.5 w-3.5" />
@@ -126,11 +127,11 @@ export default function InvestorReportHistory({ reports, resolveBrand, onChanged
                             </Button>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

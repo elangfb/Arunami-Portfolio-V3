@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Menu, X, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
@@ -80,28 +81,32 @@ export function ResponsiveSidebarShell({
         role="dialog"
         aria-modal="true"
       >
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={() => setOpen(false)}
           aria-label="Tutup menu"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-[#9ca3af] hover:bg-white/10 hover:text-white transition-colors"
+          className="absolute right-3 top-3 z-10 h-8 w-8 rounded-lg text-[#9ca3af] hover:bg-white/10 hover:text-white"
         >
           <X className="h-5 w-5" />
-        </button>
+        </Button>
         {sidebar}
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
         <header className="lg:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setOpen(true)}
             aria-label="Buka menu"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-muted transition-colors"
+            className="h-9 w-9 rounded-lg text-foreground hover:bg-muted"
           >
             <Menu className="h-5 w-5" />
-          </button>
+          </Button>
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#1e5f3f]">
               <TrendingUp className="h-4 w-4 text-white" />

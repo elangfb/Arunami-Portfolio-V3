@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Settings, Save } from 'lucide-react'
 import type { SystemSettings, UserRole } from '@/types'
 
@@ -119,22 +120,22 @@ export default function AdminSettings() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-base">Matriks Peran (referensi)</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr className="border-b">
-                  <th className="px-3 py-2 text-left font-medium w-48">Peran</th>
-                  <th className="px-3 py-2 text-left font-medium">Kapabilitas</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+            <Table className="text-sm">
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead className="px-3 py-2 text-left font-medium w-48">Peran</TableHead>
+                  <TableHead className="px-3 py-2 text-left font-medium">Kapabilitas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y">
                 {ROLE_MATRIX.map(r => (
-                  <tr key={r.role}>
-                    <td className="px-3 py-2 font-medium">{r.label}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{r.caps}</td>
-                  </tr>
+                  <TableRow key={r.role}>
+                    <TableCell className="px-3 py-2 font-medium">{r.label}</TableCell>
+                    <TableCell className="px-3 py-2 text-muted-foreground">{r.caps}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
             <p className="mt-2 text-xs text-muted-foreground">Ditegakkan oleh firestore.rules — hanya referensi, tidak dapat diubah di sini.</p>
           </CardContent>
         </Card>

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { ArrowLeft, Search, FileText, ChevronRight } from 'lucide-react'
 import InvestorReportForm from '@/pages/admin/components/InvestorReportForm'
 import InvestorReportHistory from '@/pages/admin/components/InvestorReportHistory'
@@ -141,19 +142,19 @@ export default function IRReporting() {
               </p>
             ) : (
               <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left py-2.5 px-3 font-medium">Nama</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Portofolio Aktif</th>
-                      <th className="text-right py-2.5 px-3 font-medium">Total Investasi</th>
-                      <th className="text-right py-2.5 px-3 font-medium w-28">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Portofolio Aktif</TableHead>
+                      <TableHead className="text-right">Total Investasi</TableHead>
+                      <TableHead className="text-right w-28">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {filtered.map(r => (
-                      <tr key={r.user.uid} className="hover:bg-muted/30">
-                        <td className="py-2.5 px-3">
+                      <TableRow key={r.user.uid}>
+                        <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1e5f3f]/10 text-[#1e5f3f] font-bold text-sm shrink-0">
                               {r.user.displayName?.charAt(0).toUpperCase()}
@@ -163,8 +164,8 @@ export default function IRReporting() {
                               <p className="text-xs text-muted-foreground truncate">{r.user.email}</p>
                             </div>
                           </div>
-                        </td>
-                        <td className="py-2.5 px-3">
+                        </TableCell>
+                        <TableCell>
                           {r.allocations.length === 0 ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
@@ -176,20 +177,20 @@ export default function IRReporting() {
                               ))}
                             </div>
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-medium">
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
                           {formatCurrencyCompact(r.totalInvested)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="text-right">
                           <Button size="sm" variant="outline" onClick={() => loadInvestor(r.user)}>
                             Pilih
                             <ChevronRight className="ml-1 h-3 w-3" />
                           </Button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>

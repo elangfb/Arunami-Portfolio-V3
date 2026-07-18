@@ -7,6 +7,7 @@ import { formatCurrencyExact, formatCurrencyCompact, formatPercent } from '@/lib
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { formatPeriod } from '@/lib/dateUtils'
 import type { FinancialData, InvestorAllocation, PortfolioConfig } from '@/types'
 import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
@@ -130,34 +131,34 @@ export default function InvestorReturnsPage() {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {myResult ? (
-            <table className="w-full text-sm">
-              <tbody className="divide-y">
+            <Table>
+              <TableBody>
                 {Object.entries(myResult.breakdown).map(([key, val]) => (
-                  <tr key={key} className="hover:bg-muted/30">
-                    <td className="py-2.5 text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</td>
-                    <td className="py-2.5 text-right font-medium">
+                  <TableRow key={key}>
+                    <TableCell className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</TableCell>
+                    <TableCell className="text-right font-medium">
                       {typeof val === 'number' && key.includes('ercent')
                         ? formatPercent(val)
                         : typeof val === 'number' && key.includes('ownership')
                           ? formatPercent(val)
                           : formatCurrencyExact(val as number)}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-                <tr className="bg-muted/30 font-semibold">
-                  <td className="py-2.5">Earning Saya</td>
-                  <td className="py-2.5 text-right">{formatCurrencyExact(myResult.perInvestorAmount)}</td>
-                </tr>
-                <tr className="hover:bg-muted/30">
-                  <td className="py-2.5 text-muted-foreground">ROI Bulanan</td>
-                  <td className="py-2.5 text-right font-medium">{formatPercent(myResult.roiPercent, true)}</td>
-                </tr>
-                <tr className="hover:bg-muted/30">
-                  <td className="py-2.5 text-muted-foreground">ROI Tahunan</td>
-                  <td className="py-2.5 text-right font-medium">{formatPercent(myResult.annualRoiPercent, true)}</td>
-                </tr>
-              </tbody>
-            </table>
+                <TableRow className="bg-muted/30 font-semibold">
+                  <TableCell>Earning Saya</TableCell>
+                  <TableCell className="text-right">{formatCurrencyExact(myResult.perInvestorAmount)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-muted-foreground">ROI Bulanan</TableCell>
+                  <TableCell className="text-right font-medium">{formatPercent(myResult.roiPercent, true)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-muted-foreground">ROI Tahunan</TableCell>
+                  <TableCell className="text-right font-medium">{formatPercent(myResult.annualRoiPercent, true)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
           ) : (
             <p className="text-sm text-muted-foreground">Data perhitungan belum tersedia.</p>
           )}
@@ -168,36 +169,36 @@ export default function InvestorReturnsPage() {
       <Card>
         <CardHeader><CardTitle className="text-sm">Riwayat Return Bulanan</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground text-xs">
-                <th className="text-left py-2">Bulan</th>
-                <th className="text-right py-2">Net Profit Bisnis</th>
-                <th className="text-right py-2">Earning Saya</th>
-                <th className="text-right py-2">ROI</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Bulan</TableHead>
+                <TableHead className="text-right">Net Profit Bisnis</TableHead>
+                <TableHead className="text-right">Earning Saya</TableHead>
+                <TableHead className="text-right">ROI</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {monthlyBreakdown.map(row => (
-                <tr key={row.month} className="border-b hover:bg-muted/30">
-                  <td className="py-2.5 font-medium">{formatPeriod(row.month)}</td>
-                  <td className="text-right py-2.5">{formatCurrencyCompact(row.netProfit)}</td>
-                  <td className="text-right py-2.5">{formatCurrencyCompact(row.myEarnings)}</td>
-                  <td className={`text-right py-2.5 font-medium ${row.monthlyROI >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                <TableRow key={row.month}>
+                  <TableCell className="font-medium">{formatPeriod(row.month)}</TableCell>
+                  <TableCell className="text-right">{formatCurrencyCompact(row.netProfit)}</TableCell>
+                  <TableCell className="text-right">{formatCurrencyCompact(row.myEarnings)}</TableCell>
+                  <TableCell className={`text-right font-medium ${row.monthlyROI >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                     {formatPercent(row.monthlyROI, true)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-            <tfoot className="bg-muted/30 font-medium">
-              <tr>
-                <td className="py-2.5">Total</td>
-                <td className="text-right py-2.5">{formatCurrencyCompact(monthlyBreakdown.reduce((s, p) => s + p.netProfit, 0))}</td>
-                <td className="text-right py-2.5">{formatCurrencyCompact(totalEarnings)}</td>
-                <td className="text-right py-2.5">—</td>
-              </tr>
-            </tfoot>
-          </table>
+            </TableBody>
+            <TableFooter className="bg-muted/30 font-medium">
+              <TableRow>
+                <TableCell>Total</TableCell>
+                <TableCell className="text-right">{formatCurrencyCompact(monthlyBreakdown.reduce((s, p) => s + p.netProfit, 0))}</TableCell>
+                <TableCell className="text-right">{formatCurrencyCompact(totalEarnings)}</TableCell>
+                <TableCell className="text-right">—</TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
         </CardContent>
       </Card>
     </div>

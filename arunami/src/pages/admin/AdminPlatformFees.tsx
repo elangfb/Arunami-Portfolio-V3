@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getAllPortfolios, getPortfolioConfigOrDefault, getAllAllocations } from '@/lib/firestore'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell,
+} from '@/components/ui/table'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { brandOf } from '@/lib/portfolioName'
 import { Coins, Wallet, Percent, TrendingUp } from 'lucide-react'
@@ -70,38 +73,38 @@ export default function AdminPlatformFees() {
 
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr className="border-b">
-                    <th className="px-3 py-3 text-left font-medium">Portofolio</th>
-                    <th className="px-3 py-3 text-right font-medium">AUM</th>
-                    <th className="px-3 py-3 text-right font-medium">Fee %</th>
-                    <th className="px-3 py-3 text-right font-medium">Fee / Tahun</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table className="text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="px-3 py-3 text-left font-medium">Portofolio</TableHead>
+                    <TableHead className="px-3 py-3 text-right font-medium">AUM</TableHead>
+                    <TableHead className="px-3 py-3 text-right font-medium">Fee %</TableHead>
+                    <TableHead className="px-3 py-3 text-right font-medium">Fee / Tahun</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y">
                   {rows.length === 0 ? (
-                    <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">Belum ada portofolio.</td></tr>
+                    <TableRow><TableCell colSpan={4} className="px-3 py-8 text-center text-muted-foreground">Belum ada portofolio.</TableCell></TableRow>
                   ) : rows.map(r => (
-                    <tr key={r.portfolio.id} className="hover:bg-muted/30">
-                      <td className="px-3 py-2.5 font-medium">{brandOf(r.portfolio)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatCurrencyExact(r.aum)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatPercent(r.feePercent)}</td>
-                      <td className="px-3 py-2.5 text-right font-medium text-[#1e5f3f]">{formatCurrencyExact(r.annualFee)}</td>
-                    </tr>
+                    <TableRow key={r.portfolio.id} className="hover:bg-muted/30">
+                      <TableCell className="px-3 py-2.5 font-medium">{brandOf(r.portfolio)}</TableCell>
+                      <TableCell className="px-3 py-2.5 text-right">{formatCurrencyExact(r.aum)}</TableCell>
+                      <TableCell className="px-3 py-2.5 text-right">{formatPercent(r.feePercent)}</TableCell>
+                      <TableCell className="px-3 py-2.5 text-right font-medium text-[#1e5f3f]">{formatCurrencyExact(r.annualFee)}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
+                </TableBody>
                 {rows.length > 0 && (
-                  <tfoot>
-                    <tr className="border-t bg-muted/30 font-semibold">
-                      <td className="px-3 py-2.5">Total</td>
-                      <td className="px-3 py-2.5 text-right">{formatCurrencyExact(totals.aum)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatPercent(totals.weightedFee)}</td>
-                      <td className="px-3 py-2.5 text-right text-[#1e5f3f]">{formatCurrencyExact(totals.annualFee)}</td>
-                    </tr>
-                  </tfoot>
+                  <TableFooter>
+                    <TableRow className="border-t bg-muted/30 font-semibold">
+                      <TableCell className="px-3 py-2.5">Total</TableCell>
+                      <TableCell className="px-3 py-2.5 text-right">{formatCurrencyExact(totals.aum)}</TableCell>
+                      <TableCell className="px-3 py-2.5 text-right">{formatPercent(totals.weightedFee)}</TableCell>
+                      <TableCell className="px-3 py-2.5 text-right text-[#1e5f3f]">{formatCurrencyExact(totals.annualFee)}</TableCell>
+                    </TableRow>
+                  </TableFooter>
                 )}
-              </table>
+              </Table>
             </div>
           </Card>
 

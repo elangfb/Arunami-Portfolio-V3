@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Presentation, X, Check, Circle, ArrowRight, Plus, Trash2, Copy, Save,
   DollarSign, TrendingUp, Wallet, Percent, ListChecks, ArrowUp, ArrowDown,
@@ -189,16 +190,17 @@ export default function MeetingMode() {
           <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Agenda</p>
           <nav className="space-y-1">
             {SECTIONS.map((s, i) => (
-              <button
+              <Button
                 key={s.id}
+                variant="ghost"
                 onClick={() => goto(s.id)}
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${active === s.id ? 'bg-[#38a169]/15 font-medium text-[#1e5f3f]' : 'hover:bg-muted'}`}
+                className={`flex h-auto w-full items-center justify-start gap-2 rounded-lg px-3 py-2 text-left text-sm ${active === s.id ? 'bg-[#38a169]/15 font-medium text-[#1e5f3f]' : 'hover:bg-muted'}`}
               >
                 {covered.has(s.id)
                   ? <Check className="h-4 w-4 shrink-0 text-[#38a169]" />
                   : <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />}
                 <span className="flex-1">{i + 1}. {s.label}</span>
-              </button>
+              </Button>
             ))}
           </nav>
           <div className="mt-3 border-t pt-3">
@@ -351,45 +353,43 @@ function PerbandinganSection({
         </Select>
       </div>
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr className="border-b">
-                <th className="px-3 py-2 text-left font-medium">Metrik</th>
-                <th className="px-3 py-2 text-right font-medium">{periodA ? formatPeriod(periodA) : 'A'}</th>
-                <th className="px-3 py-2 text-right font-medium">{periodB ? formatPeriod(periodB) : 'B'}</th>
-                <th className="px-3 py-2 text-right font-medium">Δ</th>
-                <th className="px-3 py-2 text-right font-medium">B vs Proyeksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {metrics.map(m => {
-                const delta = m.b - m.a
-                const up = delta >= 0
-                const vsProj = m.projB != null && m.projB !== 0 ? m.b - m.projB : null
-                return (
-                  <tr key={m.label}>
-                    <td className="px-3 py-2 font-medium">{m.label}</td>
-                    <td className="px-3 py-2 text-right">{m.fmt(m.a)}</td>
-                    <td className="px-3 py-2 text-right">{m.fmt(m.b)}</td>
-                    <td className={`px-3 py-2 text-right ${up ? 'text-emerald-600' : 'text-red-600'}`}>
-                      <span className="inline-flex items-center justify-end gap-0.5">
-                        {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{m.fmt(Math.abs(delta))}
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead>Metrik</TableHead>
+              <TableHead className="text-right">{periodA ? formatPeriod(periodA) : 'A'}</TableHead>
+              <TableHead className="text-right">{periodB ? formatPeriod(periodB) : 'B'}</TableHead>
+              <TableHead className="text-right">Δ</TableHead>
+              <TableHead className="text-right">B vs Proyeksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {metrics.map(m => {
+              const delta = m.b - m.a
+              const up = delta >= 0
+              const vsProj = m.projB != null && m.projB !== 0 ? m.b - m.projB : null
+              return (
+                <TableRow key={m.label}>
+                  <TableCell className="font-medium">{m.label}</TableCell>
+                  <TableCell className="text-right">{m.fmt(m.a)}</TableCell>
+                  <TableCell className="text-right">{m.fmt(m.b)}</TableCell>
+                  <TableCell className={`text-right ${up ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <span className="inline-flex items-center justify-end gap-0.5">
+                      {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{m.fmt(Math.abs(delta))}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {vsProj == null ? '—' : (
+                      <span className={vsProj >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                        {vsProj >= 0 ? '+' : '−'}{m.fmt(Math.abs(vsProj))}
                       </span>
-                    </td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">
-                      {vsProj == null ? '—' : (
-                        <span className={vsProj >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                          {vsProj >= 0 ? '+' : '−'}{m.fmt(Math.abs(vsProj))}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
       </Card>
       <p className="text-xs text-muted-foreground">Δ = B − A. Kolom terakhir membandingkan aktual periode B terhadap proyeksinya.</p>
     </section>
@@ -428,7 +428,7 @@ function CatatanSection({
             ) : notes.map(n => (
               <div key={n.id} className="flex items-start gap-2 rounded-lg border p-2.5 text-sm">
                 <span className="flex-1">{n.text}</span>
-                <button onClick={() => removeNote(n.id)} className="text-muted-foreground hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                <Button variant="ghost" size="icon" onClick={() => removeNote(n.id)} className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-600"><Trash2 className="h-4 w-4" /></Button>
               </div>
             ))}
           </div>
@@ -453,7 +453,7 @@ function CatatanSection({
                   <p className={a.done ? 'line-through text-muted-foreground' : ''}>{a.text}</p>
                   {a.assignee && <p className="text-xs text-muted-foreground">@{a.assignee}</p>}
                 </div>
-                <button onClick={() => removeAction(a.id)} className="text-muted-foreground hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                <Button variant="ghost" size="icon" onClick={() => removeAction(a.id)} className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-600"><Trash2 className="h-4 w-4" /></Button>
               </div>
             ))}
           </div>

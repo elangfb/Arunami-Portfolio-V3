@@ -5,6 +5,7 @@ import { MonthYearPicker } from '@/components/MonthYearPicker'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -112,13 +113,15 @@ function FinancialRow({
       {/* Remove button */}
       <div className="w-8">
         {onRemove && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onRemove}
-            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+            className="h-7 w-7 text-gray-400 hover:bg-red-50 hover:text-red-500"
           >
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -387,13 +390,15 @@ function ProjectionTab({
                               Baru
                             </Badge>
                           )}
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeOpex(row.opexName!)}
-                            className="rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 shrink-0"
+                            className="h-7 w-7 shrink-0 text-gray-400 hover:bg-red-50 hover:text-red-500"
                           >
                             <Trash2 className="h-3 w-3" />
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <span className={row.className?.includes('text-') ? row.className : ''}>
@@ -465,10 +470,10 @@ function ProjectionTab({
       {/* Assumptions */}
       <div>
         <Label className="text-sm">Asumsi</Label>
-        <textarea
+        <Textarea
           value={data.assumptions}
           onChange={e => onChange({ ...data, assumptions: e.target.value })}
-          className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          className="mt-1"
           rows={3}
         />
       </div>
@@ -551,13 +556,15 @@ function CategoriesKpiTab({
               placeholder="Nama kategori"
               className="flex-1"
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => removeCategory(i)}
-              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+              className="h-7 w-7 text-gray-400 hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         ))}
         {form.formState.errors.revenueCategories && (
@@ -616,13 +623,15 @@ function CategoriesKpiTab({
                 <SelectItem value="ratio">Ratio</SelectItem>
               </SelectContent>
             </Select>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => removeKpi(i)}
-              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+              className="h-7 w-7 text-gray-400 hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         ))}
         {form.formState.errors.kpiMetrics && (

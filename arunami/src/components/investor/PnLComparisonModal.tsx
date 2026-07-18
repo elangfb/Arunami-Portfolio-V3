@@ -8,6 +8,9 @@ import {
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select'
+import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from '@/components/ui/table'
 import { ArrowRight, ArrowDown, ArrowUp } from 'lucide-react'
 import type { PnLExtractedData, PortfolioReport } from '@/types'
 
@@ -124,45 +127,45 @@ export function PnLComparisonModal({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr className="border-b">
-                    <th className="px-3 py-2 text-left font-medium">Pos</th>
-                    <th className="px-3 py-2 text-right font-medium">{periodA ? formatPeriod(periodA) : '—'}</th>
-                    <th className="px-3 py-2 text-right font-medium">{periodB ? formatPeriod(periodB) : '—'}</th>
-                    <th className="px-3 py-2 text-right font-medium">Δ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table className="w-full text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="px-3 py-2 text-left font-medium">Pos</TableHead>
+                    <TableHead className="px-3 py-2 text-right font-medium">{periodA ? formatPeriod(periodA) : '—'}</TableHead>
+                    <TableHead className="px-3 py-2 text-right font-medium">{periodB ? formatPeriod(periodB) : '—'}</TableHead>
+                    <TableHead className="px-3 py-2 text-right font-medium">Δ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y">
                   {ROWS.map(row => {
                     const a = stmtA?.[row.key] ?? 0
                     const b = stmtB?.[row.key] ?? 0
                     const delta = b - a
                     const up = delta >= 0
                     return (
-                      <tr key={row.key} className={row.strong ? 'font-semibold' : ''}>
-                        <td className="px-3 py-2">{row.label}</td>
-                        <td className="px-3 py-2 text-right">
+                      <TableRow key={row.key} className={row.strong ? 'font-semibold' : ''}>
+                        <TableCell className="px-3 py-2">{row.label}</TableCell>
+                        <TableCell className="px-3 py-2 text-right">
                           {stmtA ? formatCurrencyExact(a) : '—'}
                           {row.margin && stmtA && <span className="ml-1 text-xs text-muted-foreground">({formatPercent(marginOf(stmtA, row.key))})</span>}
-                        </td>
-                        <td className="px-3 py-2 text-right">
+                        </TableCell>
+                        <TableCell className="px-3 py-2 text-right">
                           {stmtB ? formatCurrencyExact(b) : '—'}
                           {row.margin && stmtB && <span className="ml-1 text-xs text-muted-foreground">({formatPercent(marginOf(stmtB, row.key))})</span>}
-                        </td>
-                        <td className={`px-3 py-2 text-right ${up ? 'text-emerald-600' : 'text-red-600'}`}>
+                        </TableCell>
+                        <TableCell className={`px-3 py-2 text-right ${up ? 'text-emerald-600' : 'text-red-600'}`}>
                           {stmtA && stmtB ? (
                             <span className="inline-flex items-center justify-end gap-0.5">
                               {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                               {formatCurrencyExact(Math.abs(delta))}
                             </span>
                           ) : '—'}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
             <p className="text-xs text-muted-foreground">
               EBITDA = EBIT + penyusutan/amortisasi yang terdeteksi pada opex. Δ = periode kanan − kiri.

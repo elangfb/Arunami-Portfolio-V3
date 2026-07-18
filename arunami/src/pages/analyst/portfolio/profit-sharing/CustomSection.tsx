@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Variable, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import EditConfigDialog from './EditConfigDialog'
 import { getPortfolioConfigOrDefault, savePortfolioConfig } from '@/lib/firestore'
@@ -175,26 +176,26 @@ export default function CustomSection({
             </div>
             {investorConfig.variables.length > 0 && (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-black">
-                  <thead>
-                    <tr className="border-b text-left text-xs uppercase tracking-wide">
-                      <th className="py-2 pr-3 font-medium">Nama</th>
-                      <th className="py-2 pr-3 font-medium">Tipe</th>
-                      <th className="py-2 pr-3 font-medium">Sumber</th>
-                      <th className="py-2 pr-3 font-medium">Default</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className="text-black">
+                  <TableHeader>
+                    <TableRow className="text-left text-xs uppercase tracking-wide">
+                      <TableHead className="py-2 pr-3 font-medium text-black">Nama</TableHead>
+                      <TableHead className="py-2 pr-3 font-medium text-black">Tipe</TableHead>
+                      <TableHead className="py-2 pr-3 font-medium text-black">Sumber</TableHead>
+                      <TableHead className="py-2 pr-3 font-medium text-black">Default</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {investorConfig.variables.map(v => (
-                      <tr key={v.id} className="border-b last:border-0">
-                        <td className="py-2 pr-3 font-mono text-xs">{v.name}</td>
-                        <td className="py-2 pr-3">{v.type}</td>
-                        <td className="py-2 pr-3">{SOURCE_LABEL[v.source]}</td>
-                        <td className="py-2 pr-3">{v.defaultValue}</td>
-                      </tr>
+                      <TableRow key={v.id}>
+                        <TableCell className="py-2 pr-3 font-mono text-xs">{v.name}</TableCell>
+                        <TableCell className="py-2 pr-3">{v.type}</TableCell>
+                        <TableCell className="py-2 pr-3">{SOURCE_LABEL[v.source]}</TableCell>
+                        <TableCell className="py-2 pr-3">{v.defaultValue}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </div>

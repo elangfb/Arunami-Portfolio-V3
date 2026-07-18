@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Plus, Pencil, Trash2, Scale, AlertTriangle } from 'lucide-react'
 import type { Covenant, CovenantResult, Portfolio } from '@/types'
 
@@ -96,45 +97,43 @@ export default function CovenantsPage() {
         </div>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr className="border-b">
-                  <th className="px-3 py-3 text-left font-medium">Covenant</th>
-                  <th className="px-3 py-3 text-left font-medium">Syarat</th>
-                  <th className="px-3 py-3 text-left font-medium">Aktual</th>
-                  <th className="px-3 py-3 text-left font-medium">Periode</th>
-                  <th className="px-3 py-3 text-center font-medium">Hasil</th>
-                  <th className="px-3 py-3 text-right font-medium w-20">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {items.map(c => (
-                  <tr key={c.id} className={c.result === 'fail' ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-muted/30'}>
-                    <td className="px-3 py-3 font-medium">{c.name}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{c.requirement || '—'}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{c.actual || '—'}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{c.period || '—'}</td>
-                    <td className="px-3 py-3 text-center">
-                      <Badge variant={c.result === 'pass' ? 'success' : 'danger'}>
-                        {c.result === 'pass' ? 'Pass' : 'Gagal'}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove(c)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead>Covenant</TableHead>
+                <TableHead>Syarat</TableHead>
+                <TableHead>Aktual</TableHead>
+                <TableHead>Periode</TableHead>
+                <TableHead className="text-center">Hasil</TableHead>
+                <TableHead className="text-right w-20">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map(c => (
+                <TableRow key={c.id} className={c.result === 'fail' ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-muted/30'}>
+                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.requirement || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.actual || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.period || '—'}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant={c.result === 'pass' ? 'success' : 'danger'}>
+                      {c.result === 'pass' ? 'Pass' : 'Gagal'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove(c)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       )}
 

@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { TrendingUp, ArrowLeft, BarChart3, Medal } from 'lucide-react'
 import type { HealthLevel } from '@/types'
@@ -125,36 +126,34 @@ export default function AnalystBenchmarking() {
             </Card>
 
             <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr className="border-b">
-                      <th className="px-3 py-3 text-left font-medium w-12">#</th>
-                      <th className="px-3 py-3 text-left font-medium">Portofolio</th>
-                      <th className="px-3 py-3 text-center font-medium">Kesehatan</th>
-                      <th className="px-3 py-3 text-right font-medium">{meta.label}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {ranked.map((m, i) => (
-                      <tr
-                        key={m.portfolio.id}
-                        className="cursor-pointer hover:bg-muted/30"
-                        onClick={() => navigate(`/analyst/portfolios/${m.portfolio.id}/overview`)}
-                      >
-                        <td className="px-3 py-2.5">
-                          {m.hasData && i < 3 ? <Medal className={`h-4 w-4 ${['text-yellow-500', 'text-gray-400', 'text-amber-700'][i]}`} /> : <span className="text-muted-foreground">{i + 1}</span>}
-                        </td>
-                        <td className="px-3 py-2.5 font-medium">{m.portfolio.brandName || m.portfolio.name}</td>
-                        <td className="px-3 py-2.5 text-center"><HealthBadge level={m.portfolio.healthLevel} reasons={m.portfolio.healthReasons} /></td>
-                        <td className="px-3 py-2.5 text-right font-medium">
-                          {m.hasData ? fmt(m[metricKey] as number) : <span className="text-muted-foreground">Tanpa data</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Portofolio</TableHead>
+                    <TableHead className="text-center">Kesehatan</TableHead>
+                    <TableHead className="text-right">{meta.label}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ranked.map((m, i) => (
+                    <TableRow
+                      key={m.portfolio.id}
+                      className="cursor-pointer hover:bg-muted/30"
+                      onClick={() => navigate(`/analyst/portfolios/${m.portfolio.id}/overview`)}
+                    >
+                      <TableCell>
+                        {m.hasData && i < 3 ? <Medal className={`h-4 w-4 ${['text-yellow-500', 'text-gray-400', 'text-amber-700'][i]}`} /> : <span className="text-muted-foreground">{i + 1}</span>}
+                      </TableCell>
+                      <TableCell className="font-medium">{m.portfolio.brandName || m.portfolio.name}</TableCell>
+                      <TableCell className="text-center"><HealthBadge level={m.portfolio.healthLevel} reasons={m.portfolio.healthReasons} /></TableCell>
+                      <TableCell className="text-right font-medium">
+                        {m.hasData ? fmt(m[metricKey] as number) : <span className="text-muted-foreground">Tanpa data</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
           </>
         )}

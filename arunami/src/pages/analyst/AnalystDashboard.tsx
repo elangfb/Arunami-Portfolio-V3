@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { AnnouncementsBanner } from '@/components/shared/AnnouncementsBanner'
 import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock, LayoutDashboard, Table2, BarChart3, Presentation, Mail, StickyNote } from 'lucide-react'
@@ -189,61 +190,59 @@ export default function AnalystDashboard() {
 
           {/* Desktop: table */}
           <Card className="hidden overflow-hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr className="border-b">
-                    <th className="cursor-pointer select-none text-left px-3 py-3 font-medium" onClick={() => toggleSort('name')}>Nama Portofolio<SortIcon col="name" /></th>
-                    <th className="cursor-pointer select-none text-left px-3 py-3 font-medium" onClick={() => toggleSort('code')}>Kode<SortIcon col="code" /></th>
-                    <th className="cursor-pointer select-none text-left px-3 py-3 font-medium" onClick={() => toggleSort('stage')}>Tahap<SortIcon col="stage" /></th>
-                    <th className="cursor-pointer select-none text-left px-3 py-3 font-medium" onClick={() => toggleSort('periode')}>Periode<SortIcon col="periode" /></th>
-                    <th className="cursor-pointer select-none text-left px-3 py-3 font-medium" onClick={() => toggleSort('industryType')}>Industri<SortIcon col="industryType" /></th>
-                    <th className="cursor-pointer select-none text-right px-3 py-3 font-medium" onClick={() => toggleSort('investasiAwal')}>Investasi Awal<SortIcon col="investasiAwal" /></th>
-                    <th className="cursor-pointer select-none text-center px-3 py-3 font-medium" onClick={() => toggleSort('investors')}>Investor<SortIcon col="investors" /></th>
-                    <th className="text-center px-3 py-3 font-medium">Kesehatan</th>
-                    <th className="text-center px-3 py-3 font-medium">Grace Period</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {sorted.map(p => (
-                    <tr
-                      key={p.id}
-                      className="cursor-pointer hover:bg-muted/30"
-                      onClick={() => navigate(`/analyst/portfolios/${p.id}/overview`)}
-                    >
-                      <td className="px-3 py-3 align-middle">
-                        <div className="font-medium">{brandOf(p)}</div>
-                        {brandOf(p) !== p.name && (
-                          <div className="text-xs text-muted-foreground">{p.name}</div>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 align-middle text-muted-foreground">{p.code}</td>
-                      <td className="px-3 py-3 align-middle text-muted-foreground">{p.stage}</td>
-                      <td className="px-3 py-3 align-middle">
-                        <Badge variant="outline">{p.periode}</Badge>
-                      </td>
-                      <td className="px-3 py-3 align-middle text-muted-foreground">
-                        {INDUSTRY_PRESETS[p.industryType]?.label ?? p.industryType}
-                      </td>
-                      <td className="px-3 py-3 align-middle text-right font-medium text-[#1e5f3f]">
-                        {formatCurrencyCompact(p.investasiAwal)}
-                      </td>
-                      <td className="px-3 py-3 align-middle text-center">
-                        {p.assignedInvestors.length}
-                      </td>
-                      <td className="px-3 py-3 align-middle text-center">
-                        <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
-                      </td>
-                      <td className="px-3 py-3 align-middle text-center">
-                        {p.isGracePeriod
-                          ? <Badge variant="warning">Grace · {p.graceConfig?.returnMode === 'fixed_yield' ? 'Yield' : 'Tanpa payout'}</Badge>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('name')}>Nama Portofolio<SortIcon col="name" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('code')}>Kode<SortIcon col="code" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('stage')}>Tahap<SortIcon col="stage" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('periode')}>Periode<SortIcon col="periode" /></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('industryType')}>Industri<SortIcon col="industryType" /></TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort('investasiAwal')}>Investasi Awal<SortIcon col="investasiAwal" /></TableHead>
+                  <TableHead className="cursor-pointer select-none text-center" onClick={() => toggleSort('investors')}>Investor<SortIcon col="investors" /></TableHead>
+                  <TableHead className="text-center">Kesehatan</TableHead>
+                  <TableHead className="text-center">Grace Period</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sorted.map(p => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer hover:bg-muted/30"
+                    onClick={() => navigate(`/analyst/portfolios/${p.id}/overview`)}
+                  >
+                    <TableCell>
+                      <div className="font-medium">{brandOf(p)}</div>
+                      {brandOf(p) !== p.name && (
+                        <div className="text-xs text-muted-foreground">{p.name}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{p.code}</TableCell>
+                    <TableCell className="text-muted-foreground">{p.stage}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{p.periode}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {INDUSTRY_PRESETS[p.industryType]?.label ?? p.industryType}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-[#1e5f3f]">
+                      {formatCurrencyCompact(p.investasiAwal)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {p.assignedInvestors.length}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {p.isGracePeriod
+                        ? <Badge variant="warning">Grace · {p.graceConfig?.returnMode === 'fixed_yield' ? 'Yield' : 'Tanpa payout'}</Badge>
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Card>
           </>
         )}

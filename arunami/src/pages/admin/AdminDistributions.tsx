@@ -24,6 +24,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
 import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from '@/components/ui/table'
+import {
   Banknote, Plus, ChevronDown, ChevronRight, Trash2, ArrowRight, Pause, Play, Loader2,
 } from 'lucide-react'
 import type {
@@ -129,35 +132,35 @@ export default function AdminDistributions() {
                 {isOpen && (
                   <div className="border-t">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr className="border-b">
-                            <th className="px-3 py-2 text-left font-medium">Investor</th>
-                            <th className="px-3 py-2 text-right font-medium">Kepemilikan</th>
-                            <th className="px-3 py-2 text-right font-medium">Bruto</th>
-                            <th className="px-3 py-2 text-right font-medium">Fee</th>
-                            <th className="px-3 py-2 text-right font-medium">Netto</th>
-                            <th className="px-3 py-2 text-center font-medium">Status</th>
-                            <th className="px-3 py-2 text-right font-medium">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
+                      <Table className="text-sm">
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead className="px-3 py-2 text-left font-medium">Investor</TableHead>
+                            <TableHead className="px-3 py-2 text-right font-medium">Kepemilikan</TableHead>
+                            <TableHead className="px-3 py-2 text-right font-medium">Bruto</TableHead>
+                            <TableHead className="px-3 py-2 text-right font-medium">Fee</TableHead>
+                            <TableHead className="px-3 py-2 text-right font-medium">Netto</TableHead>
+                            <TableHead className="px-3 py-2 text-center font-medium">Status</TableHead>
+                            <TableHead className="px-3 py-2 text-right font-medium">Aksi</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody className="divide-y">
                           {batch.lines.map((line, i) => {
                             const ns = nextLineStatus(line.status)
                             return (
-                              <tr key={line.investorUid} className="hover:bg-muted/30">
-                                <td className="px-3 py-2">
+                              <TableRow key={line.investorUid} className="hover:bg-muted/30">
+                                <TableCell className="px-3 py-2">
                                   <div className="font-medium">{line.investorName}</div>
                                   {line.status === 'held' && line.heldReason && (
                                     <div className="text-xs text-red-600">Ditahan: {line.heldReason}</div>
                                   )}
-                                </td>
-                                <td className="px-3 py-2 text-right text-muted-foreground">{line.ownershipPercent.toFixed(2)}%</td>
-                                <td className="px-3 py-2 text-right">{formatCurrencyExact(line.grossAmount)}</td>
-                                <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrencyExact(line.feeAmount)}</td>
-                                <td className="px-3 py-2 text-right font-medium">{formatCurrencyExact(line.netAmount)}</td>
-                                <td className="px-3 py-2 text-center"><LineStatusPill status={line.status} /></td>
-                                <td className="px-3 py-2">
+                                </TableCell>
+                                <TableCell className="px-3 py-2 text-right text-muted-foreground">{line.ownershipPercent.toFixed(2)}%</TableCell>
+                                <TableCell className="px-3 py-2 text-right">{formatCurrencyExact(line.grossAmount)}</TableCell>
+                                <TableCell className="px-3 py-2 text-right text-muted-foreground">{formatCurrencyExact(line.feeAmount)}</TableCell>
+                                <TableCell className="px-3 py-2 text-right font-medium">{formatCurrencyExact(line.netAmount)}</TableCell>
+                                <TableCell className="px-3 py-2 text-center"><LineStatusPill status={line.status} /></TableCell>
+                                <TableCell className="px-3 py-2">
                                   <div className="flex justify-end gap-1">
                                     {ns && (
                                       <Button size="sm" variant="outline" disabled={busyBatch === batch.id} onClick={() => advance(batch, i)}>
@@ -174,12 +177,12 @@ export default function AdminDistributions() {
                                       </Button>
                                     )}
                                   </div>
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             )
                           })}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                     <div className="flex justify-end p-3">
                       <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => remove(batch)}>
@@ -361,19 +364,19 @@ function CreateBatchDialog({
                 {preview.returnModelLabel} · Netto total {formatCurrencyExact(totalNet)}
               </div>
               <div className="max-h-64 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y">
+                <Table className="text-sm">
+                  <TableBody className="divide-y">
                     {preview.lines.length === 0 ? (
-                      <tr><td className="px-3 py-4 text-center text-muted-foreground">Tidak ada investor pada portofolio ini.</td></tr>
+                      <TableRow><TableCell className="px-3 py-4 text-center text-muted-foreground">Tidak ada investor pada portofolio ini.</TableCell></TableRow>
                     ) : preview.lines.map(l => (
-                      <tr key={l.investorUid}>
-                        <td className="px-3 py-2">{l.investorName}</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{l.ownershipPercent.toFixed(2)}%</td>
-                        <td className="px-3 py-2 text-right font-medium">{formatCurrencyExact(l.netAmount)}</td>
-                      </tr>
+                      <TableRow key={l.investorUid}>
+                        <TableCell className="px-3 py-2">{l.investorName}</TableCell>
+                        <TableCell className="px-3 py-2 text-right text-muted-foreground">{l.ownershipPercent.toFixed(2)}%</TableCell>
+                        <TableCell className="px-3 py-2 text-right font-medium">{formatCurrencyExact(l.netAmount)}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </div>
           )}

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { Search, Eye, Users, Wallet } from 'lucide-react'
 import type { InvestorAllocation, InvestorSummary } from '@/types'
@@ -123,19 +124,19 @@ export default function AdminInvestors({ detailBase = '/admin/investors' }: Admi
             </p>
           ) : (
             <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-medium">Nama</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Portofolio Aktif</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Total Investasi</th>
-                    <th className="text-right py-2.5 px-3 font-medium w-28">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table className="text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Nama</TableHead>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Portofolio Aktif</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">Total Investasi</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium w-28">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y">
                   {filtered.map(s => (
-                    <tr key={s.user.uid} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3">
+                    <TableRow key={s.user.uid} className="hover:bg-muted/30">
+                      <TableCell className="py-2.5 px-3">
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1e5f3f]/10 text-[#1e5f3f] font-bold text-sm shrink-0">
                             {s.user.displayName?.charAt(0).toUpperCase()}
@@ -145,8 +146,8 @@ export default function AdminInvestors({ detailBase = '/admin/investors' }: Admi
                             <p className="text-xs text-muted-foreground truncate">{s.user.email}</p>
                           </div>
                         </div>
-                      </td>
-                      <td className="py-2.5 px-3">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3">
                         {s.allocations.length === 0 ? (
                           <span className="text-muted-foreground">—</span>
                         ) : (
@@ -158,11 +159,11 @@ export default function AdminInvestors({ detailBase = '/admin/investors' }: Admi
                             ))}
                           </div>
                         )}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-medium">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3 text-right font-medium">
                         {formatCurrencyCompact(s.totalInvested)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3 text-right">
                         <Button
                           size="sm"
                           variant="outline"
@@ -171,11 +172,11 @@ export default function AdminInvestors({ detailBase = '/admin/investors' }: Admi
                           <Eye className="mr-1 h-3 w-3" />
                           Detail
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

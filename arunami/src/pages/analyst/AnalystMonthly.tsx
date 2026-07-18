@@ -8,6 +8,7 @@ import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { TrendingUp, ArrowLeft, Table2 } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
@@ -91,42 +92,40 @@ export default function AnalystMonthly() {
           <div className="h-64 animate-pulse rounded-lg bg-muted" />
         ) : (
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr className="border-b">
-                    <th className="px-3 py-3 text-left font-medium">Portofolio</th>
-                    <th className="px-3 py-3 text-left font-medium">Bulan</th>
-                    <th className="px-3 py-3 text-right font-medium">Revenue</th>
-                    <th className="px-3 py-3 text-right font-medium">Net Profit</th>
-                    <th className="px-3 py-3 text-right font-medium">Bagi Hasil</th>
-                    <th className="px-3 py-3 text-right font-medium">Yield Bulanan</th>
-                    <th className="px-3 py-3 text-right font-medium">Yield Tahunan</th>
-                    <th className="px-3 py-3 text-right font-medium">Yield Disesuaikan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filtered.length === 0 ? (
-                    <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Belum ada data bulanan.</td></tr>
-                  ) : filtered.map(r => (
-                    <tr
-                      key={`${r.portfolioId}-${r.month}`}
-                      className="cursor-pointer hover:bg-muted/30"
-                      onClick={() => navigate(`/analyst/portfolios/${r.portfolioId}/overview`)}
-                    >
-                      <td className="px-3 py-2.5 font-medium">{r.brandName}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{formatPeriod(r.month)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatCurrencyCompact(r.revenue)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatCurrencyCompact(r.netProfit)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatCurrencyCompact(r.bagiHasil)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatPercent(r.monthlyYield)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatPercent(r.annualizedYield)}</td>
-                      <td className="px-3 py-2.5 text-right text-muted-foreground">{formatPercent(r.adjustedAnnualizedYield)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>Portofolio</TableHead>
+                  <TableHead>Bulan</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Net Profit</TableHead>
+                  <TableHead className="text-right">Bagi Hasil</TableHead>
+                  <TableHead className="text-right">Yield Bulanan</TableHead>
+                  <TableHead className="text-right">Yield Tahunan</TableHead>
+                  <TableHead className="text-right">Yield Disesuaikan</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">Belum ada data bulanan.</TableCell></TableRow>
+                ) : filtered.map(r => (
+                  <TableRow
+                    key={`${r.portfolioId}-${r.month}`}
+                    className="cursor-pointer hover:bg-muted/30"
+                    onClick={() => navigate(`/analyst/portfolios/${r.portfolioId}/overview`)}
+                  >
+                    <TableCell className="font-medium">{r.brandName}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatPeriod(r.month)}</TableCell>
+                    <TableCell className="text-right">{formatCurrencyCompact(r.revenue)}</TableCell>
+                    <TableCell className="text-right">{formatCurrencyCompact(r.netProfit)}</TableCell>
+                    <TableCell className="text-right">{formatCurrencyCompact(r.bagiHasil)}</TableCell>
+                    <TableCell className="text-right">{formatPercent(r.monthlyYield)}</TableCell>
+                    <TableCell className="text-right">{formatPercent(r.annualizedYield)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{formatPercent(r.adjustedAnnualizedYield)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Card>
         )}
       </main>

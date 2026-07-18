@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { getFinancialData } from '@/lib/firestore'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie,
@@ -151,36 +152,36 @@ export default function RevenuePage() {
       <Card>
         <CardHeader><CardTitle className="text-sm">Tabel Varians</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground text-xs">
-                <th className="text-left py-2 pr-4">Bulan</th>
-                <th className="text-right py-2 px-4">Rev. Aktual</th>
-                <th className="text-right py-2 px-4">Rev. Proyeksi</th>
-                <th className="text-right py-2 px-4">Varians</th>
-                <th className="text-right py-2 px-4">Profit Aktual</th>
-                <th className="text-right py-2 px-4">Profit Proyeksi</th>
-                <th className="text-right py-2">Varians</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Bulan</TableHead>
+                <TableHead className="text-right">Rev. Aktual</TableHead>
+                <TableHead className="text-right">Rev. Proyeksi</TableHead>
+                <TableHead className="text-right">Varians</TableHead>
+                <TableHead className="text-right">Profit Aktual</TableHead>
+                <TableHead className="text-right">Profit Proyeksi</TableHead>
+                <TableHead className="text-right">Varians</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {varianceData.map(row => (
-                <tr key={row.month} className="border-b hover:bg-muted/30">
-                  <td className="py-2 pr-4 font-medium">{formatPeriod(row.month)}</td>
-                  <td className="text-right py-2 px-4">{formatCurrencyCompact(row.revenueAktual)}</td>
-                  <td className="text-right py-2 px-4">{formatCurrencyCompact(row.revenueProyeksi)}</td>
-                  <td className={`text-right py-2 px-4 font-medium ${row.revenueVar >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                <TableRow key={row.month} className="hover:bg-muted/30">
+                  <TableCell className="font-medium">{formatPeriod(row.month)}</TableCell>
+                  <TableCell className="text-right">{formatCurrencyCompact(row.revenueAktual)}</TableCell>
+                  <TableCell className="text-right">{formatCurrencyCompact(row.revenueProyeksi)}</TableCell>
+                  <TableCell className={`text-right font-medium ${row.revenueVar >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                     {formatPercent(row.revenuePct, true)}
-                  </td>
-                  <td className="text-right py-2 px-4">{formatCurrencyCompact(row.profitAktual)}</td>
-                  <td className="text-right py-2 px-4">{formatCurrencyCompact(row.profitProyeksi)}</td>
-                  <td className={`text-right py-2 font-medium ${row.profitVar >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  </TableCell>
+                  <TableCell className="text-right">{formatCurrencyCompact(row.profitAktual)}</TableCell>
+                  <TableCell className="text-right">{formatCurrencyCompact(row.profitProyeksi)}</TableCell>
+                  <TableCell className={`text-right font-medium ${row.profitVar >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                     {formatPercent(row.profitPct, true)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react'
 import EditConfigDialog from './EditConfigDialog'
 import { formatCurrencyExact } from '@/lib/utils'
@@ -98,28 +99,28 @@ export default function FixedScheduleSection({
 
           {payments.length > 0 && (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm text-black">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wide">
-                    <th className="py-2 pr-3 font-medium">Jatuh Tempo</th>
-                    <th className="py-2 pr-3 font-medium">Jumlah</th>
-                    <th className="py-2 pr-3 font-medium">Label</th>
-                    <th className="py-2 pr-3 font-medium">Status</th>
-                    <th className="py-2 pr-3 font-medium">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="text-black">
+                <TableHeader>
+                  <TableRow className="text-left text-xs uppercase tracking-wide">
+                    <TableHead className="py-2 pr-3 font-medium text-black">Jatuh Tempo</TableHead>
+                    <TableHead className="py-2 pr-3 font-medium text-black">Jumlah</TableHead>
+                    <TableHead className="py-2 pr-3 font-medium text-black">Label</TableHead>
+                    <TableHead className="py-2 pr-3 font-medium text-black">Status</TableHead>
+                    <TableHead className="py-2 pr-3 font-medium text-black">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {payments.map(p => (
-                    <tr key={p.id} className="border-b last:border-0">
-                      <td className="py-2 pr-3 whitespace-nowrap">{p.dueDate || '-'}</td>
-                      <td className="py-2 pr-3 whitespace-nowrap">{formatCurrencyExact(p.amount)}</td>
-                      <td className="py-2 pr-3">{p.label || '-'}</td>
-                      <td className="py-2 pr-3">
+                    <TableRow key={p.id}>
+                      <TableCell className="py-2 pr-3 whitespace-nowrap">{p.dueDate || '-'}</TableCell>
+                      <TableCell className="py-2 pr-3 whitespace-nowrap">{formatCurrencyExact(p.amount)}</TableCell>
+                      <TableCell className="py-2 pr-3">{p.label || '-'}</TableCell>
+                      <TableCell className="py-2 pr-3">
                         <Badge variant={p.status === 'paid' ? 'default' : 'outline'}>
                           {p.status === 'paid' ? 'Dibayar' : 'Tertunda'}
                         </Badge>
-                      </td>
-                      <td className="py-2 pr-3">
+                      </TableCell>
+                      <TableCell className="py-2 pr-3">
                         {p.status === 'pending' ? (
                           <Button
                             size="sm"
@@ -132,11 +133,11 @@ export default function FixedScheduleSection({
                         ) : (
                           <span className="text-xs text-muted-foreground">-</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

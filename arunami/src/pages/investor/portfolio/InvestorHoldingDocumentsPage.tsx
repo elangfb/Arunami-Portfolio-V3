@@ -4,6 +4,7 @@ import { getDocumentsForPortfolios } from '@/lib/firestore'
 import { DOCUMENT_CATEGORY_LABELS, formatFileSize } from '@/lib/documents'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { FileText, ExternalLink, Inbox } from 'lucide-react'
 import type { LibraryDocument } from '@/types'
 import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
@@ -56,9 +57,9 @@ export default function InvestorHoldingDocumentsPage() {
                   <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(d.fileSize)} · {formatDate(d.createdAt?.seconds)}</p>
                 </div>
                 <a href={d.fileUrl} target="_blank" rel="noreferrer" className="shrink-0">
-                  <button className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted">
+                  <Button variant="outline" size="sm">
                     <ExternalLink className="h-3.5 w-3.5" />Buka
-                  </button>
+                  </Button>
                 </a>
               </CardContent>
             </Card>

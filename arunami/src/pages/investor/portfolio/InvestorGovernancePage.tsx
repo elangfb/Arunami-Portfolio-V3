@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { getCovenants, getMilestones } from '@/lib/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { AlertTriangle, Scale, Target } from 'lucide-react'
 import type { Covenant, Milestone, MilestoneStatus } from '@/types'
 import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
@@ -53,30 +54,30 @@ export default function InvestorGovernancePage() {
           {covenants.length === 0 ? (
             <p className="text-sm text-muted-foreground">Belum ada data covenant.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground">
-                  <th className="py-2 text-left font-medium">Covenant</th>
-                  <th className="py-2 text-left font-medium">Syarat</th>
-                  <th className="py-2 text-left font-medium">Aktual</th>
-                  <th className="py-2 text-left font-medium">Periode</th>
-                  <th className="py-2 text-center font-medium">Hasil</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Covenant</TableHead>
+                  <TableHead>Syarat</TableHead>
+                  <TableHead>Aktual</TableHead>
+                  <TableHead>Periode</TableHead>
+                  <TableHead className="text-center">Hasil</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {covenants.map(c => (
-                  <tr key={c.id} className="border-b last:border-0">
-                    <td className="py-2 font-medium">{c.name}</td>
-                    <td className="py-2 text-muted-foreground">{c.requirement || '—'}</td>
-                    <td className="py-2 text-muted-foreground">{c.actual || '—'}</td>
-                    <td className="py-2 text-muted-foreground">{c.period || '—'}</td>
-                    <td className="py-2 text-center">
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{c.requirement || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{c.actual || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{c.period || '—'}</TableCell>
+                    <TableCell className="text-center">
                       <Badge variant={c.result === 'pass' ? 'success' : 'danger'}>{c.result === 'pass' ? 'Pass' : 'Gagal'}</Badge>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -87,27 +88,27 @@ export default function InvestorGovernancePage() {
           {milestones.length === 0 ? (
             <p className="text-sm text-muted-foreground">Belum ada data milestone.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground">
-                  <th className="py-2 text-left font-medium">Milestone</th>
-                  <th className="py-2 text-left font-medium">Target</th>
-                  <th className="py-2 text-center font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Milestone</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {milestones.map(m => (
-                  <tr key={m.id} className="border-b last:border-0">
-                    <td className="py-2">
+                  <TableRow key={m.id}>
+                    <TableCell>
                       <p className="font-medium">{m.title}</p>
                       {m.successCriteria && <p className="text-xs text-muted-foreground">{m.successCriteria}</p>}
-                    </td>
-                    <td className="py-2 text-muted-foreground">{m.targetDate || '—'}</td>
-                    <td className="py-2 text-center"><Badge variant={STATUS_VARIANT[m.status]}>{STATUS_LABEL[m.status]}</Badge></td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{m.targetDate || '—'}</TableCell>
+                    <TableCell className="text-center"><Badge variant={STATUS_VARIANT[m.status]}>{STATUS_LABEL[m.status]}</Badge></TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

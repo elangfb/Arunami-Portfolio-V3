@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { brandOf } from '@/lib/portfolioName'
 import { CapTableFillBar } from '@/components/shared/CapTableFillBar'
@@ -395,35 +396,35 @@ export default function AdminPortfolios() {
       ) : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr className="border-b">
-                  <th className="w-8 px-3 py-3" />
-                  <th className="text-left px-3 py-3 font-medium">Nama Portofolio</th>
-                  <th className="text-left px-3 py-3 font-medium">Kode</th>
-                  <th className="text-left px-3 py-3 font-medium">Tahap</th>
-                  <th className="text-left px-3 py-3 font-medium">Periode</th>
-                  <th className="text-right px-3 py-3 font-medium">Investasi Awal</th>
-                  <th className="text-center px-3 py-3 font-medium">Investor</th>
-                  <th className="text-center px-3 py-3 font-medium">Analis</th>
-                  <th className="text-right px-3 py-3 font-medium w-24">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+            <Table className="text-sm">
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead className="w-8 px-3 py-3" />
+                  <TableHead className="text-left px-3 py-3 font-medium">Nama Portofolio</TableHead>
+                  <TableHead className="text-left px-3 py-3 font-medium">Kode</TableHead>
+                  <TableHead className="text-left px-3 py-3 font-medium">Tahap</TableHead>
+                  <TableHead className="text-left px-3 py-3 font-medium">Periode</TableHead>
+                  <TableHead className="text-right px-3 py-3 font-medium">Investasi Awal</TableHead>
+                  <TableHead className="text-center px-3 py-3 font-medium">Investor</TableHead>
+                  <TableHead className="text-center px-3 py-3 font-medium">Analis</TableHead>
+                  <TableHead className="text-right px-3 py-3 font-medium w-24">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y">
                 {filteredPortfolios.map(p => {
                   const isExpanded = expandedId === p.id
                   return (
                     <Fragment key={p.id}>
-                      <tr
+                      <TableRow
                         className={`cursor-pointer hover:bg-muted/30 ${isExpanded ? 'bg-muted/20' : ''}`}
                         onClick={() => toggleExpand(p)}
                       >
-                        <td className="px-3 py-3 align-middle">
+                        <TableCell className="px-3 py-3 align-middle">
                           <ChevronDown
                             className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                           />
-                        </td>
-                        <td className="px-3 py-3 align-middle">
+                        </TableCell>
+                        <TableCell className="px-3 py-3 align-middle">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{brandOf(p)}</span>
                             {p.archived && (
@@ -433,22 +434,22 @@ export default function AdminPortfolios() {
                           {brandOf(p) !== p.name && (
                             <div className="text-xs text-muted-foreground">{p.name}</div>
                           )}
-                        </td>
-                        <td className="px-3 py-3 align-middle text-muted-foreground">{p.code}</td>
-                        <td className="px-3 py-3 align-middle text-muted-foreground">{p.stage}</td>
-                        <td className="px-3 py-3 align-middle">
+                        </TableCell>
+                        <TableCell className="px-3 py-3 align-middle text-muted-foreground">{p.code}</TableCell>
+                        <TableCell className="px-3 py-3 align-middle text-muted-foreground">{p.stage}</TableCell>
+                        <TableCell className="px-3 py-3 align-middle">
                           <Badge variant="outline">{p.periode}</Badge>
-                        </td>
-                        <td className="px-3 py-3 align-middle text-right font-medium">
+                        </TableCell>
+                        <TableCell className="px-3 py-3 align-middle text-right font-medium">
                           {formatCurrencyCompact(p.investasiAwal)}
-                        </td>
-                        <td className="px-3 py-3 align-middle text-center">
+                        </TableCell>
+                        <TableCell className="px-3 py-3 align-middle text-center">
                           {p.assignedInvestors.length}
-                        </td>
-                        <td className="px-3 py-3 align-middle text-center">
+                        </TableCell>
+                        <TableCell className="px-3 py-3 align-middle text-center">
                           {p.assignedAnalysts?.length ?? 0}
-                        </td>
-                        <td className="px-3 py-3 align-middle text-right">
+                        </TableCell>
+                        <TableCell className="px-3 py-3 align-middle text-right">
                           <div className="flex justify-end gap-1">
                             {p.archived ? (
                               <>
@@ -512,12 +513,12 @@ export default function AdminPortfolios() {
                               </>
                             )}
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
 
                       {isExpanded && (
-                        <tr className="bg-muted/10">
-                          <td colSpan={9} className="px-6 py-5">
+                        <TableRow className="bg-muted/10 hover:bg-muted/10">
+                          <TableCell colSpan={9} className="px-6 py-5">
                             {p.description && (
                               <div className="mb-4">
                                 <p className="text-xs font-medium text-muted-foreground mb-1">Deskripsi</p>
@@ -547,23 +548,23 @@ export default function AdminPortfolios() {
                                     )}
                                     {allocations.length > 0 && (
                                       <div className="rounded-md border overflow-hidden">
-                                        <table className="w-full text-sm">
-                                          <thead className="bg-muted/50">
-                                            <tr>
-                                              <th className="text-left py-2 px-3 font-medium">Nama Investor</th>
-                                              <th className="text-right py-2 px-3 font-medium">Jumlah Investasi</th>
-                                              <th className="text-center py-2 px-3 font-medium">Persentase</th>
-                                              <th className="text-right py-2 px-3 font-medium w-16">Aksi</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y">
+                                        <Table className="text-sm">
+                                          <TableHeader className="bg-muted/50">
+                                            <TableRow>
+                                              <TableHead className="text-left py-2 px-3 font-medium">Nama Investor</TableHead>
+                                              <TableHead className="text-right py-2 px-3 font-medium">Jumlah Investasi</TableHead>
+                                              <TableHead className="text-center py-2 px-3 font-medium">Persentase</TableHead>
+                                              <TableHead className="text-right py-2 px-3 font-medium w-16">Aksi</TableHead>
+                                            </TableRow>
+                                          </TableHeader>
+                                          <TableBody className="divide-y">
                                             {allocations.map(alloc => {
                                               const isEditing = editAllocId === alloc.id
                                               // DF-08: resolve name/email live; fall back to denormalized copy.
                                               const investorUser = investors.find(i => i.uid === alloc.investorUid)
                                               return (
-                                                <tr key={alloc.id} className="hover:bg-muted/30">
-                                                  <td className="py-2.5 px-3">
+                                                <TableRow key={alloc.id} className="hover:bg-muted/30">
+                                                  <TableCell className="py-2.5 px-3">
                                                     <div className="flex items-center gap-2">
                                                       <p className="font-medium">{investorUser?.displayName ?? alloc.investorName}</p>
                                                       {investorUser?.isArunamiTeam && (
@@ -573,8 +574,8 @@ export default function AdminPortfolios() {
                                                     {(investorUser?.email ?? alloc.investorEmail) && (
                                                       <p className="text-xs text-muted-foreground">{investorUser?.email ?? alloc.investorEmail}</p>
                                                     )}
-                                                  </td>
-                                                  <td className="py-2.5 px-3 text-right">
+                                                  </TableCell>
+                                                  <TableCell className="py-2.5 px-3 text-right">
                                                     {isEditing ? (
                                                       <Input
                                                         type="number"
@@ -585,8 +586,8 @@ export default function AdminPortfolios() {
                                                     ) : (
                                                       formatCurrencyCompact(alloc.investedAmount)
                                                     )}
-                                                  </td>
-                                                  <td className="py-2.5 px-3 text-center">
+                                                  </TableCell>
+                                                  <TableCell className="py-2.5 px-3 text-center">
                                                     {isEditing ? (
                                                       <Input
                                                         type="number"
@@ -597,8 +598,8 @@ export default function AdminPortfolios() {
                                                     ) : (
                                                       alloc.ownershipPercent != null ? `${alloc.ownershipPercent}%` : '—'
                                                     )}
-                                                  </td>
-                                                  <td className="py-2.5 px-3 text-right">
+                                                  </TableCell>
+                                                  <TableCell className="py-2.5 px-3 text-right">
                                                     {isEditing ? (
                                                       <div className="flex justify-end gap-1">
                                                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={cancelEditAllocation}>
@@ -628,12 +629,12 @@ export default function AdminPortfolios() {
                                                         </Button>
                                                       </div>
                                                     )}
-                                                  </td>
-                                                </tr>
+                                                  </TableCell>
+                                                </TableRow>
                                               )
                                             })}
-                                          </tbody>
-                                        </table>
+                                          </TableBody>
+                                        </Table>
                                       </div>
                                     )}
 
@@ -802,14 +803,14 @@ export default function AdminPortfolios() {
                                 </div>
                               </div>
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )}
                     </Fragment>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </Card>
       )}

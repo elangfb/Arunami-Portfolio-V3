@@ -4,6 +4,7 @@ import { getReports } from '@/lib/firestore'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { comparePeriods, formatPeriod } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import type { Portfolio, PortfolioReport, PnLExtractedData, ProjectionExtractedData } from '@/types'
 
 interface Context {
@@ -119,44 +120,46 @@ export default function CostsPage() {
             ))}
           </div>
 
-          <div className="mt-8 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground text-xs">
-                  <th className="text-left py-2">Item Biaya</th>
-                  <th className="text-right py-2 px-2">Jumlah</th>
-                  <th className="text-right py-2 px-2">%</th>
-                  <th className="text-right py-2 px-2">vs Bulan Lalu</th>
-                  <th className="text-right py-2 px-2">vs Proyeksi</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="mt-8">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item Biaya</TableHead>
+                  <TableHead className="text-right">Jumlah</TableHead>
+                  <TableHead className="text-right">%</TableHead>
+                  <TableHead className="text-right">vs Bulan Lalu</TableHead>
+                  <TableHead className="text-right">vs Proyeksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map(item => (
-                  <tr key={item.name} className="border-b hover:bg-muted/30">
-                    <td className="py-2.5">{item.name}</td>
-                    <td className="text-right py-2.5 px-2 font-medium">{formatCurrencyCompact(item.amount)}</td>
-                    <td className="text-right py-2.5 px-2 text-muted-foreground">{item.percentage.toFixed(1)}%</td>
-                    <td className={`text-right py-2.5 px-2 font-medium ${
+                  <TableRow key={item.name} className="hover:bg-muted/30">
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrencyCompact(item.amount)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{item.percentage.toFixed(1)}%</TableCell>
+                    <TableCell className={`text-right font-medium ${
                       item.momPct == null ? 'text-muted-foreground' : item.momPct > 0 ? 'text-red-600' : 'text-green-600'
                     }`}>
                       {item.momPct == null ? '—' : formatPercent(item.momPct, true)}
-                    </td>
-                    <td className={`text-right py-2.5 px-2 font-medium ${
+                    </TableCell>
+                    <TableCell className={`text-right font-medium ${
                       item.projPct == null ? 'text-muted-foreground' : item.projPct > 0 ? 'text-red-600' : 'text-green-600'
                     }`}>
                       {item.projPct == null ? '—' : formatPercent(item.projPct, true)}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-                <tr className="font-semibold">
-                  <td className="py-2.5">Total</td>
-                  <td className="text-right py-2.5 px-2">{formatCurrencyCompact(totalCost)}</td>
-                  <td className="text-right py-2.5 px-2">100%</td>
-                  <td className="text-right py-2.5 px-2 text-muted-foreground">—</td>
-                  <td className="text-right py-2.5 px-2 text-muted-foreground">—</td>
-                </tr>
-              </tbody>
-            </table>
+              </TableBody>
+              <TableFooter>
+                <TableRow className="font-semibold">
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right">{formatCurrencyCompact(totalCost)}</TableCell>
+                  <TableCell className="text-right">100%</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
             <p className="mt-3 text-xs text-muted-foreground">
               Kenaikan biaya (positif) ditampilkan merah; penurunan (negatif) ditampilkan hijau.
             </p>

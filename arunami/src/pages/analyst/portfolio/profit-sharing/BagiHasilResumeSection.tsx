@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
@@ -270,31 +271,31 @@ export default function BagiHasilResumeSection({
             </div>
 
             <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-xs text-muted-foreground">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-medium">Periode</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Bagi Hasil</th>
-                    {returnsPrincipal && <th className="text-right py-2.5 px-3 font-medium">Pengembalian Pokok</th>}
-                    <th className="text-left py-2.5 px-3 font-medium">Sumber</th>
-                    <th className="text-right py-2.5 px-3 font-medium w-24">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table>
+                <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
+                  <TableRow>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Periode</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">Bagi Hasil</TableHead>
+                    {returnsPrincipal && <TableHead className="text-right py-2.5 px-3 font-medium">Pengembalian Pokok</TableHead>}
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Sumber</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium w-24">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {loadingRows ? (
-                    <tr><td colSpan={returnsPrincipal ? 5 : 4} className="py-6 text-center text-muted-foreground">Memuat…</td></tr>
+                    <TableRow><TableCell colSpan={returnsPrincipal ? 5 : 4} className="py-6 text-center text-muted-foreground">Memuat…</TableCell></TableRow>
                   ) : rows.length === 0 ? (
-                    <tr><td colSpan={returnsPrincipal ? 5 : 4} className="py-6 text-center text-muted-foreground">Belum ada catatan.</td></tr>
+                    <TableRow><TableCell colSpan={returnsPrincipal ? 5 : 4} className="py-6 text-center text-muted-foreground">Belum ada catatan.</TableCell></TableRow>
                   ) : rows.map(row => (
-                    <tr key={row.key} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3 font-medium">{formatPeriod(row.period)}</td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrencyExact(row.bagiHasil)}</td>
+                    <TableRow key={row.key} className="hover:bg-muted/30">
+                      <TableCell className="py-2.5 px-3 font-medium">{formatPeriod(row.period)}</TableCell>
+                      <TableCell className="py-2.5 px-3 text-right">{formatCurrencyExact(row.bagiHasil)}</TableCell>
                       {returnsPrincipal && (
-                        <td className="py-2.5 px-3 text-right">
+                        <TableCell className="py-2.5 px-3 text-right">
                           {row.principal != null ? formatCurrencyExact(row.principal) : '—'}
-                        </td>
+                        </TableCell>
                       )}
-                      <td className="py-2.5 px-3">
+                      <TableCell className="py-2.5 px-3">
                         {row.proofUrl ? (
                           <a href={row.proofUrl} target="_blank" rel="noreferrer"
                             className="inline-flex items-center gap-1 text-[#1e5f3f] hover:underline">
@@ -308,25 +309,25 @@ export default function BagiHasilResumeSection({
                             {row.source === 'manual' ? 'Manual' : 'Otomatis'}
                           </Badge>
                         )}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3 text-right">
                         {row.entry ? (
                           <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => openEdit(row.entry!)} className="text-slate-500 hover:text-slate-800" title="Edit">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(row.entry!)} className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Edit">
                               <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={() => removeEntry(row.entry!)} className="text-red-500 hover:text-red-700" title="Hapus">
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => removeEntry(row.entry!)} className="h-7 w-7 text-red-500 hover:text-red-700" title="Hapus">
                               <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            </Button>
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </>
         )}

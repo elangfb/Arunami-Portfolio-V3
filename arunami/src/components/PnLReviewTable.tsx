@@ -3,6 +3,8 @@ import { formatPeriod } from '@/lib/dateUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Loader2, CheckCircle2, Plus, X, Eye, EyeOff } from 'lucide-react'
 import type {
   PnLUploadPending,
@@ -664,7 +666,7 @@ export function PnLReviewTable({
             {units.map(unit => (
               <div key={unit.id} className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs text-muted-foreground truncate">{unit.name}</label>
+                  <Label className="text-xs text-muted-foreground truncate">{unit.name}</Label>
                   <Button
                     type="button"
                     size="icon"
@@ -689,12 +691,11 @@ export function PnLReviewTable({
 
       {/* Notes */}
       <div className="rounded-lg border p-4 space-y-2">
-        <label className="text-sm font-medium">Catatan</label>
-        <textarea
+        <Label className="text-sm font-medium">Catatan</Label>
+        <Textarea
           value={data.notes ?? ''}
           onChange={e => onDataChange({ ...data, notes: e.target.value })}
           rows={3}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           placeholder="Catatan tambahan..."
         />
       </div>

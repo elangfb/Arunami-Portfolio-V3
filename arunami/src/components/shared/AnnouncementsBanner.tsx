@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getAnnouncements } from '@/lib/firestore'
+import { Button } from '@/components/ui/button'
 import { Megaphone, X } from 'lucide-react'
 import type { Announcement, UserRole } from '@/types'
 
@@ -39,9 +40,15 @@ export function AnnouncementsBanner({ role }: { role: UserRole }) {
             <p className="text-sm font-semibold">{a.title}</p>
             <p className="whitespace-pre-wrap text-sm text-muted-foreground">{a.body}</p>
           </div>
-          <button onClick={() => dismiss(a.id)} title="Tutup" className="shrink-0 text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => dismiss(a.id)}
+            title="Tutup"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       ))}
     </div>

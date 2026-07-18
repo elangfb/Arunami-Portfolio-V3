@@ -9,6 +9,7 @@ import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select'
@@ -144,43 +145,41 @@ export default function InvestorDistributionsPage() {
             </div>
 
             <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr className="border-b">
-                      <th className="px-3 py-3 text-left font-medium">Periode</th>
-                      <th className="px-3 py-3 text-left font-medium">Portofolio</th>
-                      <th className="px-3 py-3 text-right font-medium">Bagi Hasil</th>
-                      {hasPrincipal && <th className="px-3 py-3 text-right font-medium">Pengembalian Pokok</th>}
-                      <th className="px-3 py-3 text-center font-medium">Status</th>
-                      <th className="px-3 py-3 text-right font-medium">Bukti</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filtered.length === 0 ? (
-                      <tr><td colSpan={hasPrincipal ? 6 : 5} className="px-3 py-10 text-center text-muted-foreground">
-                        <Inbox className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                        Belum ada distribusi.
-                      </td></tr>
-                    ) : filtered.map(r => (
-                      <tr key={r.key} className="hover:bg-muted/30">
-                        <td className="px-3 py-2.5 font-medium">{formatPeriod(r.period)}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{r.portfolioName}</td>
-                        <td className="px-3 py-2.5 text-right font-medium">{formatCurrencyExact(r.bagiHasil)}</td>
-                        {hasPrincipal && <td className="px-3 py-2.5 text-right text-muted-foreground">{r.principal != null ? formatCurrencyExact(r.principal) : '—'}</td>}
-                        <td className="px-3 py-2.5 text-center"><Badge variant="success">Dibayar</Badge></td>
-                        <td className="px-3 py-2.5 text-right">
-                          {r.proofUrl ? (
-                            <a href={r.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#1e5f3f] hover:underline">
-                              <FileImage className="h-3.5 w-3.5" />Lihat
-                            </a>
-                          ) : <span className="text-muted-foreground">—</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Periode</TableHead>
+                    <TableHead>Portofolio</TableHead>
+                    <TableHead className="text-right">Bagi Hasil</TableHead>
+                    {hasPrincipal && <TableHead className="text-right">Pengembalian Pokok</TableHead>}
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Bukti</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow><TableCell colSpan={hasPrincipal ? 6 : 5} className="py-10 text-center text-muted-foreground">
+                      <Inbox className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                      Belum ada distribusi.
+                    </TableCell></TableRow>
+                  ) : filtered.map(r => (
+                    <TableRow key={r.key}>
+                      <TableCell className="font-medium">{formatPeriod(r.period)}</TableCell>
+                      <TableCell className="text-muted-foreground">{r.portfolioName}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrencyExact(r.bagiHasil)}</TableCell>
+                      {hasPrincipal && <TableCell className="text-right text-muted-foreground">{r.principal != null ? formatCurrencyExact(r.principal) : '—'}</TableCell>}
+                      <TableCell className="text-center"><Badge variant="success">Dibayar</Badge></TableCell>
+                      <TableCell className="text-right">
+                        {r.proofUrl ? (
+                          <a href={r.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#1e5f3f] hover:underline">
+                            <FileImage className="h-3.5 w-3.5" />Lihat
+                          </a>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
 
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

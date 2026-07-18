@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Landmark, Plus } from 'lucide-react'
 import EditConfigDialog from './EditConfigDialog'
 import { formatCurrencyExact } from '@/lib/utils'
@@ -77,26 +78,26 @@ export default function AnnualDividendSection({
 
           {history.length > 0 && (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm text-black">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wide">
-                    <th className="py-2 pr-3 font-medium">Tahun</th>
-                    <th className="py-2 pr-3 font-medium">Jumlah</th>
-                    <th className="py-2 pr-3 font-medium">Disetujui</th>
-                    <th className="py-2 pr-3 font-medium">Catatan</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="text-black">
+                <TableHeader>
+                  <TableRow className="text-left text-xs uppercase tracking-wide">
+                    <TableHead className="py-2 pr-3 font-medium text-black">Tahun</TableHead>
+                    <TableHead className="py-2 pr-3 font-medium text-black">Jumlah</TableHead>
+                    <TableHead className="py-2 pr-3 font-medium text-black">Disetujui</TableHead>
+                    <TableHead className="py-2 pr-3 font-medium text-black">Catatan</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {[...history].sort((a, b) => b.year - a.year).map(d => (
-                    <tr key={d.id} className="border-b last:border-0">
-                      <td className="py-2 pr-3">{d.year}</td>
-                      <td className="py-2 pr-3">{formatCurrencyExact(d.totalAmount)}</td>
-                      <td className="py-2 pr-3">{formatDate(d.approvedAt)}</td>
-                      <td className="py-2 pr-3">{d.notes || '-'}</td>
-                    </tr>
+                    <TableRow key={d.id}>
+                      <TableCell className="py-2 pr-3">{d.year}</TableCell>
+                      <TableCell className="py-2 pr-3">{formatCurrencyExact(d.totalAmount)}</TableCell>
+                      <TableCell className="py-2 pr-3">{formatDate(d.approvedAt)}</TableCell>
+                      <TableCell className="py-2 pr-3">{d.notes || '-'}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

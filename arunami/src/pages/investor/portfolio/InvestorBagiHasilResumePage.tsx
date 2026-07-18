@@ -6,6 +6,7 @@ import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { FileImage, Inbox } from 'lucide-react'
 import type { InvestorPortfolioOutletContext } from './InvestorPortfolioLayout'
 
@@ -111,26 +112,26 @@ export default function InvestorBagiHasilResumePage() {
               <p className="text-sm text-muted-foreground">Belum ada catatan bagi hasil.</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground text-xs">
-                  <th className="text-left py-2">Periode</th>
-                  <th className="text-right py-2">Bagi Hasil</th>
-                  {showPrincipal && <th className="text-right py-2">Pengembalian Pokok</th>}
-                  <th className="text-right py-2">Sumber</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Periode</TableHead>
+                  <TableHead className="text-right">Bagi Hasil</TableHead>
+                  {showPrincipal && <TableHead className="text-right">Pengembalian Pokok</TableHead>}
+                  <TableHead className="text-right">Sumber</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map(row => (
-                  <tr key={row.key} className="border-b hover:bg-muted/30">
-                    <td className="py-2.5 font-medium">{formatPeriod(row.period)}</td>
-                    <td className="text-right py-2.5">{formatCurrencyExact(row.bagiHasil)}</td>
+                  <TableRow key={row.key}>
+                    <TableCell className="font-medium">{formatPeriod(row.period)}</TableCell>
+                    <TableCell className="text-right">{formatCurrencyExact(row.bagiHasil)}</TableCell>
                     {showPrincipal && (
-                      <td className="text-right py-2.5">
+                      <TableCell className="text-right">
                         {row.principal != null ? formatCurrencyExact(row.principal) : '—'}
-                      </td>
+                      </TableCell>
                     )}
-                    <td className="py-2.5 text-right">
+                    <TableCell className="text-right">
                       {row.proofUrl ? (
                         <a
                           href={row.proofUrl}
@@ -148,19 +149,19 @@ export default function InvestorBagiHasilResumePage() {
                           {row.source === 'otomatis' ? 'Otomatis' : 'Manual'}
                         </Badge>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-              <tfoot className="bg-muted/30 font-semibold">
-                <tr>
-                  <td className="py-2.5">Total</td>
-                  <td className="text-right py-2.5">{formatCurrencyExact(totalBagiHasil)}</td>
-                  {showPrincipal && <td className="text-right py-2.5">{formatCurrencyExact(totalPrincipal)}</td>}
-                  <td className="py-2.5 text-right">—</td>
-                </tr>
-              </tfoot>
-            </table>
+              </TableBody>
+              <TableFooter className="bg-muted/30 font-semibold">
+                <TableRow>
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right">{formatCurrencyExact(totalBagiHasil)}</TableCell>
+                  {showPrincipal && <TableCell className="text-right">{formatCurrencyExact(totalPrincipal)}</TableCell>}
+                  <TableCell className="text-right">—</TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
           )}
         </CardContent>
       </Card>

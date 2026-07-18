@@ -20,6 +20,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from '@/components/ui/table'
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from '@/components/ui/select'
+import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import {
@@ -198,20 +204,20 @@ export default function IRTransferProofs() {
               </p>
             ) : (
               <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-<tr>
-                      <th className="text-left py-2.5 px-3 font-medium">Investor</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Portofolio Aktif</th>
-                      <th className="text-right py-2.5 px-3 font-medium">Total Investasi</th>
-                      <th className="text-right py-2.5 px-3 font-medium">Total Bagi Hasil</th>
-                      <th className="text-right py-2.5 px-3 font-medium w-32">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Investor</TableHead>
+                      <TableHead>Portofolio Aktif</TableHead>
+                      <TableHead className="text-right">Total Investasi</TableHead>
+                      <TableHead className="text-right">Total Bagi Hasil</TableHead>
+                      <TableHead className="text-right w-32">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {filtered.map(r => (
-                      <tr key={r.user.uid} className="hover:bg-muted/30">
-                        <td className="py-2.5 px-3">
+                      <TableRow key={r.user.uid}>
+                        <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1e5f3f]/10 text-[#1e5f3f] font-bold text-sm shrink-0">
                               {r.user.displayName?.charAt(0).toUpperCase()}
@@ -221,16 +227,16 @@ export default function IRTransferProofs() {
                               <p className="text-xs text-muted-foreground truncate">{r.user.email}</p>
                             </div>
                           </div>
-                        </td>
-                        <td className="py-2.5 px-3">
+                        </TableCell>
+                        <TableCell>
                           {r.allocations.length === 0 ? <span className="text-muted-foreground">—</span> : (
                             <div className="flex flex-wrap gap-1">
                               {r.allocations.map(a => <Badge key={a.id} variant="outline" className="text-xs">{a.portfolioCode}</Badge>)}
                             </div>
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-medium">{formatCurrencyCompact(r.totalInvested)}</td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrencyCompact(r.totalInvested)}</TableCell>
+                        <TableCell className="text-right">
                           {r.totalBagiHasil > 0 ? (
                             <>
                               <span className="font-medium text-[#1e5f3f]">{formatCurrencyCompact(r.totalBagiHasil)}</span>
@@ -239,16 +245,16 @@ export default function IRTransferProofs() {
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="text-right">
                           <Button size="sm" variant="outline" onClick={() => loadInvestor(r.user)}>
                             Pilih<ChevronRight className="ml-1 h-3 w-3" />
                           </Button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
@@ -329,28 +335,28 @@ export default function IRTransferProofs() {
             <p className="py-8 text-center text-sm text-muted-foreground">Belum ada laporan yang dipublikasikan untuk investor ini.</p>
           ) : (
             <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-medium">Periode</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Cakupan</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Bukti Dikirim</th>
-                    <th className="text-right py-2.5 px-3 font-medium w-56">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Periode</TableHead>
+                    <TableHead>Cakupan</TableHead>
+                    <TableHead>Bukti Dikirim</TableHead>
+                    <TableHead className="text-right w-56">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {reports.map(r => {
                     const proofs = proofsByReport[r.id] ?? []
                     const isGraceNoPayout =
                       r.scope !== 'accumulated' && r.scope !== 'all_time' &&
                       graceNoPayoutPortfolios.has(r.portfolioId)
                     return (
-                      <tr key={r.id} className="hover:bg-muted/30 align-top">
-                        <td className="py-2.5 px-3 font-medium">{periodLabel(r)}</td>
-                        <td className="py-2.5 px-3 text-muted-foreground">
+                      <TableRow key={r.id}>
+                        <TableCell className="align-top font-medium">{periodLabel(r)}</TableCell>
+                        <TableCell className="align-top text-muted-foreground">
                           {r.scope === 'accumulated' ? 'Akumulasi' : r.scope === 'all_time' ? 'All-Time' : resolveBrand({ id: r.portfolioId, ptName: r.portfolioName })}
-                        </td>
-                        <td className="py-2.5 px-3">
+                        </TableCell>
+                        <TableCell className="align-top">
                           {proofs.length === 0 ? (
                             <span className="text-muted-foreground text-xs">Belum ada</span>
                           ) : (
@@ -362,23 +368,25 @@ export default function IRTransferProofs() {
                                     {p.fileName}
                                   </a>
                                   <span className="font-medium">{formatCurrencyCompact(p.amount)}</span>
-                                  <button
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={async () => {
                                       if (!confirm('Hapus bukti transfer ini? Notifikasi terkait juga akan dihapus.')) return
                                       try { await deleteInvestorTransferProof(p); await refreshProofsFor(r.id); toast.success('Bukti transfer dihapus') }
                                       catch { toast.error('Gagal menghapus') }
                                     }}
-                                    className="text-red-500 hover:text-red-700"
+                                    className="h-6 w-6 text-red-500 hover:text-red-700"
                                     title="Hapus"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                  </Button>
                                 </div>
                               ))}
                             </div>
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="align-top text-right">
                           {isGraceNoPayout ? (
                             <span className="text-xs text-muted-foreground" title="Laporan grace period informatif — tidak ada payout">
                               Tanpa payout (grace)
@@ -388,12 +396,12 @@ export default function IRTransferProofs() {
                               <Upload className="mr-1.5 h-3.5 w-3.5" />Kirim Bukti
                             </Button>
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -414,45 +422,47 @@ export default function IRTransferProofs() {
             <p className="py-6 text-center text-sm text-muted-foreground">Belum ada bukti tanpa laporan.</p>
           ) : (
             <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-medium">Periode</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Portofolio</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Bukti</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Nominal</th>
-                    <th className="text-right py-2.5 px-3 font-medium w-12"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Periode</TableHead>
+                    <TableHead>Portofolio</TableHead>
+                    <TableHead>Bukti</TableHead>
+                    <TableHead className="text-right">Nominal</TableHead>
+                    <TableHead className="text-right w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {standaloneProofs.map(p => (
-                    <tr key={p.id} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3 font-medium">{formatPeriod(p.period)}</td>
-                      <td className="py-2.5 px-3 text-muted-foreground">{resolveBrand({ id: p.portfolioId, ptName: p.portfolioName })}</td>
-                      <td className="py-2.5 px-3">
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{formatPeriod(p.period)}</TableCell>
+                      <TableCell className="text-muted-foreground">{resolveBrand({ id: p.portfolioId, ptName: p.portfolioName })}</TableCell>
+                      <TableCell>
                         <a href={p.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[#1e5f3f] hover:underline">
                           {isPdfProof(p.fileName) ? <FileText className="h-3.5 w-3.5" /> : <FileImage className="h-3.5 w-3.5" />}
                           <span className="truncate max-w-[12rem]">{p.fileName}</span>
                         </a>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-medium">{formatCurrencyCompact(p.amount)}</td>
-                      <td className="py-2.5 px-3 text-right">
-                        <button
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrencyCompact(p.amount)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={async () => {
                             if (!confirm('Hapus bukti transfer ini? Notifikasi terkait juga akan dihapus.')) return
                             try { await deleteInvestorTransferProof(p); await refreshStandalone(); toast.success('Bukti transfer dihapus') }
                             catch { toast.error('Gagal menghapus') }
                           }}
-                          className="text-red-500 hover:text-red-700"
+                          className="h-6 w-6 text-red-500 hover:text-red-700"
                           title="Hapus"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -681,16 +691,16 @@ function StandaloneProofDialog({
             {allocations.length === 0 ? (
               <p className="text-xs text-red-600">Investor ini belum punya alokasi portofolio.</p>
             ) : (
-              <select
-                id="sa-portfolio"
-                value={portfolioId}
-                onChange={e => setPortfolioId(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              >
-                {allocations.map(a => (
-                  <option key={a.portfolioId} value={a.portfolioId}>{resolveBrand({ id: a.portfolioId, ptName: a.portfolioName })} ({a.portfolioCode})</option>
-                ))}
-              </select>
+              <Select value={portfolioId} onValueChange={setPortfolioId}>
+                <SelectTrigger id="sa-portfolio">
+                  <SelectValue placeholder="Pilih portofolio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allocations.map(a => (
+                    <SelectItem key={a.portfolioId} value={a.portfolioId}>{resolveBrand({ id: a.portfolioId, ptName: a.portfolioName })} ({a.portfolioCode})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
 

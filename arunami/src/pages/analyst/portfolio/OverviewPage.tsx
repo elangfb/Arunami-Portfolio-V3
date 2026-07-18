@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -236,16 +237,16 @@ export default function OverviewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground">
-                  <th className="py-2 text-left font-medium"></th>
-                  <th className="py-2 text-right font-medium">Aktual {formatPeriod(latestPeriod)}</th>
-                  <th className="py-2 text-right font-medium">Aktual Bulan Lalu</th>
-                  <th className="py-2 text-right font-medium">Proyeksi {formatPeriod(latestPeriod)}</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead></TableHead>
+                  <TableHead className="text-right">Aktual {formatPeriod(latestPeriod)}</TableHead>
+                  <TableHead className="text-right">Aktual Bulan Lalu</TableHead>
+                  <TableHead className="text-right">Proyeksi {formatPeriod(latestPeriod)}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {comparisonRows.map(r => {
                   const delta = (cur: number | null, base: number | null) => {
                     if (cur == null || base == null || base === 0) return null
@@ -255,27 +256,27 @@ export default function OverviewPage() {
                   const dProj = delta(r.current, r.projection)
                   const cell = (v: number | null, d: number | null) => (
                     v == null
-                      ? <td className="py-2 text-right text-muted-foreground">—</td>
-                      : <td className="py-2 text-right">
+                      ? <TableCell className="text-right text-muted-foreground">—</TableCell>
+                      : <TableCell className="text-right">
                           {formatCurrencyExact(v)}
                           {d !== null && (
                             <div className={`text-[10px] ${d >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                               {d >= 0 ? '+' : ''}{d.toFixed(1)}%
                             </div>
                           )}
-                        </td>
+                        </TableCell>
                   )
                   return (
-                    <tr key={r.label} className="border-b last:border-0">
-                      <td className="py-2 font-medium">{r.label}</td>
+                    <TableRow key={r.label}>
+                      <TableCell className="font-medium">{r.label}</TableCell>
                       {cell(r.current, null)}
                       {cell(r.previous, dPrev)}
                       {cell(r.projection, dProj)}
-                    </tr>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}
@@ -349,32 +350,32 @@ export default function OverviewPage() {
 
           <div className="overflow-x-auto">
             <p className="mb-1 text-xs font-medium text-muted-foreground">Laba Bersih vs Target (6 bulan terakhir)</p>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground">
-                  <th className="py-2 text-left font-medium">Bulan</th>
-                  <th className="py-2 text-right font-medium">Target</th>
-                  <th className="py-2 text-right font-medium">Aktual</th>
-                  <th className="py-2 text-right font-medium">% Target</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Bulan</TableHead>
+                  <TableHead className="text-right">Target</TableHead>
+                  <TableHead className="text-right">Aktual</TableHead>
+                  <TableHead className="text-right">% Target</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {data.profitData.filter(r => r.aktual !== 0).slice(-6).map(r => {
                   const pct = r.proyeksi > 0 ? (r.aktual / r.proyeksi) * 100 : null
                   const under = pct !== null && pct < 80
                   return (
-                    <tr key={r.month} className="border-b last:border-0">
-                      <td className="py-2">{formatPeriod(r.month)}</td>
-                      <td className="py-2 text-right">{formatCurrencyCompact(r.proyeksi)}</td>
-                      <td className="py-2 text-right">{formatCurrencyCompact(r.aktual)}</td>
-                      <td className={`py-2 text-right ${under ? 'font-medium text-red-500' : ''}`}>
+                    <TableRow key={r.month}>
+                      <TableCell>{formatPeriod(r.month)}</TableCell>
+                      <TableCell className="text-right">{formatCurrencyCompact(r.proyeksi)}</TableCell>
+                      <TableCell className="text-right">{formatCurrencyCompact(r.aktual)}</TableCell>
+                      <TableCell className={`text-right ${under ? 'font-medium text-red-500' : ''}`}>
                         {pct !== null ? `${pct.toFixed(0)}%` : '—'}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>

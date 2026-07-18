@@ -9,6 +9,7 @@ import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { formatPeriod } from '@/lib/dateUtils'
 import type {
   FinancialData, TransferProof, Portfolio, InvestorAllocation, PortfolioConfig, AppUser,
@@ -159,17 +160,17 @@ export default function InvestorsPage() {
           {allocations.length === 0 ? (
             <p className="text-sm text-muted-foreground">Belum ada alokasi investor. Tambahkan melalui halaman Manajemen Portofolio.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left py-2.5 px-3 font-medium">Investor</th>
-                  <th className="text-right py-2.5 px-3 font-medium">Investasi</th>
-                  <th className="text-right py-2.5 px-3 font-medium">Net untuk Investor</th>
-                  <th className="text-right py-2.5 px-3 font-medium">Monthly ROI</th>
-                  <th className="text-right py-2.5 px-3 font-medium">Annual ROI</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>Investor</TableHead>
+                  <TableHead className="text-right">Investasi</TableHead>
+                  <TableHead className="text-right">Net untuk Investor</TableHead>
+                  <TableHead className="text-right">Monthly ROI</TableHead>
+                  <TableHead className="text-right">Annual ROI</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map(({ alloc, investorUser, result }) => {
                   // DF-08: resolve name/email live from users; fall back to the
                   // denormalized allocation copy only if the user is missing.
@@ -179,8 +180,8 @@ export default function InvestorsPage() {
                   const investorMonthly = result?.roiPercent ?? 0
                   const investorAnnual = result?.annualRoiPercent ?? 0
                   return (
-                    <tr key={alloc.id} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3">
+                    <TableRow key={alloc.id} className="hover:bg-muted/30">
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{displayName}</p>
                           {investorUser?.isArunamiTeam && (
@@ -190,24 +191,24 @@ export default function InvestorsPage() {
                         {displayEmail && (
                           <p className="text-xs text-muted-foreground">{displayEmail}</p>
                         )}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(alloc.investedAmount)}</td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrencyCompact(investorNet)}</td>
-                      <td className="py-2.5 px-3 text-right">
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrencyCompact(alloc.investedAmount)}</TableCell>
+                      <TableCell className="text-right">{formatCurrencyCompact(investorNet)}</TableCell>
+                      <TableCell className="text-right">
                         <span className={investorMonthly >= 0 ? 'text-green-600' : 'text-red-500'}>
                           {formatPercent(investorMonthly, true)}
                         </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
+                      </TableCell>
+                      <TableCell className="text-right">
                         <span className={investorAnnual >= 0 ? 'text-green-600' : 'text-red-500'}>
                           {formatPercent(investorAnnual, true)}
                         </span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

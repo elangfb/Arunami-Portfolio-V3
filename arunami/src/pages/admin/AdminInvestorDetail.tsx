@@ -13,6 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import {
+  Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell,
+} from '@/components/ui/table'
 import { ArrowLeft, Wallet, TrendingUp, Briefcase, BarChart3, FileText, Search, Wrench } from 'lucide-react'
 import InvestorReportGenerator from './components/InvestorReportGenerator'
 import InvestorReportHistory from './components/InvestorReportHistory'
@@ -317,59 +320,59 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
             </p>
           ) : (
             <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-medium">Portofolio</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Kepemilikan</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Investasi</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Earning Terakhir</th>
-                    <th className="text-right py-2.5 px-3 font-medium">Total Earning</th>
-                    <th className="text-right py-2.5 px-3 font-medium">ROI Bulanan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table className="text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Portofolio</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">Kepemilikan</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">Investasi</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">Earning Terakhir</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">Total Earning</TableHead>
+                    <TableHead className="text-right py-2.5 px-3 font-medium">ROI Bulanan</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y">
                   {portfolios.map(p => {
                     const ownershipPct = p.portfolio
                       ? ownershipFraction(p.allocation, p.portfolio) * 100
                       : (p.allocation.ownershipPercent ?? 0)
 
                     return (
-                      <tr key={p.allocation.id} className="hover:bg-muted/30">
-                        <td className="py-2.5 px-3">
+                      <TableRow key={p.allocation.id} className="hover:bg-muted/30">
+                        <TableCell className="py-2.5 px-3">
                           <p className="font-medium">{p.portfolio ? brandOf(p.portfolio) : p.allocation.portfolioName}</p>
                           <p className="text-xs text-muted-foreground">{p.allocation.portfolioCode}</p>
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="py-2.5 px-3 text-right">
                           {formatPercent(ownershipPct)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="py-2.5 px-3 text-right">
                           {formatCurrencyExact(p.allocation.investedAmount)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="py-2.5 px-3 text-right">
                           {formatCurrencyExact(p.earnings)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-medium">
+                        </TableCell>
+                        <TableCell className="py-2.5 px-3 text-right font-medium">
                           {formatCurrencyExact(Math.round(p.totalEarnings))}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
+                        </TableCell>
+                        <TableCell className="py-2.5 px-3 text-right">
                           {formatPercent(p.monthlyROI)}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-muted/30 font-medium">
-                    <td className="py-2.5 px-3">Total</td>
-                    <td></td>
-                    <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalInvested)}</td>
-                    <td className="py-2.5 px-3 text-right">{formatCurrencyExact(totalLatestEarnings)}</td>
-                    <td className="py-2.5 px-3 text-right">{formatCurrencyExact(Math.round(totalEarnings))}</td>
-                    <td className="py-2.5 px-3 text-right">{formatPercent(avgROI)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="bg-muted/30 font-medium">
+                    <TableCell className="py-2.5 px-3">Total</TableCell>
+                    <TableCell></TableCell>
+                    <TableCell className="py-2.5 px-3 text-right">{formatCurrencyExact(totalInvested)}</TableCell>
+                    <TableCell className="py-2.5 px-3 text-right">{formatCurrencyExact(totalLatestEarnings)}</TableCell>
+                    <TableCell className="py-2.5 px-3 text-right">{formatCurrencyExact(Math.round(totalEarnings))}</TableCell>
+                    <TableCell className="py-2.5 px-3 text-right">{formatPercent(avgROI)}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -424,30 +427,30 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
             </p>
           ) : (
             <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-medium">Tanggal</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Tipe</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Subjek</th>
-                    <th className="text-left py-2.5 px-3 font-medium">Channel</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table className="text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Tanggal</TableHead>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Tipe</TableHead>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Subjek</TableHead>
+                    <TableHead className="text-left py-2.5 px-3 font-medium">Channel</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y">
                   {filteredComms.map(comm => (
-                    <tr key={comm.id} className="hover:bg-muted/30">
-                      <td className="py-2.5 px-3">{formatCommsDate(comm)}</td>
-                      <td className="py-2.5 px-3">
+                    <TableRow key={comm.id} className="hover:bg-muted/30">
+                      <TableCell className="py-2.5 px-3">{formatCommsDate(comm)}</TableCell>
+                      <TableCell className="py-2.5 px-3">
                         <Badge variant="outline" className="capitalize">{comm.type === 'report' ? 'Laporan' : 'Pesan'}</Badge>
-                      </td>
-                      <td className="py-2.5 px-3">{comm.subject}</td>
-                      <td className="py-2.5 px-3">
+                      </TableCell>
+                      <TableCell className="py-2.5 px-3">{comm.subject}</TableCell>
+                      <TableCell className="py-2.5 px-3">
                         <Badge variant="secondary">{channelLabel[comm.channel] ?? comm.channel}</Badge>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
