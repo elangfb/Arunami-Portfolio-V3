@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { getInvestorPortfolios, getDocumentsForPortfolios } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { DOCUMENT_CATEGORY_LABELS, DOCUMENT_CATEGORIES, formatFileSize } from '@/lib/documents'
@@ -10,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select'
-import { TrendingUp, ArrowLeft, FolderOpen, Search, FileText, ExternalLink, Inbox } from 'lucide-react'
+import { FolderOpen, Search, FileText, ExternalLink, Inbox } from 'lucide-react'
 import type { LibraryDocument, DocumentCategory, Portfolio } from '@/types'
 
 function formatDate(seconds: number | undefined): string {
@@ -19,7 +18,6 @@ function formatDate(seconds: number | undefined): string {
 }
 
 export default function InvestorDocumentsPage() {
-  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [docs, setDocs] = useState<LibraryDocument[]>([])
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
@@ -47,22 +45,7 @@ export default function InvestorDocumentsPage() {
   }, [docs, search, portfolioFilter, categoryFilter])
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/investor')}>
-            <ArrowLeft className="mr-1 h-4 w-4" />Kembali
-          </Button>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
             <FolderOpen className="h-6 w-6 text-[#1e5f3f]" />
@@ -123,7 +106,6 @@ export default function InvestorDocumentsPage() {
             ))}
           </div>
         )}
-      </main>
-    </div>
+    </main>
   )
 }

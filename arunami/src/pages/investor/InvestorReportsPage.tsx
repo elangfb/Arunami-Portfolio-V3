@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { getPublishedInvestorReports, markInvestorReportRead, markInvestorReportsRead } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TrendingUp, ArrowLeft, Printer, Infinity as InfinityIcon, CalendarRange, CheckCheck } from 'lucide-react'
+import { Printer, Infinity as InfinityIcon, CalendarRange, CheckCheck } from 'lucide-react'
 import type { InvestorReportDoc } from '@/types'
 
 type View = 'alltime' | 'periodik'
@@ -26,7 +25,6 @@ function printReport(html: string) {
 }
 
 export default function InvestorReportsPage() {
-  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,22 +90,7 @@ export default function InvestorReportsPage() {
   }, [displayedReport?.id])
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/investor')}>
-            <ArrowLeft className="mr-1 h-4 w-4" />Kembali
-          </Button>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -216,7 +199,6 @@ export default function InvestorReportsPage() {
             </CardContent>
           </Card>
         )}
-      </main>
-    </div>
+    </main>
   )
 }

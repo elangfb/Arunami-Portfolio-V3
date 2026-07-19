@@ -52,6 +52,7 @@ import CovenantsPage from '@/pages/analyst/portfolio/CovenantsPage'
 import ProfitSharingPage from '@/pages/analyst/portfolio/ProfitSharingPage'
 
 // Investor
+import InvestorLayout from '@/pages/investor/InvestorLayout'
 import InvestorDashboard from '@/pages/investor/InvestorDashboard'
 import InvestorReportsPage from '@/pages/investor/InvestorReportsPage'
 import InvestorContractsPage from '@/pages/investor/InvestorContractsPage'
@@ -190,63 +191,25 @@ export default function App() {
             <Route path="investors/:uid" element={<IRInvestorDetail />} />
           </Route>
 
-          {/* Investor routes */}
+          {/* Investor routes — shared dark sidebar via InvestorLayout */}
           <Route
             path="/investor"
             element={
               <AuthGuard allowedRoles={['investor']}>
-                <InvestorDashboard />
+                <InvestorLayout />
               </AuthGuard>
             }
-          />
-          <Route
-            path="/investor/reports"
-            element={
-              <AuthGuard allowedRoles={['investor']}>
-                <InvestorReportsPage />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/investor/contracts"
-            element={
-              <AuthGuard allowedRoles={['investor']}>
-                <InvestorContractsPage />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/investor/distributions"
-            element={
-              <AuthGuard allowedRoles={['investor']}>
-                <InvestorDistributionsPage />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/investor/performance"
-            element={
-              <AuthGuard allowedRoles={['investor']}>
-                <InvestorPerformancePage />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/investor/documents"
-            element={
-              <AuthGuard allowedRoles={['investor']}>
-                <InvestorDocumentsPage />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/investor/profile"
-            element={
-              <AuthGuard allowedRoles={['investor']}>
-                <InvestorProfilePage />
-              </AuthGuard>
-            }
-          />
+          >
+            <Route index element={<InvestorDashboard />} />
+            <Route path="reports" element={<InvestorReportsPage />} />
+            <Route path="contracts" element={<InvestorContractsPage />} />
+            <Route path="distributions" element={<InvestorDistributionsPage />} />
+            <Route path="performance" element={<InvestorPerformancePage />} />
+            <Route path="documents" element={<InvestorDocumentsPage />} />
+            <Route path="profile" element={<InvestorProfilePage />} />
+          </Route>
+
+          {/* Portfolio drill-down keeps its own layout, outside the sidebar rail */}
           <Route
             path="/investor/portfolios/:id"
             element={

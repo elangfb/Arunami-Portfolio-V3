@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   getInvestorPortfolios, getTransferProofsForInvestor, getBagiHasilManualEntriesForInvestor,
 } from '@/lib/firestore'
@@ -7,13 +6,12 @@ import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact, formatCurrencyCompact } from '@/lib/utils'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select'
-import { TrendingUp, ArrowLeft, Wallet, FileImage, Inbox, Layers } from 'lucide-react'
+import { Wallet, FileImage, Inbox, Layers } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 interface LedgerRow {
@@ -28,7 +26,6 @@ interface LedgerRow {
 }
 
 export default function InvestorDistributionsPage() {
-  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [rows, setRows] = useState<LedgerRow[]>([])
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
@@ -92,22 +89,7 @@ export default function InvestorDistributionsPage() {
   const hasPrincipal = filtered.some(r => (r.principal ?? 0) > 0)
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/investor')}>
-            <ArrowLeft className="mr-1 h-4 w-4" />Kembali
-          </Button>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
             <Wallet className="h-6 w-6 text-[#1e5f3f]" />
@@ -188,8 +170,7 @@ export default function InvestorDistributionsPage() {
             </p>
           </>
         )}
-      </main>
-    </div>
+    </main>
   )
 }
 

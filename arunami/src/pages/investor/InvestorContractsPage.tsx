@@ -5,10 +5,9 @@ import { useAuthStore } from '@/store/authStore'
 import { brandOf } from '@/lib/portfolioName'
 import { contractStatus, daysRemainingLabel, type ContractSeverity } from '@/lib/contracts'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { ContractBadge, ContractDurationBar } from '@/components/shared/ContractStatus'
-import { TrendingUp, ArrowLeft, AlertTriangle, FileClock } from 'lucide-react'
+import { AlertTriangle, FileClock } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 export default function InvestorContractsPage() {
@@ -39,22 +38,7 @@ export default function InvestorContractsPage() {
     s === 'kritis' ? 'kontrak segera berakhir' : s === 'segera' ? 'perlu ditinjau' : ''
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/investor')}>
-            <ArrowLeft className="mr-1 h-4 w-4" />Kembali
-          </Button>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
             <FileClock className="h-6 w-6 text-[#1e5f3f]" />
@@ -124,7 +108,6 @@ export default function InvestorContractsPage() {
             </div>
           </>
         )}
-      </main>
-    </div>
+    </main>
   )
 }
