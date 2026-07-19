@@ -28,6 +28,7 @@ import AdminDistributions from '@/pages/admin/AdminDistributions'
 import PortfolioSetupWizard from '@/pages/admin/setup/PortfolioSetupWizard'
 
 // Analyst
+import AnalystLayout from '@/pages/analyst/AnalystLayout'
 import AnalystDashboard from '@/pages/analyst/AnalystDashboard'
 import AnalystRenewals from '@/pages/analyst/AnalystRenewals'
 import AnalystOverview from '@/pages/analyst/AnalystOverview'
@@ -124,68 +125,30 @@ export default function App() {
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 
-          {/* Analyst routes */}
+          {/* Analyst routes — shared dark sidebar via AnalystLayout */}
           <Route
             path="/analyst"
             element={
               <AuthGuard allowedRoles={['admin', 'analyst']}>
-                <AnalystDashboard />
+                <AnalystLayout />
               </AuthGuard>
             }
-          />
-          <Route
-            path="/analyst/renewals"
-            element={
-              <AuthGuard allowedRoles={['admin', 'analyst']}>
-                <AnalystRenewals />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/analyst/overview"
-            element={
-              <AuthGuard allowedRoles={['admin', 'analyst']}>
-                <AnalystOverview />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/analyst/monthly"
-            element={
-              <AuthGuard allowedRoles={['admin', 'analyst']}>
-                <AnalystMonthly />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/analyst/benchmarking"
-            element={
-              <AuthGuard allowedRoles={['admin', 'analyst']}>
-                <AnalystBenchmarking />
-              </AuthGuard>
-            }
-          />
+          >
+            <Route index element={<AnalystDashboard />} />
+            <Route path="overview" element={<AnalystOverview />} />
+            <Route path="monthly" element={<AnalystMonthly />} />
+            <Route path="benchmarking" element={<AnalystBenchmarking />} />
+            <Route path="renewals" element={<AnalystRenewals />} />
+            <Route path="engagement" element={<AnalystEngagement />} />
+            <Route path="notes" element={<AnalystNotes />} />
+          </Route>
+
+          {/* Full-screen presentation mode — no sidebar rail */}
           <Route
             path="/analyst/meeting"
             element={
               <AuthGuard allowedRoles={['admin', 'analyst']}>
                 <MeetingMode />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/analyst/engagement"
-            element={
-              <AuthGuard allowedRoles={['admin', 'analyst']}>
-                <AnalystEngagement />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/analyst/notes"
-            element={
-              <AuthGuard allowedRoles={['admin', 'analyst']}>
-                <AnalystNotes />
               </AuthGuard>
             }
           />

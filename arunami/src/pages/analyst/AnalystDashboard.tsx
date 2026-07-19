@@ -1,28 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { signOut } from 'firebase/auth'
-import { toast } from 'sonner'
-import { auth } from '@/lib/firebase'
 import { getAnalystPortfolios } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { brandOf } from '@/lib/portfolioName'
 import { INDUSTRY_PRESETS } from '@/lib/industryPresets'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { AnnouncementsBanner } from '@/components/shared/AnnouncementsBanner'
-import { TrendingUp, LogOut, Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown, FileClock, LayoutDashboard, Table2, BarChart3, Presentation, Mail, StickyNote } from 'lucide-react'
+import { Briefcase, Search, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 type SortKey = 'name' | 'code' | 'stage' | 'periode' | 'industryType' | 'investasiAwal' | 'investors'
 
 export default function AnalystDashboard() {
   const navigate = useNavigate()
-  const { user, setUser } = useAuthStore()
+  const { user } = useAuthStore()
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -33,12 +29,6 @@ export default function AnalystDashboard() {
     if (!user) return
     getAnalystPortfolios(user.uid).then(data => { setPortfolios(data); setLoading(false) })
   }, [user])
-
-  const handleLogout = async () => {
-    await signOut(auth); setUser(null)
-    navigate('/login', { replace: true })
-    toast.success('Berhasil keluar')
-  }
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -77,51 +67,8 @@ export default function AnalystDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sticky header */}
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="hidden text-sm text-muted-foreground sm:inline">Halo, {user?.displayName}</span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="mr-1 h-4 w-4" />Keluar
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8">
+    <main className="p-4 sm:p-6 lg:p-8">
         <AnnouncementsBanner role="analyst" />
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/overview')}>
-            <LayoutDashboard className="mr-1 h-4 w-4" />Ringkasan Global
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/monthly')}>
-            <Table2 className="mr-1 h-4 w-4" />Data Bulanan
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/benchmarking')}>
-            <BarChart3 className="mr-1 h-4 w-4" />Benchmarking
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/renewals')}>
-            <FileClock className="mr-1 h-4 w-4" />Perpanjangan Kontrak
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/engagement')}>
-            <Mail className="mr-1 h-4 w-4" />Engagement
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/notes')}>
-            <StickyNote className="mr-1 h-4 w-4" />Catatan Global
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analyst/meeting')}>
-            <Presentation className="mr-1 h-4 w-4" />Mode Rapat
-          </Button>
-        </div>
-
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Dashboard Analis</h1>
@@ -246,7 +193,6 @@ export default function AnalystDashboard() {
           </Card>
           </>
         )}
-      </main>
-    </div>
+    </main>
   )
 }

@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { HealthBadge } from '@/components/shared/HealthBadge'
-import { TrendingUp, ArrowLeft, BarChart3, Medal } from 'lucide-react'
+import { BarChart3, Medal } from 'lucide-react'
 import type { HealthLevel } from '@/types'
 
 type MetricKey = 'annualizedYield' | 'monthlyYield' | 'revenue' | 'netProfit' | 'bagiHasil'
@@ -63,22 +63,7 @@ export default function AnalystBenchmarking() {
     }))
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analyst')}>
-            <ArrowLeft className="mr-1 h-4 w-4" />Kembali
-          </Button>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
             <BarChart3 className="h-6 w-6 text-[#38a169]" />
@@ -157,7 +142,6 @@ export default function AnalystBenchmarking() {
             </Card>
           </>
         )}
-      </main>
-    </div>
+    </main>
   )
 }

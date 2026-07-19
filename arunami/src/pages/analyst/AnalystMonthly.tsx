@@ -6,10 +6,9 @@ import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { TrendingUp, ArrowLeft, Table2 } from 'lucide-react'
+import { Table2 } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 export default function AnalystMonthly() {
@@ -45,22 +44,7 @@ export default function AnalystMonthly() {
   }, [rows, portfolioFilter, monthFilter])
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analyst')}>
-            <ArrowLeft className="mr-1 h-4 w-4" />Kembali
-          </Button>
-        </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
             <Table2 className="h-6 w-6 text-[#38a169]" />
@@ -128,7 +112,6 @@ export default function AnalystMonthly() {
             </Table>
           </Card>
         )}
-      </main>
-    </div>
+    </main>
   )
 }

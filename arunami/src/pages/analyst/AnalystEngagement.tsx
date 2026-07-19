@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getAnalystPortfolios, getAllInvestorReportsForPortfolio, saveCommunication,
@@ -18,7 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { TrendingUp, ArrowLeft, Mail, MailCheck, MailX, Send, Loader2 } from 'lucide-react'
+import { Mail, MailCheck, MailX, Send, Loader2 } from 'lucide-react'
 import type { Portfolio } from '@/types'
 
 type EngagementStatus = 'unsent' | 'unread' | 'read'
@@ -40,7 +39,6 @@ const STATUS_META: Record<EngagementStatus, { label: string; cls: string }> = {
 }
 
 export default function AnalystEngagement() {
-  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [rows, setRows] = useState<EngagementRow[]>([])
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
@@ -97,21 +95,7 @@ export default function AnalystEngagement() {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">ARUNAMI</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analyst')}>
-            <ArrowLeft className="mr-1 h-4 w-4" />Kembali
-          </Button>
-        </div>
-      </header>
-
+    <>
       <main className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
@@ -207,7 +191,7 @@ export default function AnalystEngagement() {
           onClose={() => setReminder(null)}
         />
       )}
-    </div>
+    </>
   )
 }
 
