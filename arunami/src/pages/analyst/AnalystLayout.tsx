@@ -5,8 +5,9 @@ import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
+import { BrandMark } from '@/components/BrandMark'
 import {
-  LayoutDashboard, Briefcase, TrendingUp, LogOut, Table2, BarChart3,
+  LayoutDashboard, Briefcase, LogOut, Table2, BarChart3,
   FileClock, Mail, StickyNote, Presentation,
 } from 'lucide-react'
 
@@ -35,9 +36,7 @@ export default function AnalystLayout() {
   const sidebarContent = (
     <>
       <div className="flex h-16 items-center gap-3 px-6 border-b border-white/10">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38a169]">
-          <TrendingUp className="h-5 w-5 text-white" />
-        </div>
+        <BrandMark className="h-8 w-8" />
         <span className="text-lg font-bold text-white">ARUNAMI</span>
       </div>
 

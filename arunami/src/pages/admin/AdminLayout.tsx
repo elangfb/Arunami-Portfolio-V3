@@ -8,8 +8,9 @@ import { kycStatusOf } from '@/lib/kyc'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
+import { BrandMark } from '@/components/BrandMark'
 import {
-  LayoutDashboard, Users, Briefcase, TrendingUp, LogOut, UserCheck, ScrollText, ShieldAlert,
+  LayoutDashboard, Users, Briefcase, LogOut, UserCheck, ScrollText, ShieldAlert,
   ShieldCheck, Banknote, FolderOpen, Megaphone, Coins, Settings,
 } from 'lucide-react'
 
@@ -65,9 +66,7 @@ export default function AdminLayout() {
   const sidebarContent = (
     <>
       <div className="flex h-16 items-center gap-3 px-6 border-b border-white/10">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38a169]">
-          <TrendingUp className="h-5 w-5 text-white" />
-        </div>
+        <BrandMark className="h-8 w-8" />
         <span className="text-lg font-bold text-white">ARUNAMI</span>
       </div>
 

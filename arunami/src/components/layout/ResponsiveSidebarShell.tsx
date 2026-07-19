@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Menu, X, TrendingUp } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { BrandMark } from '@/components/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
@@ -108,9 +109,7 @@ export function ResponsiveSidebarShell({
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-4 w-4 text-white" />
-            </div>
+            <BrandMark className="h-7 w-7 shrink-0" />
             <span className="truncate text-sm font-semibold">{mobileTitle ?? 'ARUNAMI'}</span>
           </div>
         </header>

@@ -11,7 +11,8 @@ import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Eye, EyeOff, TrendingUp } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
+import { BrandMark } from '@/components/BrandMark'
 
 const loginSchema = z.object({
   email: z.string().email('Email tidak valid'),
@@ -48,9 +49,7 @@ export default function LoginPage() {
       {/* Brand Panel */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-[#0d1f17] p-12 text-white">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#38a169]">
-            <TrendingUp className="h-6 w-6 text-white" />
-          </div>
+          <BrandMark className="h-10 w-10" />
           <span className="text-2xl font-bold tracking-tight">ARUNAMI</span>
         </div>
 
@@ -79,9 +78,7 @@ export default function LoginPage() {
       <div className="flex w-full lg:w-1/2 items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div className="flex items-center gap-2 lg:hidden mb-8">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e5f3f]">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
+            <BrandMark className="h-8 w-8" />
             <span className="text-xl font-bold">ARUNAMI</span>
           </div>
 

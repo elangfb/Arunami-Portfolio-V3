@@ -8,9 +8,10 @@ import { contractStatus } from '@/lib/contracts'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShell'
+import { BrandMark } from '@/components/BrandMark'
 import {
   LayoutDashboard, Wallet, BarChart3, FileText, FolderOpen, FileClock, User,
-  TrendingUp, LogOut,
+  LogOut,
 } from 'lucide-react'
 
 export default function InvestorLayout() {
@@ -54,9 +55,7 @@ export default function InvestorLayout() {
   const sidebarContent = (
     <>
       <div className="flex h-16 items-center gap-3 px-6 border-b border-white/10">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38a169]">
-          <TrendingUp className="h-5 w-5 text-white" />
-        </div>
+        <BrandMark className="h-8 w-8" />
         <div className="min-w-0">
           <span className="block text-lg font-bold leading-tight text-white">ARUNAMI</span>
           <span className="block text-[11px] leading-tight text-[#7A96B3]">Portal Investor</span>
