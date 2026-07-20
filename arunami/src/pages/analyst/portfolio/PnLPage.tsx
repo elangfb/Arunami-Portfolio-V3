@@ -580,6 +580,7 @@ export default function PnLPage() {
           notes: pendingPnl.notes ?? '',
           customCategories: month.customCategories ?? [],
           cogsSubItems: month.cogsSubItems ?? [],
+          revenueSubItems: month.revenueSubItems ?? [],
         }
         await saveReport(portfolioId, {
           type: 'pnl',
