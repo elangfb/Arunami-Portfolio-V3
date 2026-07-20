@@ -33,7 +33,10 @@ import {
   addOpexAcrossMonths,
   removeOpexAcrossMonths,
   setOpexAmountInMonth,
+  accountKey,
+  dedupeOpexItems,
 } from '@/lib/customCategories'
+import PnLIssuesPanel from '@/components/PnLIssuesPanel'
 import {
   resolveBodyOrder,
   moveInBody,
@@ -186,6 +189,22 @@ export function PnLReviewTable({
   }
   const handleOpexRemoveSub = (_catId: string, subId: string) => {
     updateMonths(removeOpexAcrossMonths(months, subId))
+  }
+  /**
+   * Rename an opex account across every month — how the analyst resolves a
+   * duplicate flagged in PnLIssuesPanel. If the target name already exists in a
+   * month, the rows collapse via dedupeOpexItems rather than leaving two.
+   */
+  const handleRenameOpexAccount = (from: string, to: string) => {
+    const fromKey = accountKey(from)
+    updateMonths(
+      months.map(m => ({
+        ...m,
+        opex: dedupeOpexItems(
+          (m.opex ?? []).map(o => (accountKey(o.name) === fromKey ? { ...o, name: to } : o)),
+        ),
+      })),
+    )
   }
   const handleMoveOpexSub = (_catId: string, subId: string, direction: MoveDirection) => {
     if (!onRowOrderChange) return
@@ -466,6 +485,9 @@ export function PnLReviewTable({
           Menunggu Konfirmasi
         </Badge>
       </div>
+
+      {/* Advisory: duplicate / look-alike / unfamiliar account names. Never blocks save. */}
+      <PnLIssuesPanel issues={data.issues ?? []} onRenameAccount={handleRenameOpexAccount} />
 
       {/* Main multi-month review table */}
       <p className="mb-1 text-xs text-muted-foreground md:hidden">Geser tabel ke samping untuk melihat semua kolom →</p>

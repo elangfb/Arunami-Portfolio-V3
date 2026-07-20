@@ -12,6 +12,7 @@ import type {
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
 import { accountKey, dedupeOpexItems, slugifyCategory, unionOpexNames } from '@/lib/customCategories'
+import { detectPnLIssues } from '@/lib/pnlIssues'
 import { normalizePeriod } from '@/lib/dateUtils'
 
 // The real API key lives server-side in the /api/anthropic relay (see
@@ -235,7 +236,12 @@ export async function extractPnLMonthly(file: File, config?: PortfolioConfig): P
     }
   })
 
-  return { ...parsed, monthlyData: normalizedData, status: 'pending_review' }
+  // Detected on the RAW months, before dedupe — once rows are collapsed the
+  // evidence of what was merged is gone. Portfolio history is not available
+  // here, so 'new_account' is added by the caller (see PnLPage.handleFileUpload).
+  const issues = detectPnLIssues(parsed.monthlyData)
+
+  return { ...parsed, monthlyData: normalizedData, status: 'pending_review', issues }
 }
 
 // ─── Portfolio Setup Extraction (with classification) ────────────────────

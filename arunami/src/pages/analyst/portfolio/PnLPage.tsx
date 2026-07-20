@@ -37,6 +37,7 @@ import {
   dedupeOpexItems,
   unionOpexNames,
 } from '@/lib/customCategories'
+import { detectNewAccounts } from '@/lib/pnlIssues'
 import {
   resolveBodyOrder,
   moveInBody,
@@ -512,13 +513,25 @@ export default function PnLPage() {
       }
 
       // Normalize month periods in each row
+      const monthlyData = data.monthlyData.map(m => ({
+        ...m,
+        month: normalizePeriod(m.month),
+      }))
+
+      // The extractor flags duplicate and look-alike account names; only here do
+      // we know the portfolio's account history, so new accounts are added now.
+      // Skipped on the first upload: with no history every account is new, so
+      // flagging all of them is noise rather than a signal.
+      const knownOpexNames = reports.flatMap(r =>
+        ((r.extractedData as PnLExtractedData).opex ?? []).map(o => o.name),
+      )
+      const newAccountIssues =
+        knownOpexNames.length > 0 ? detectNewAccounts(monthlyData, knownOpexNames) : []
       const normalizedData: PnLUploadPending = {
         ...data,
         unitBreakdown: filteredBreakdown,
-        monthlyData: data.monthlyData.map(m => ({
-          ...m,
-          month: normalizePeriod(m.month),
-        })),
+        monthlyData,
+        issues: [...(data.issues ?? []), ...newAccountIssues],
       }
 
       setPendingPnl(normalizedData)

@@ -441,12 +441,45 @@ export interface MonthlyPnLRow {
   revenueSubItems?: CustomSubItem[]
 }
 
+/**
+ * Things about an uploaded P&L that an analyst should look at before saving.
+ * Advisory only — none of these block confirmation. Detection lives in
+ * `@/lib/pnlIssues`.
+ */
+export type PnLIssueKind =
+  /** Two spellings of one account; one carried the figure, so they were merged. */
+  | 'merged'
+  /** Two spellings of one account, BOTH with a figure. Left alone — needs a human. */
+  | 'ambiguous'
+  /** Different accounts whose names look alike. Never merged, only suggested. */
+  | 'similar'
+  /** An account not seen before in this portfolio and not a standard opex name. */
+  | 'new_account'
+
+export interface PnLIssue {
+  kind: PnLIssueKind
+  /** Account labels involved, as stored. */
+  labels: string[]
+  /** Month keys where it occurs. */
+  months: string[]
+  /** For 'merged': the label that was kept. */
+  kept?: string
+  /** For 'ambiguous': the amounts, aligned with `labels`. */
+  amounts?: number[]
+}
+
 export interface PnLUploadPending {
   period: string
   notes: string
   unitBreakdown: Record<string, number>
   monthlyData: MonthlyPnLRow[]
   status: 'pending_review' | 'confirmed'
+  /**
+   * Advisory notes for the analyst reviewing this upload — duplicate account
+   * spellings, look-alike names, accounts new to this portfolio. Never blocks
+   * confirmation and is not persisted with the report.
+   */
+  issues?: PnLIssue[]
 }
 
 export interface ProjectionExtractedData {
