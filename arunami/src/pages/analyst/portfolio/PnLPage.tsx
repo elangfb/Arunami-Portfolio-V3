@@ -33,6 +33,9 @@ import {
   unionCogsSubItems,
   unionRevenueSubItems,
   slugifyCategory,
+  accountKey,
+  dedupeOpexItems,
+  unionOpexNames,
 } from '@/lib/customCategories'
 import {
   resolveBodyOrder,
@@ -224,15 +227,17 @@ export default function PnLPage() {
       taxes: d.taxes,
       netProfit: d.netProfit,
     }
-    for (const item of d.opex ?? []) {
+    for (const item of dedupeOpexItems(d.opex ?? [])) {
       data[`opex:${item.name}`] = item.amount
     }
-    // Initialize opex items from ALL reports that may not exist in this report
-    const allOpexNames = [...new Set(reports.flatMap(r => {
-      const rd = r.extractedData as PnLExtractedData
-      return (rd.opex ?? []).map(o => o.name)
-    }))]
+    // Initialize opex items from ALL reports that may not exist in this report.
+    // Matched on `accountKey`: a raw-string union would re-add every alternate
+    // spelling of an account this report already has, at 0, and saving would
+    // write those empty twins back into the report.
+    const ownKeys = new Set((d.opex ?? []).map(o => accountKey(o.name)))
+    const allOpexNames = unionOpexNames(reports.map(r => (r.extractedData as PnLExtractedData).opex))
     for (const name of allOpexNames) {
+      if (ownKeys.has(accountKey(name))) continue
       if (data[`opex:${name}`] === undefined) data[`opex:${name}`] = 0
     }
     // Seed custom category rows from union of all reports; use this report's
@@ -399,11 +404,8 @@ export default function PnLPage() {
     const name = rawName.trim()
     if (!name) return
     // Collide against both saved reports and newly-added-in-this-edit names.
-    const allOpex = [...new Set(reports.flatMap(r => {
-      const rd = r.extractedData as PnLExtractedData
-      return (rd.opex ?? []).map(o => o.name)
-    }))]
-    if ([...allOpex, ...inlineAddedOpexNames].some(n => n.toLowerCase() === name.toLowerCase())) {
+    const allOpex = unionOpexNames(reports.map(r => (r.extractedData as PnLExtractedData).opex))
+    if ([...allOpex, ...inlineAddedOpexNames].some(n => accountKey(n) === accountKey(name))) {
       toast.error('Item opex dengan nama ini sudah ada')
       return
     }
@@ -416,9 +418,13 @@ export default function PnLPage() {
     setInlineSaving(true)
     try {
       const d = report.extractedData as PnLExtractedData
-      const opex: OpexItem[] = Object.entries(inlineData)
-        .filter(([k]) => k.startsWith('opex:'))
-        .map(([k, amount]) => ({ name: k.slice(5), amount }))
+      // Dedupe on save so reports that already hold twin spellings self-heal on
+      // the next edit instead of carrying them forever.
+      const opex: OpexItem[] = dedupeOpexItems(
+        Object.entries(inlineData)
+          .filter(([k]) => k.startsWith('opex:'))
+          .map(([k, amount]) => ({ name: k.slice(5), amount })),
+      )
 
       const customCategories: CustomCategory[] = inlineCategories.map(cat => ({
         id: cat.id,

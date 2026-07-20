@@ -3,6 +3,32 @@ import type { CustomCategory, CustomCategoryType, CustomSubItem, OpexItem } from
 export const slugifyCategory = (name: string) =>
   name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
+/**
+ * Canonical identity for an account label. Two labels that produce the same key
+ * are the same account, stored differently — "Beban Listrik & Air" and
+ * "Beban Listrik dan Air", or "THR" and "Beban THR".
+ *
+ * Deliberately narrow: it folds case, punctuation, the "&"/"and"/"dan"
+ * connector, and a LEADING "Beban"/"Biaya" expense marker. It does not touch
+ * those words mid-string, so "Gaji Terapis" and "Gaji Non Terapis" stay
+ * distinct. Over-merging two real accounts is far worse than leaving a cosmetic
+ * duplicate, so anything less clear-cut is left for a human to decide.
+ *
+ * Note `slugifyCategory` is not a substitute — it maps "&" to "-", so
+ * "listrik-dan-air" and "listrik-air" would not match.
+ */
+export const accountKey = (name: string): string => {
+  const base = name
+    .toLowerCase()
+    .replace(/&/g, ' dan ')
+    .replace(/\band\b/g, ' dan ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  // Fall back to `base` when the label is nothing but the marker (e.g. "Beban").
+  return base.replace(/^(beban|biaya)\s+/, '') || base
+}
+
 export function sumSubItems(category: CustomCategory): number {
   return category.subItems.reduce((s, x) => s + (Number(x.amount) || 0), 0)
 }
@@ -362,13 +388,56 @@ export function setRevenueSubItemAmountInMonth<T extends { revenueSubItems?: Cus
 // main-category whose sub-items use the opex name as a stable id. These helpers
 // let callers add/remove opex names uniformly across all month rows.
 
+/**
+ * Collapse opex rows that are the same account under different spellings,
+ * keeping the row that carries the figure.
+ *
+ * If two rows for one account BOTH hold a non-zero amount they may genuinely be
+ * different accounts that only look alike, so every row is kept untouched —
+ * summing them would invent a number, dropping one would lose it.
+ */
+export function dedupeOpexItems(items: OpexItem[]): OpexItem[] {
+  const groups = new Map<string, OpexItem[]>()
+  for (const item of items) {
+    const key = accountKey(item.name)
+    const group = groups.get(key)
+    if (group) group.push(item)
+    else groups.set(key, [item])
+  }
+  const out: OpexItem[] = []
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      out.push(group[0])
+      continue
+    }
+    const withAmount = group.filter(o => (Number(o.amount) || 0) !== 0)
+    if (withAmount.length > 1) {
+      out.push(...group)
+      continue
+    }
+    out.push(withAmount[0] ?? group[0])
+  }
+  return out
+}
+
+/**
+ * Union of opex labels across sources, one entry per account. Where a single
+ * account appears under several spellings, the one actually carrying a figure
+ * wins — so back-filling from this list can't reintroduce the empty twin.
+ */
 export function unionOpexNames(sources: Array<OpexItem[] | undefined>): string[] {
-  const set = new Set<string>()
+  const byKey = new Map<string, { name: string; hasAmount: boolean }>()
   for (const list of sources) {
     if (!list) continue
-    for (const o of list) set.add(o.name)
+    for (const o of list) {
+      const key = accountKey(o.name)
+      const hasAmount = (Number(o.amount) || 0) !== 0
+      const current = byKey.get(key)
+      if (!current) byKey.set(key, { name: o.name, hasAmount })
+      else if (hasAmount && !current.hasAmount) byKey.set(key, { name: o.name, hasAmount })
+    }
   }
-  return Array.from(set)
+  return [...byKey.values()].map(v => v.name)
 }
 
 export function addOpexAcrossMonths<T extends { opex?: OpexItem[] }>(
@@ -377,8 +446,8 @@ export function addOpexAcrossMonths<T extends { opex?: OpexItem[] }>(
 ): { months: T[]; name: string | null } {
   const name = rawName.trim()
   if (!name) return { months, name: null }
-  const existing = new Set(months.flatMap(m => (m.opex ?? []).map(o => o.name.toLowerCase())))
-  if (existing.has(name.toLowerCase())) return { months, name: null }
+  const existing = new Set(months.flatMap(m => (m.opex ?? []).map(o => accountKey(o.name))))
+  if (existing.has(accountKey(name))) return { months, name: null }
   const next = months.map(m => ({
     ...m,
     opex: [...(m.opex ?? []), { name, amount: 0 }],
@@ -390,9 +459,10 @@ export function removeOpexAcrossMonths<T extends { opex?: OpexItem[] }>(
   months: T[],
   name: string,
 ): T[] {
+  const key = accountKey(name)
   return months.map(m => ({
     ...m,
-    opex: (m.opex ?? []).filter(o => o.name !== name),
+    opex: (m.opex ?? []).filter(o => accountKey(o.name) !== key),
   }))
 }
 
@@ -402,12 +472,13 @@ export function setOpexAmountInMonth<T extends { opex?: OpexItem[] }>(
   name: string,
   amount: number,
 ): T[] {
+  const key = accountKey(name)
   return months.map((m, i) => {
     if (i !== monthIdx) return m
     const current = m.opex ?? []
-    const has = current.some(o => o.name === name)
+    const has = current.some(o => accountKey(o.name) === key)
     const nextOpex = has
-      ? current.map(o => (o.name === name ? { ...o, amount } : o))
+      ? current.map(o => (accountKey(o.name) === key ? { ...o, amount } : o))
       : [...current, { name, amount }]
     return { ...m, opex: nextOpex }
   })

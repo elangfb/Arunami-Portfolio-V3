@@ -11,7 +11,7 @@ import type {
   IndustryType, ProjectionUploadPending, PnLUploadPending, MonthlyPnLRow,
 } from '@/types'
 import { isStandardOpex, isStandardRevenue } from '@/lib/standardVariables'
-import { slugifyCategory } from '@/lib/customCategories'
+import { accountKey, dedupeOpexItems, slugifyCategory, unionOpexNames } from '@/lib/customCategories'
 import { normalizePeriod } from '@/lib/dateUtils'
 
 // The real API key lives server-side in the /api/anthropic relay (see
@@ -149,7 +149,7 @@ Kembalikan HANYA JSON valid (tanpa penjelasan lain) dengan struktur:
 ATURAN:
 - Sertakan data untuk SETIAP bulan yang ada di dokumen (jangan diringkas/diaggregat)
 - Semua nilai moneter dalam IDR (angka saja, tanpa simbol Rp atau titik ribuan)
-- Gunakan nama opex yang KONSISTEN di semua bulan
+- Gunakan nama opex yang KONSISTEN di semua bulan — persis sama huruf demi huruf. Jangan menulis akun yang sama dengan dua ejaan berbeda (mis. "Beban Listrik & Air" dan "Beban Listrik dan Air", atau "THR" dan "Beban THR"); pilih satu ejaan lalu pakai terus
 - Jika dokumen memecah COGS menjadi komponen (Bahan Baku, Tenaga Kerja Langsung, Overhead Produksi, dll), isi "cogsBreakdown" dengan setiap komponen. Gunakan nama yang KONSISTEN di semua bulan. Sum cogsBreakdown harus sama dengan cogs. Jika tidak ada breakdown di dokumen, kembalikan array kosong.
 - grossProfit = revenue - cogs
 - operatingProfit = grossProfit - totalOpex
@@ -170,8 +170,12 @@ export async function extractPnLMonthly(file: File, config?: PortfolioConfig): P
     throw new Error('Struktur data tidak sesuai — dokumen mungkin tidak berisi laporan laba-rugi bulanan')
   }
 
-  // Normalize opex names across months: collect all unique names, ensure every month has all
-  const allOpexNames = [...new Set(parsed.monthlyData.flatMap(m => (m.opex ?? []).map(o => o.name)))]
+  // Normalize opex names across months: one entry per account, then ensure every
+  // month has all of them. Keyed by `accountKey`, not the raw string — the model
+  // can spell one account several ways ("THR" / "Beban THR", "Listrik & Air" /
+  // "Listrik dan Air"), and a raw-string union turns each spelling into its own
+  // permanent line item back-filled at 0 in every other month.
+  const allOpexNames = unionOpexNames(parsed.monthlyData.map(m => m.opex))
 
   // Normalize COGS breakdown names across months the same way, then convert to CustomSubItems
   // with slugified ids. If no month has any breakdown, cogsSubItems stays empty and cogs is
@@ -187,10 +191,13 @@ export async function extractPnLMonthly(file: File, config?: PortfolioConfig): P
   }
 
   const normalizedData: MonthlyPnLRow[] = parsed.monthlyData.map(m => {
-    const existingNames = new Set((m.opex ?? []).map(o => o.name))
+    // Collapse same-account rows inside the month first, so a month that lists
+    // both spellings doesn't keep the empty one alongside the real figure.
+    const monthOpex = dedupeOpexItems(m.opex ?? [])
+    const existingKeys = new Set(monthOpex.map(o => accountKey(o.name)))
     const filledOpex = [
-      ...(m.opex ?? []),
-      ...allOpexNames.filter(n => !existingNames.has(n)).map(n => ({ name: n, amount: 0 })),
+      ...monthOpex,
+      ...allOpexNames.filter(n => !existingKeys.has(accountKey(n))).map(n => ({ name: n, amount: 0 })),
     ]
 
     const existingCogsNames = new Set((m.cogsBreakdown ?? []).map(o => o.name))
