@@ -151,7 +151,7 @@ export default function RevenuePage() {
       {/* Variance Table */}
       <Card>
         <CardHeader><CardTitle className="text-sm">Tabel Varians</CardTitle></CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           <Table>
             <TableHeader>
               <TableRow>

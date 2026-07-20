@@ -14,6 +14,8 @@ interface ResponsiveSidebarShellProps {
   children: ReactNode
   /** Short title shown in the mobile top bar. */
   mobileTitle?: ReactNode
+  /** Opt out of the centered max-w-7xl content container (for genuinely full-width pages). */
+  fullBleed?: boolean
 }
 
 /**
@@ -27,6 +29,7 @@ export function ResponsiveSidebarShell({
   sidebar,
   children,
   mobileTitle,
+  fullBleed = false,
 }: ResponsiveSidebarShellProps) {
   const [open, setOpen] = useState(false)
   const location = useLocation()
@@ -114,7 +117,10 @@ export function ResponsiveSidebarShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        {/* Scrollbar stays at the viewport edge; the container only constrains content. */}
+        <main className="flex-1 overflow-y-auto">
+          <div className={cn('w-full', !fullBleed && 'mx-auto max-w-7xl')}>{children}</div>
+        </main>
       </div>
     </div>
   )
