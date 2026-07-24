@@ -124,7 +124,7 @@ export default function AnalystDashboard() {
                   <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <span>{p.assignedInvestors.length} investor</span>
-                      <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
+                      <HealthBadge level={p.healthLevel} reasons={p.healthReasons} computedAt={p.healthComputedAt ?? null} />
                     </div>
                     {p.isGracePeriod
                       ? <Badge variant="warning">Grace · {p.graceConfig?.returnMode === 'fixed_yield' ? 'Yield' : 'Tanpa payout'}</Badge>
@@ -179,7 +179,7 @@ export default function AnalystDashboard() {
                       {p.assignedInvestors.length}
                     </TableCell>
                     <TableCell className="text-center">
-                      <HealthBadge level={p.healthLevel} reasons={p.healthReasons} />
+                      <HealthBadge level={p.healthLevel} reasons={p.healthReasons} computedAt={p.healthComputedAt ?? null} />
                     </TableCell>
                     <TableCell className="text-center">
                       {p.isGracePeriod

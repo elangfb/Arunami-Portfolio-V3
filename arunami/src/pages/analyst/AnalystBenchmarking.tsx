@@ -131,7 +131,7 @@ export default function AnalystBenchmarking() {
                         {m.hasData && i < 3 ? <Medal className={`h-4 w-4 ${['text-yellow-500', 'text-gray-400', 'text-amber-700'][i]}`} /> : <span className="text-muted-foreground">{i + 1}</span>}
                       </TableCell>
                       <TableCell className="font-medium">{m.portfolio.brandName || m.portfolio.name}</TableCell>
-                      <TableCell className="text-center"><HealthBadge level={m.portfolio.healthLevel} reasons={m.portfolio.healthReasons} /></TableCell>
+                      <TableCell className="text-center"><HealthBadge level={m.portfolio.healthLevel} reasons={m.portfolio.healthReasons} computedAt={m.portfolio.healthComputedAt ?? null} /></TableCell>
                       <TableCell className="text-right font-medium">
                         {m.hasData ? fmt(m[metricKey] as number) : <span className="text-muted-foreground">Tanpa data</span>}
                       </TableCell>

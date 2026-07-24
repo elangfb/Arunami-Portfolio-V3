@@ -156,6 +156,32 @@ export function getNextReportingPeriod(
   return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`
 }
 
+// ─── Relative Time ──────────────────────────────────────────────────────
+
+/** Whole days elapsed between `then` and `now`, floored at 0. */
+export function daysSince(then: Date, now: Date = new Date()): number {
+  return Math.max(0, Math.floor((now.getTime() - then.getTime()) / 86_400_000))
+}
+
+/**
+ * Indonesian "how long ago" label for a day count — used on freshness stamps,
+ * where how stale a value is matters more than its exact timestamp.
+ * 0 → "hari ini", 1 → "kemarin", 45 → "1 bulan lalu".
+ */
+export function formatDaysAgo(days: number): string {
+  if (days <= 0) return 'hari ini'
+  if (days === 1) return 'kemarin'
+  if (days < 30) return `${days} hari lalu`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} bulan lalu`
+  return `${Math.floor(months / 12)} tahun lalu`
+}
+
+/** "19 Januari 2026" — for pairing an exact date with a relative label. */
+export function formatFullDate(date: Date): string {
+  return `${date.getDate()} ${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`
+}
+
 // ─── Period Grouping Helpers ────────────────────────────────────────────
 
 import type { PeriodType } from '@/store/reportFilterStore'

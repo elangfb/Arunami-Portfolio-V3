@@ -10,7 +10,7 @@ import { formatCurrencyExact, formatCurrencyCompact, formatPercent } from '@/lib
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { brandOf } from '@/lib/portfolioName'
 import { HealthBadge } from '@/components/shared/HealthBadge'
-import { HEALTH_LABELS } from '@/lib/health'
+import { HEALTH_LABELS, healthFreshness } from '@/lib/health'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -132,7 +132,10 @@ export default function MeetingMode() {
     const lines: string[] = []
     lines.push(`Notulen Rapat — ${brandOf(portfolio)}`)
     if (periodB) lines.push(`Periode ditinjau: ${periodA ? formatPeriod(periodA) + ' → ' : ''}${formatPeriod(periodB)}`)
-    lines.push(`Kesehatan: ${HEALTH_LABELS[portfolio.healthLevel ?? 'sehat']}`)
+    lines.push(
+      `Kesehatan: ${HEALTH_LABELS[portfolio.healthLevel ?? 'sehat']}` +
+      ` (${healthFreshness(portfolio.healthComputedAt).label.toLowerCase()})`,
+    )
     if (weeklyUpdate.trim()) { lines.push('', 'Update Mingguan:', weeklyUpdate.trim()) }
     if (notes.length) { lines.push('', 'Catatan:'); notes.forEach(n => lines.push(`- ${n.text}`)) }
     if (actions.length) {
@@ -177,7 +180,13 @@ export default function MeetingMode() {
               </SelectContent>
             </Select>
           </div>
-          {portfolio && <HealthBadge level={portfolio.healthLevel} reasons={portfolio.healthReasons} />}
+          {portfolio && (
+            <HealthBadge
+              level={portfolio.healthLevel}
+              reasons={portfolio.healthReasons}
+              computedAt={portfolio.healthComputedAt ?? null}
+            />
+          )}
         </div>
         <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={() => navigate('/analyst')}>
           <X className="mr-1 h-4 w-4" />Keluar
@@ -298,7 +307,12 @@ function RingkasanSection({ metric, portfolio }: { metric: PortfolioMetric | nul
       <SectionTitle>Ringkasan Kinerja — {brandOf(portfolio)}</SectionTitle>
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">Status kesehatan:</span>
-        <HealthBadge level={portfolio.healthLevel} reasons={portfolio.healthReasons} size="md" />
+        <HealthBadge
+          level={portfolio.healthLevel}
+          reasons={portfolio.healthReasons}
+          computedAt={portfolio.healthComputedAt ?? null}
+          size="md"
+        />
         <span className="text-muted-foreground">{HEALTH_LABELS[portfolio.healthLevel ?? 'sehat']}</span>
       </div>
       {!metric?.hasData ? (

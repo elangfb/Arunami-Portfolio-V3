@@ -1,3 +1,4 @@
+import { daysSince, formatDaysAgo } from '@/lib/dateUtils'
 import type { HealthLevel, HealthRules, HealthThreshold, MonthlyDataPoint } from '@/types'
 
 // ─── Defaults & metadata ──────────────────────────────────────────────────
@@ -139,4 +140,52 @@ export function computeHealth(input: HealthInput): HealthResult {
   }
 
   return { level, reasons, signals: { latenessDays, silenceDays, underTargetMonths } }
+}
+
+// ─── Freshness ────────────────────────────────────────────────────────────
+
+/**
+ * How old a saved level may get before it stops meaning anything. Nothing
+ * recomputes health in the background — the time-based signals (lateness,
+ * silence) keep growing after a save, so a level saved long enough ago says
+ * more about when an analyst last looked than about the portfolio today.
+ */
+export const HEALTH_STALE_DAYS = 30
+
+export interface HealthFreshness {
+  /** When the level was last saved; null when it never was. */
+  date: Date | null
+  /** Whole days since that save; null when never saved. */
+  daysAgo: number | null
+  /** True when never saved, or saved more than HEALTH_STALE_DAYS ago. */
+  isStale: boolean
+  /** Indonesian label — "Diperbarui 2 bulan lalu" / "Belum pernah diperbarui". */
+  label: string
+}
+
+/**
+ * Describe how current a stored `healthLevel` is. Accepts either a Firestore
+ * timestamp (`{ seconds }`, as read back from a doc) or a Date (as stamped
+ * locally right after a save), since both shapes reach the UI.
+ */
+export function healthFreshness(
+  computedAt?: { seconds: number } | Date | null,
+  now: Date = new Date(),
+): HealthFreshness {
+  const date =
+    computedAt instanceof Date ? computedAt
+    : computedAt?.seconds != null ? new Date(computedAt.seconds * 1000)
+    : null
+
+  if (!date || isNaN(date.getTime())) {
+    return { date: null, daysAgo: null, isStale: true, label: 'Belum pernah diperbarui' }
+  }
+
+  const daysAgo = daysSince(date, now)
+  return {
+    date,
+    daysAgo,
+    isStale: daysAgo > HEALTH_STALE_DAYS,
+    label: `Diperbarui ${formatDaysAgo(daysAgo)}`,
+  }
 }
