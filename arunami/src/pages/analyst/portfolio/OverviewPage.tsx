@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getFinancialData, getReports, getHealthRules, updatePortfolioHealth } from '@/lib/firestore'
+import { getFinancialData, getReports, getHealthRules, updatePortfolioHealth, getConfigTimeline } from '@/lib/firestore'
+import { findConfigVersionForPeriod, type ConfigVersion } from '@/lib/configTimeline'
 import { computeHealth, DEFAULT_HEALTH_RULES, HEALTH_SOP, healthFreshness } from '@/lib/health'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent, calcMoM, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +29,7 @@ const GREEN_PALETTE = ['#1e5f3f', '#38a169', '#48bb78', '#68d391', '#9ae6b4']
 export default function OverviewPage() {
   const { portfolio, portfolioId } = useOutletContext<Context>()
   const [data, setData] = useState<FinancialData | null>(null)
+  const [configTimeline, setConfigTimeline] = useState<ConfigVersion[]>([])
   const [loading, setLoading] = useState(true)
   const [pnlReports, setPnlReports] = useState<PortfolioReport[]>([])
   const [projReports, setProjReports] = useState<PortfolioReport[]>([])
@@ -47,6 +49,10 @@ export default function OverviewPage() {
 
   useEffect(() => {
     if (portfolioId) getFinancialData(portfolioId).then(d => { setData(d); setLoading(false) })
+  }, [portfolioId])
+
+  useEffect(() => {
+    if (portfolioId) getConfigTimeline(portfolioId).then(setConfigTimeline).catch(() => {})
   }, [portfolioId])
 
   useEffect(() => { getHealthRules().then(setRules).catch(() => {}) }, [])
@@ -183,8 +189,11 @@ export default function OverviewPage() {
   const revenueChartData = trimToThreeMonthsAhead(data.revenueData)
   const profitChartData = trimToThreeMonthsAhead(data.profitData)
 
-  // Total Investment ROI: net-for-investor / total investment
-  const cfg = data.investorConfig
+  // Total Investment ROI: net-for-investor / total investment.
+  // `data.investorConfig` is a snapshot of the CURRENT terms, so prefer the
+  // version that was in force for the month these KPIs describe.
+  const cfg = findConfigVersionForPeriod(configTimeline, latestPeriod ?? '')?.investorConfig
+    ?? data.investorConfig
   const investorShare = lastProfit * (cfg.investorSharePercent / 100)
   const arunamiFee = investorShare * (cfg.arunamiFeePercent / 100)
   const netForInvestor = investorShare - arunamiFee

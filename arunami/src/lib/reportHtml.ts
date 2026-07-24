@@ -2,6 +2,7 @@ import { formatCurrencyExact, formatPercent } from './utils'
 import { formatPeriod, comparePeriods, isQuarterPeriod, quarterToMonths, previousPeriod } from './dateUtils'
 import { calculateDistribution } from './distributionStrategies'
 import type { DistributionResult } from './distributionStrategies'
+import { resolveConfigForPeriod, type ConfigVersion } from './configTimeline'
 import type {
   Portfolio, PortfolioConfig, PnLExtractedData, ProjectionExtractedData,
   ManagementReport, Note, InvestorAllocation, InvestorConfigUnion,
@@ -12,6 +13,12 @@ import type { AllTimeReportSummary } from './allTimeReport'
 interface BuildArgs {
   portfolio: Portfolio
   config?: PortfolioConfig
+  /**
+   * Return-config version history. When supplied, the distribution for `period`
+   * is calculated with the terms that were in force for that period rather than
+   * today's — so re-rendering an old month can't restate it.
+   */
+  configTimeline?: ConfigVersion[]
   allocation?: InvestorAllocation
   /** Global investor-pool share of Net Profit, in percent (e.g. 70 = 70%). */
   investorSharePercent: number
@@ -370,7 +377,7 @@ export interface InvestorReportSectionResult {
  */
 export function buildInvestorReportSections(args: BuildArgs): InvestorReportSectionResult {
   const {
-    portfolio, config, allocation, investorSharePercent, isArunamiTeam, period,
+    portfolio, config, configTimeline, allocation, investorSharePercent, isArunamiTeam, period,
     pnlReports, projectionReports, managementReports, notes,
   } = args
 
@@ -407,9 +414,15 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
     .filter(r => comparePeriods(r.period, mgmtCutoff) <= 0)
     .at(-1) ?? null
 
+  // Resolve the config that applied to THIS period, so a later change to the
+  // split (or to the model itself) never restates an earlier report.
+  const periodConfig = config && configTimeline
+    ? resolveConfigForPeriod(config, configTimeline, period)
+    : config
+
   // Determine model type from config, falling back to percentage_based
-  const modelType = config?.investorConfig?.type ?? 'percentage_based'
-  const investorConfig = config?.investorConfig ?? {
+  const modelType = periodConfig?.investorConfig?.type ?? 'percentage_based'
+  const investorConfig = periodConfig?.investorConfig ?? {
     type: 'percentage_based' as const,
     investorSharePercent,
     arunamiFeePercent: 0,

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { getFinancialData, getAllocationsForInvestor, getPortfolioConfigOrDefault } from '@/lib/firestore'
+import { getFinancialData, getAllocationsForInvestor, getPortfolioConfigOrDefault, getConfigTimeline } from '@/lib/firestore'
 import { calculateDistribution } from '@/lib/distributionStrategies'
+import { resolveInvestorConfigForPeriod, type ConfigVersion } from '@/lib/configTimeline'
 import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +22,7 @@ export default function InvestorOverviewPage() {
   const [data, setData] = useState<FinancialData | null>(null)
   const [allocation, setAllocation] = useState<InvestorAllocation | null>(null)
   const [config, setConfig] = useState<PortfolioConfig | null>(null)
+  const [configTimeline, setConfigTimeline] = useState<ConfigVersion[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,10 +31,12 @@ export default function InvestorOverviewPage() {
       getFinancialData(portfolioId),
       getAllocationsForInvestor(user.uid),
       getPortfolioConfigOrDefault(portfolioId),
-    ]).then(([d, allocs, cfg]) => {
+      getConfigTimeline(portfolioId),
+    ]).then(([d, allocs, cfg, timeline]) => {
       setData(d)
       setAllocation(allocs.find(a => a.portfolioId === portfolioId) ?? null)
       setConfig(cfg)
+      setConfigTimeline(timeline)
       setLoading(false)
     })
   }, [portfolioId, user])
@@ -64,7 +68,7 @@ export default function InvestorOverviewPage() {
   if (allocation && portfolio && config?.investorConfig) {
     myResult = calculateDistribution({
       reportData: { period: activePeriod, revenue: lastRevenue, netProfit: lastProfit, grossProfit: 0 },
-      config: config.investorConfig,
+      config: resolveInvestorConfigForPeriod(config, configTimeline, activePeriod),
       allocation,
       portfolio,
       isArunamiTeam: user?.isArunamiTeam,

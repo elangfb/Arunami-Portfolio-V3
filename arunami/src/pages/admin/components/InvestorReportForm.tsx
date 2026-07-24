@@ -100,6 +100,7 @@ export default function InvestorReportForm({ investor, portfolioData, publishedR
       .map(p => buildInvestorReportSections({
         portfolio: p.portfolio!,
         config: p.config ?? undefined,
+        configTimeline: p.configTimeline,
         allocation: p.allocation,
         investorSharePercent: p.investorSharePercent,
         isArunamiTeam: investor.isArunamiTeam,

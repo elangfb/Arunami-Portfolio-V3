@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
-  getUser, getAllocationsForInvestor, getPortfolioConfigOrDefault, getFinancialData,
-  getCommunicationsForInvestor, getPortfolio, getPublishedInvestorReports,
+  getUser, getAllocationsForInvestor, getPortfolioConfigOrDefault, getConfigTimeline,
+  getFinancialData, getCommunicationsForInvestor, getPortfolio, getPublishedInvestorReports,
 } from '@/lib/firestore'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
+import { resolveInvestorConfigForPeriod } from '@/lib/configTimeline'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
 import { brandOf, makeBrandResolver } from '@/lib/portfolioName'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
@@ -96,8 +97,9 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
     // Enrich each allocation with financial data
     const enriched = await Promise.all(
       allocations.map(async (allocation) => {
-        const [config, financial, ptf] = await Promise.all([
+        const [config, configTimeline, financial, ptf] = await Promise.all([
           getPortfolioConfigOrDefault(allocation.portfolioId),
+          getConfigTimeline(allocation.portfolioId),
           getFinancialData(allocation.portfolioId),
           getPortfolio(allocation.portfolioId),
         ])
@@ -133,7 +135,8 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
           const earningFor = (period: string, revenue: number, profit: number) =>
             calculateDistribution({
               reportData: { period, revenue, netProfit: profit, grossProfit: 0 },
-              config: config.investorConfig!,
+              // Each published month earns on the terms in force back then.
+              config: resolveInvestorConfigForPeriod(config, configTimeline, period),
               allocation,
               portfolio: ptf,
               isArunamiTeam: user?.isArunamiTeam,

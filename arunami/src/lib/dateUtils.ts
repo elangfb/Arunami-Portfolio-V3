@@ -156,6 +156,29 @@ export function getNextReportingPeriod(
   return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`
 }
 
+/** Months between one reporting period and the next, by frequency. */
+const FREQUENCY_STEP_MONTHS: Record<'bulanan' | 'kuartalan' | 'semesteran', number> = {
+  bulanan: 1,
+  kuartalan: 3,
+  semesteran: 6,
+}
+
+/**
+ * The next `count` reporting periods (YYYY-MM), starting at
+ * {@link getNextReportingPeriod}. Backs the "Berlaku Mulai Periode" picker in
+ * Profit Sharing: a config change may only take effect from a future period,
+ * so reports already issued can never be restated.
+ */
+export function listUpcomingReportingPeriods(
+  frequency: 'bulanan' | 'kuartalan' | 'semesteran',
+  count = 12,
+  from: Date = new Date(),
+): string[] {
+  const first = getNextReportingPeriod(frequency, from)
+  const step = FREQUENCY_STEP_MONTHS[frequency]
+  return Array.from({ length: Math.max(1, count) }, (_, i) => addMonthOffset(first, i * step))
+}
+
 // ─── Relative Time ──────────────────────────────────────────────────────
 
 /** Whole days elapsed between `then` and `now`, floored at 0. */

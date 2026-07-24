@@ -3,13 +3,14 @@ import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getReports, getManagementReports, getNotes,
-  getAllocationsForPortfolio, getPortfolioConfigOrDefault,
+  getAllocationsForPortfolio, getPortfolioConfigOrDefault, getConfigTimeline,
   getInvestorReportsForPortfolio,
   upsertInvestorReportDraft, publishInvestorReport, publishAllInvestorReports,
   unpublishInvestorReport, unpublishAllInvestorReports,
   getAllUsers,
 } from '@/lib/firestore'
 import { buildInvestorReportHtml } from '@/lib/reportHtml'
+import type { ConfigVersion } from '@/lib/configTimeline'
 import { formatPeriod, comparePeriods, extractAvailablePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -39,6 +40,7 @@ export default function PublishingPage() {
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
   const [investorSharePercent, setInvestorSharePercent] = useState<number>(0)
   const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
+  const [configTimeline, setConfigTimeline] = useState<ConfigVersion[]>([])
   const [loading, setLoading] = useState(true)
 
   // Publishing state
@@ -53,13 +55,14 @@ export default function PublishingPage() {
   useEffect(() => {
     if (!portfolioId) return
     ;(async () => {
-      const [pnls, projs, mgmts, n, allocs, config, usrs] = await Promise.all([
+      const [pnls, projs, mgmts, n, allocs, config, timeline, usrs] = await Promise.all([
         getReports(portfolioId, 'pnl'),
         getReports(portfolioId, 'projection'),
         getManagementReports(portfolioId),
         getNotes(portfolioId),
         getAllocationsForPortfolio(portfolioId),
         getPortfolioConfigOrDefault(portfolioId),
+        getConfigTimeline(portfolioId),
         getAllUsers(),
       ])
       setPnlReports(pnls)
@@ -68,6 +71,7 @@ export default function PublishingPage() {
       setNotes(n)
       setAllocations(allocs)
       setPortfolioConfig(config)
+      setConfigTimeline(timeline)
       setInvestors(usrs)
       setInvestorSharePercent(config.investorConfig.investorSharePercent)
       // Auto-pick latest period that has a P&L, fall back to latest projection
@@ -131,6 +135,7 @@ export default function PublishingPage() {
     return buildInvestorReportHtml({
       portfolio,
       config: portfolioConfig ?? undefined,
+      configTimeline,
       allocation: selectedAllocation,
       investorSharePercent,
       isArunamiTeam: investorUser?.isArunamiTeam,
@@ -140,7 +145,7 @@ export default function PublishingPage() {
       managementReports: mgmtReports,
       notes,
     })
-  }, [portfolio, portfolioConfig, selectedAllocation, investorSharePercent, selectedPeriod, pnlReports, projReports, mgmtReports, notes])
+  }, [portfolio, portfolioConfig, configTimeline, selectedAllocation, investorSharePercent, selectedPeriod, pnlReports, projReports, mgmtReports, notes])
 
   const statusFor = (uid: string) =>
     existingReports.find(r => r.investorUid === uid)?.status ?? null
@@ -228,6 +233,7 @@ export default function PublishingPage() {
           htmlContent: buildInvestorReportHtml({
             portfolio,
             config: portfolioConfig ?? undefined,
+            configTimeline,
             allocation: alloc,
             investorSharePercent,
             isArunamiTeam: investorUser?.isArunamiTeam,

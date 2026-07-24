@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { AlertTriangle } from 'lucide-react'
-import { formatPeriod } from '@/lib/dateUtils'
+import { formatPeriod, listUpcomingReportingPeriods } from '@/lib/dateUtils'
 import { recordConfigChange } from '@/lib/firestore'
 import type {
   PortfolioConfig, InvestorConfigUnion, ConfigChangeKind,
@@ -41,10 +44,23 @@ export default function EditConfigDialog({
   const [reasonText, setReasonText] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { if (open) setReasonText('') }, [open])
+  // Only future periods are offered: a change may never restate a report that
+  // has already been issued.
+  const periodOptions = useMemo(
+    () => listUpcomingReportingPeriods(currentConfig.reportingFrequency, 12),
+    [currentConfig.reportingFrequency],
+  )
+  const defaultPeriod = periodOptions[0] ?? nextPeriod
+  const [effectiveFrom, setEffectiveFrom] = useState(defaultPeriod)
+
+  useEffect(() => {
+    if (!open) return
+    setReasonText('')
+    setEffectiveFrom(defaultPeriod)
+  }, [open, defaultPeriod])
 
   const reasonValid = !reasonRequired || reasonText.trim().length > 0
-  const saveEnabled = canSave && reasonValid && !saving && !!currentUser
+  const saveEnabled = canSave && reasonValid && !!effectiveFrom && !saving && !!currentUser
 
   const handleSave = async () => {
     if (!saveEnabled || !currentUser) return
@@ -60,7 +76,7 @@ export default function EditConfigDialog({
         fromValue: draft.fromValue,
         toValue: draft.toValue,
         reasonNote: reasonText,
-        effectiveFromPeriod: nextPeriod,
+        effectiveFromPeriod: effectiveFrom,
         changedByUid: currentUser.uid,
         changedByName: currentUser.displayName,
       })
@@ -84,6 +100,24 @@ export default function EditConfigDialog({
         <div className="space-y-4 mt-2">
           {children}
 
+          <div className="space-y-1">
+            <Label className="text-xs text-black">Berlaku Mulai Periode *</Label>
+            <Select value={effectiveFrom} onValueChange={setEffectiveFrom}>
+              <SelectTrigger className="text-black">
+                <SelectValue placeholder="Pilih periode" />
+              </SelectTrigger>
+              <SelectContent>
+                {periodOptions.map(p => (
+                  <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Hanya periode mendatang. Laporan periode sebelumnya tetap memakai
+              ketentuan lama.
+            </p>
+          </div>
+
           {reasonRequired && (
             <div className="space-y-1">
               <Label className="text-xs text-black">Alasan Perubahan *</Label>
@@ -101,7 +135,7 @@ export default function EditConfigDialog({
             <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-700" />
             <div className="text-black font-bold">
               Perubahan berlaku mulai periode{' '}
-              <span className="underline">{nextPeriod ? formatPeriod(nextPeriod) : '-'}</span>.
+              <span className="underline">{effectiveFrom ? formatPeriod(effectiveFrom) : '-'}</span>.
               Laporan periode sebelumnya tidak akan berubah.
             </div>
           </div>

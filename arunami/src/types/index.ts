@@ -953,6 +953,19 @@ export interface EquityChangeEntry {
   changeKind?: ConfigChangeKind
   fromValue?: string
   toValue?: string
+  /**
+   * Full before/after snapshots of the return config. These turn the audit trail
+   * into a version timeline: `src/lib/configTimeline.ts` replays them so each
+   * reporting period is calculated with the config that was in force *then*,
+   * honouring `effectiveFromPeriod` instead of always using `config/current`.
+   *
+   * Optional because rows written before this existed carry no snapshot; the
+   * timeline skips those and falls back to the live config (legacy behaviour).
+   */
+  fromInvestorConfig?: InvestorConfigUnion
+  toInvestorConfig?: InvestorConfigUnion
+  fromReturnModel?: ReturnModelType
+  toReturnModel?: ReturnModelType
 }
 
 // ─── Admin Data Override Audit Log ────────────────────────────────────────

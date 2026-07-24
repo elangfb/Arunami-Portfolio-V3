@@ -1,6 +1,7 @@
 import type { FinancialData, InvestorAllocation, Portfolio, PortfolioConfig } from '@/types'
 import { calculateDistribution } from './distributionStrategies'
-import { getFinancialData, getPortfolioConfigOrDefault } from './firestore'
+import { resolveInvestorConfigForPeriod, type ConfigVersion } from './configTimeline'
+import { getFinancialData, getPortfolioConfigOrDefault, getConfigTimeline } from './firestore'
 
 // Cross-portfolio analytics for the BA-PM (analyst) global views. Reuses the
 // distribution engine with a "whole portfolio" allocation (100% ownership on the
@@ -52,6 +53,7 @@ export function computePortfolioMetric(
   financialData: FinancialData | null,
   config: PortfolioConfig | null,
   currentPeriod?: string,
+  configTimeline: ConfigVersion[] = [],
 ): PortfolioMetric {
   const empty: PortfolioMetric = {
     portfolio, revenue: 0, netProfit: 0, bagiHasil: 0,
@@ -72,7 +74,8 @@ export function computePortfolioMetric(
     const revenue = revByMonth.get(p.month) ?? 0
     const result = calculateDistribution({
       reportData: { period: p.month, revenue, netProfit: p.aktual, grossProfit: 0 },
-      config: config.investorConfig,
+      // Terms as they stood for this month, not today's.
+      config: resolveInvestorConfigForPeriod(config, configTimeline, p.month),
       allocation: alloc,
       portfolio,
     })
@@ -117,11 +120,12 @@ export async function loadPortfolioMetrics(
   return Promise.all(
     portfolios.map(async p => {
       try {
-        const [fd, cfg] = await Promise.all([
+        const [fd, cfg, timeline] = await Promise.all([
           getFinancialData(p.id),
           getPortfolioConfigOrDefault(p.id),
+          getConfigTimeline(p.id),
         ])
-        return computePortfolioMetric(p, fd, cfg, currentPeriod)
+        return computePortfolioMetric(p, fd, cfg, currentPeriod, timeline)
       } catch (err) {
         console.error(`Failed to compute metrics for ${p.code}`, err)
         return computePortfolioMetric(p, null, null, currentPeriod)

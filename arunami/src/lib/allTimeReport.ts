@@ -11,6 +11,7 @@
 // report is counted once.
 
 import { calculateDistribution } from './distributionStrategies'
+import { resolveInvestorConfigForPeriod } from './configTimeline'
 import { isQuarterPeriod, quarterToMonths, comparePeriods } from './dateUtils'
 import type { InvestorReportSource } from './firestore'
 import {
@@ -109,12 +110,21 @@ export function computeAllTimeReport(args: {
       .sort(comparePeriods)
     if (months.length === 0) continue
 
-    const modelType = src.config?.investorConfig?.type ?? 'percentage_based'
-    const investorConfig: InvestorConfigUnion = src.config?.investorConfig ?? {
+    const fallbackConfig: InvestorConfigUnion = {
       type: 'percentage_based',
       investorSharePercent: src.investorSharePercent,
       arunamiFeePercent: 0,
     }
+    // The terms in force for a given month — a later change to the split must
+    // not restate months already counted.
+    const configFor = (month: string): InvestorConfigUnion =>
+      src.config
+        ? resolveInvestorConfigForPeriod(src.config, src.configTimeline ?? [], month)
+        : fallbackConfig
+
+    // Aggregation shape (per-month vs per-year vs whole-range) follows the
+    // portfolio's current model; only the terms vary per period.
+    const modelType = src.config?.investorConfig?.type ?? 'percentage_based'
 
     const byPeriod: AllTimePeriodLine[] = []
     let cumulativeEarnings = 0
@@ -124,7 +134,7 @@ export function computeAllTimeReport(args: {
       // independent of the post-grace model. calculateDistribution is grace-aware.
       for (const m of months) {
         const res = calculateDistribution({
-          reportData: null, config: investorConfig, allocation, portfolio, isArunamiTeam, monthsInPeriod: 1,
+          reportData: null, config: configFor(m), allocation, portfolio, isArunamiTeam, monthsInPeriod: 1,
         })
         if (res.perInvestorAmount !== 0) {
           cumulativeEarnings += res.perInvestorAmount
@@ -138,7 +148,7 @@ export function computeAllTimeReport(args: {
       for (const y of years) {
         const res = calculateDistribution({
           reportData: { period: `${y}-01`, revenue: 0, netProfit: 0, grossProfit: 0 },
-          config: investorConfig, allocation, portfolio, isArunamiTeam, monthsInPeriod: 1,
+          config: configFor(`${y}-01`), allocation, portfolio, isArunamiTeam, monthsInPeriod: 1,
         })
         if (res.perInvestorAmount !== 0) {
           cumulativeEarnings += res.perInvestorAmount
@@ -148,8 +158,10 @@ export function computeAllTimeReport(args: {
     } else if (modelType === 'fixed_schedule') {
       // Scheduled payments are matched against the whole published range at once
       // (only `paid` entries in range count) to avoid double counting.
+      // One call over the whole range, so it can only carry one config: use the
+      // terms in force at the start of the published range.
       const res = calculateDistribution({
-        reportData: null, config: investorConfig, allocation, portfolio, isArunamiTeam,
+        reportData: null, config: configFor(months[0]), allocation, portfolio, isArunamiTeam,
         monthsInPeriod: months.length, scheduleMonths: months,
       })
       cumulativeEarnings += res.perInvestorAmount
@@ -157,7 +169,7 @@ export function computeAllTimeReport(args: {
       for (const m of months) {
         const one = calculateDistribution({
           reportData: { period: m, revenue: 0, netProfit: 0, grossProfit: 0 },
-          config: investorConfig, allocation, portfolio, isArunamiTeam, monthsInPeriod: 1, scheduleMonths: [m],
+          config: configFor(m), allocation, portfolio, isArunamiTeam, monthsInPeriod: 1, scheduleMonths: [m],
         })
         if (one.perInvestorAmount !== 0) {
           byPeriod.push({ period: m, netProfit: 0, earnings: one.perInvestorAmount, roi: one.roiPercent })
@@ -171,7 +183,7 @@ export function computeAllTimeReport(args: {
           ? { period: m, revenue: pnl.revenue, netProfit: pnl.netProfit, grossProfit: pnl.grossProfit }
           : null
         const res = calculateDistribution({
-          reportData, config: investorConfig, allocation, portfolio, isArunamiTeam, monthsInPeriod: 1,
+          reportData, config: configFor(m), allocation, portfolio, isArunamiTeam, monthsInPeriod: 1,
         })
         cumulativeEarnings += res.perInvestorAmount
         byPeriod.push({ period: m, netProfit: pnl?.netProfit ?? 0, earnings: res.perInvestorAmount, roi: res.roiPercent })

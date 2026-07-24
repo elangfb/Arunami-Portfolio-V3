@@ -25,6 +25,7 @@ import type {
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 import { DEFAULT_HEALTH_RULES } from '@/lib/health'
+import { buildConfigTimeline, type ConfigVersion } from '@/lib/configTimeline'
 
 // ─── Users ────────────────────────────────────────────────────────────────
 
@@ -237,6 +238,15 @@ export async function getEquityHistory(portfolioId: string): Promise<EquityChang
 }
 
 /**
+ * The portfolio's return-config version timeline, replayed from its change
+ * history. Pair with `resolveConfigForPeriod` so each reporting period is
+ * calculated against the terms that applied to it.
+ */
+export async function getConfigTimeline(portfolioId: string): Promise<ConfigVersion[]> {
+  return buildConfigTimeline(await getEquityHistory(portfolioId))
+}
+
+/**
  * Generic config change recorder. Merges the new investorConfig into the
  * portfolio config and appends an audit row to equityHistory, all in one
  * batch. Use for any change to the per-model return config (yield %, revenue
@@ -286,6 +296,12 @@ export async function recordConfigChange(params: {
     changeKind,
     fromValue,
     toValue,
+    // Before/after snapshots — these make the trail replayable, so reports for
+    // periods before `effectiveFromPeriod` keep using the old terms.
+    fromInvestorConfig: currentConfig.investorConfig,
+    toInvestorConfig: newInvestorConfig,
+    fromReturnModel: currentConfig.returnModel,
+    toReturnModel: newReturnModel ?? currentConfig.returnModel,
     ...(reasonNote && reasonNote.trim() ? { reasonNote: reasonNote.trim() } : {}),
   }
   batch.set(historyRef, entry)
@@ -490,6 +506,8 @@ export async function getAllocationsForInvestor(investorUid: string): Promise<In
 export interface InvestorReportSource {
   allocation: InvestorAllocation
   config: PortfolioConfig | null
+  /** Return-config versions, so each period uses the terms in force for it. */
+  configTimeline: ConfigVersion[]
   portfolio: Portfolio | null
   pnlReports: PnLExtractedData[]
   projReports: ProjectionExtractedData[]
@@ -509,8 +527,9 @@ export async function getInvestorReportSources(investorUid: string): Promise<Inv
   return Promise.all(
     allocations.map(async (allocation) => {
       const pid = allocation.portfolioId
-      const [config, portfolio, pnls, projs, mgmts, notes] = await Promise.all([
+      const [config, configTimeline, portfolio, pnls, projs, mgmts, notes] = await Promise.all([
         getPortfolioConfigOrDefault(pid),
+        getConfigTimeline(pid),
         getPortfolio(pid),
         getReports(pid, 'pnl'),
         getReports(pid, 'projection'),
@@ -520,6 +539,7 @@ export async function getInvestorReportSources(investorUid: string): Promise<Inv
       return {
         allocation,
         config,
+        configTimeline,
         portfolio,
         pnlReports: pnls.map(r => r.extractedData as PnLExtractedData),
         projReports: projs.map(r => r.extractedData as ProjectionExtractedData),

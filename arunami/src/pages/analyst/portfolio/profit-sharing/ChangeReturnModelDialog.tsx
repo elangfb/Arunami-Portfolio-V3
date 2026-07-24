@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,10 +7,13 @@ import { AlertTriangle } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { formatPeriod, getNextReportingPeriod } from '@/lib/dateUtils'
+import { formatPeriod, listUpcomingReportingPeriods } from '@/lib/dateUtils'
 import { getPortfolioConfig, recordConfigChange } from '@/lib/firestore'
 import { ModelPicker } from '@/pages/admin/setup/StepInvestorModel'
 import {
@@ -110,6 +113,7 @@ export default function ChangeReturnModelDialog({
   const [saving, setSaving] = useState(false)
   const [currentConfig, setCurrentConfig] = useState<PortfolioConfig | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)
+  const [effectiveFrom, setEffectiveFrom] = useState('')
 
   const form = useForm<DialogFormData>({
     resolver: zodResolver(dialogSchema) as never,
@@ -150,7 +154,18 @@ export default function ChangeReturnModelDialog({
       .finally(() => setLoadingConfig(false))
   }, [open, portfolioId, form])
 
-  const nextPeriod = currentConfig ? getNextReportingPeriod(currentConfig.reportingFrequency) : ''
+  // Only future periods: switching models must never restate an issued report.
+  const periodOptions = useMemo(
+    () => currentConfig
+      ? listUpcomingReportingPeriods(currentConfig.reportingFrequency, 12)
+      : [],
+    [currentConfig],
+  )
+
+  // Default to the earliest selectable period once the config lands.
+  useEffect(() => {
+    setEffectiveFrom(periodOptions[0] ?? '')
+  }, [periodOptions])
 
   const selectedModel = form.watch('returnModel')
   const normalizedCurrent: ReturnModelType | null = currentConfig
@@ -166,6 +181,7 @@ export default function ChangeReturnModelDialog({
     if (!valid) return
     if (!modelChanged) return
     if (reasonText.trim().length === 0) return
+    if (!effectiveFrom) return
 
     setSaving(true)
     try {
@@ -189,7 +205,7 @@ export default function ChangeReturnModelDialog({
         fromValue: `${MODEL_LABEL[currentConfig.returnModel]} (${summarizeCurrentConfig(currentConfig.investorConfig)})`,
         toValue: MODEL_LABEL[newReturnModel],
         reasonNote: reasonText,
-        effectiveFromPeriod: nextPeriod,
+        effectiveFromPeriod: effectiveFrom,
         changedByUid: currentUser.uid,
         changedByName: currentUser.displayName,
       })
@@ -206,7 +222,8 @@ export default function ChangeReturnModelDialog({
   }
 
   const reasonValid = reasonText.trim().length > 0
-  const saveEnabled = modelChanged && reasonValid && !saving && !!currentUser && !!currentConfig
+  const saveEnabled =
+    modelChanged && reasonValid && !!effectiveFrom && !saving && !!currentUser && !!currentConfig
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -240,6 +257,24 @@ export default function ChangeReturnModelDialog({
               <ModelPicker form={form} />
 
               <div className="space-y-1">
+                <Label className="text-xs text-black">Berlaku Mulai Periode *</Label>
+                <Select value={effectiveFrom} onValueChange={setEffectiveFrom}>
+                  <SelectTrigger className="text-black">
+                    <SelectValue placeholder="Pilih periode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periodOptions.map(p => (
+                      <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Hanya periode mendatang. Laporan periode sebelumnya tetap memakai
+                  model lama.
+                </p>
+              </div>
+
+              <div className="space-y-1">
                 <Label className="text-xs text-black">Alasan Perubahan *</Label>
                 <Textarea
                   rows={3}
@@ -254,7 +289,7 @@ export default function ChangeReturnModelDialog({
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-700" />
                 <div className="text-black font-bold">
                   Perubahan berlaku mulai periode{' '}
-                  <span className="underline">{nextPeriod ? formatPeriod(nextPeriod) : '-'}</span>.
+                  <span className="underline">{effectiveFrom ? formatPeriod(effectiveFrom) : '-'}</span>.
                   Laporan periode sebelumnya tidak akan berubah.
                 </div>
               </div>

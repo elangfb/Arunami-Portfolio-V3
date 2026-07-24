@@ -3,9 +3,10 @@ import { toast } from 'sonner'
 import {
   getDistributionBatches, createDistributionBatch, updateDistributionBatchLines,
   deleteDistributionBatch, getAllPortfolios, getAllocationsForPortfolio,
-  getPortfolioConfigOrDefault, getFinancialData, getAllUsers,
+  getPortfolioConfigOrDefault, getConfigTimeline, getFinancialData, getAllUsers,
 } from '@/lib/firestore'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
+import { resolveInvestorConfigForPeriod } from '@/lib/configTimeline'
 import {
   LINE_STATUS_LABELS, LINE_STATUS_CLASSES, BATCH_STATUS_LABELS, nextLineStatus,
 } from '@/lib/distributionBatch'
@@ -253,13 +254,16 @@ function CreateBatchDialog({
     if (!selectedPortfolio || !period) return
     setLoadingPreview(true)
     try {
-      const [allocations, config, fd, users] = await Promise.all([
+      const [allocations, config, timeline, fd, users] = await Promise.all([
         getAllocationsForPortfolio(portfolioId),
         getPortfolioConfigOrDefault(portfolioId),
+        getConfigTimeline(portfolioId),
         getFinancialData(portfolioId),
         getAllUsers(),
       ])
       const teamUids = new Set(users.filter(u => u.isArunamiTeam).map(u => u.uid))
+      // Distribute on the terms that applied to the chosen period.
+      const periodConfig = resolveInvestorConfigForPeriod(config, timeline, period)
       const profit = fd?.profitData.find(p => p.month === period)
       const revenue = fd?.revenueData.find(r => r.month === period)?.aktual ?? 0
       const netProfit = profit?.aktual ?? 0
@@ -268,7 +272,7 @@ function CreateBatchDialog({
       const lines: DistributionBatchLine[] = allocations.map(alloc => {
         const result = calculateDistribution({
           reportData: { period, revenue, netProfit, grossProfit: 0 },
-          config: config.investorConfig,
+          config: periodConfig,
           allocation: alloc,
           portfolio: selectedPortfolio,
           isArunamiTeam: teamUids.has(alloc.investorUid),

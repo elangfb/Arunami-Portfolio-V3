@@ -156,6 +156,16 @@ export default function ProfitSharingPage() {
     [config],
   )
 
+  // A saved change lands in the live config straight away but only governs
+  // reports from its effective period on. Without this the card would read
+  // "Saat Ini" for terms that aren't in force yet.
+  const pendingChange = useMemo(() => {
+    if (!nextPeriod) return null
+    return history
+      .filter(h => h.effectiveFromPeriod && h.effectiveFromPeriod >= nextPeriod)
+      .sort((a, b) => a.effectiveFromPeriod.localeCompare(b.effectiveFromPeriod))[0] ?? null
+  }, [history, nextPeriod])
+
   if (loading) {
     return <div className="p-6 text-sm text-muted-foreground">Memuat...</div>
   }
@@ -188,6 +198,22 @@ export default function ProfitSharingPage() {
         </div>
       </div>
 
+      {pendingChange && (
+        <div className="flex gap-3 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm text-black">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-700" />
+          <div>
+            Angka di bawah adalah ketentuan baru
+            {pendingChange.toValue ? ` (${pendingChange.toValue})` : ''}, yang mulai
+            berlaku periode{' '}
+            <span className="font-semibold underline">
+              {formatPeriod(pendingChange.effectiveFromPeriod)}
+            </span>
+            . Laporan sampai periode sebelumnya masih memakai ketentuan lama
+            {pendingChange.fromValue ? ` (${pendingChange.fromValue})` : ''}.
+          </div>
+        </div>
+      )}
+
       <ModelSection
         config={config}
         portfolio={portfolio}
@@ -201,11 +227,13 @@ export default function ProfitSharingPage() {
         <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-700" />
         <div className="text-sm text-black font-bold">
           <p>
-            Perubahan hanya berlaku untuk laporan mulai periode{' '}
+            Setiap perubahan berlaku mulai periode yang Anda pilih saat menyimpan —
+            paling awal{' '}
             <span className="underline">{nextPeriod ? formatPeriod(nextPeriod) : '-'}</span>.
           </p>
           <p className="mt-1">
-            Data historis dan laporan yang sudah dipublikasikan tidak akan diubah.
+            Data historis dan laporan periode sebelumnya tetap memakai ketentuan
+            yang berlaku saat itu.
           </p>
         </div>
       </div>

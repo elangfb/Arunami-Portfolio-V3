@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   getFinancialData, getTransferProofs,
-  getAllocationsForPortfolio, getPortfolioConfigOrDefault, getAllUsers,
+  getAllocationsForPortfolio, getPortfolioConfigOrDefault, getConfigTimeline, getAllUsers,
 } from '@/lib/firestore'
 import { calculateDistribution } from '@/lib/distributionStrategies'
+import { resolveInvestorConfigForPeriod, type ConfigVersion } from '@/lib/configTimeline'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,7 @@ export default function InvestorsPage() {
   const [proofs, setProofs] = useState<TransferProof[]>([])
   const [allocations, setAllocations] = useState<InvestorAllocation[]>([])
   const [config, setConfig] = useState<PortfolioConfig | null>(null)
+  const [configTimeline, setConfigTimeline] = useState<ConfigVersion[]>([])
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   // Dana sosial (social fund) — ad-hoc deduction, off by default.
@@ -36,12 +38,14 @@ export default function InvestorsPage() {
       getTransferProofs(portfolioId),
       getAllocationsForPortfolio(portfolioId),
       getPortfolioConfigOrDefault(portfolioId),
+      getConfigTimeline(portfolioId),
       getAllUsers(),
-    ]).then(([d, p, allocs, cfg, u]) => {
+    ]).then(([d, p, allocs, cfg, timeline, u]) => {
       setData(d)
       setProofs(p)
       setAllocations(allocs)
       setConfig(cfg)
+      setConfigTimeline(timeline)
       setUsers(u)
       setLoading(false)
     })
@@ -63,6 +67,11 @@ export default function InvestorsPage() {
   let monthlyROI = 0
   let annualROI = 0
 
+  // Terms in force for the month being shown, not necessarily today's.
+  const periodInvestorConfig = config
+    ? resolveInvestorConfigForPeriod(config, configTimeline, latestActualPeriod ?? '')
+    : null
+
   if (config?.investorConfig && portfolio) {
     const mockAlloc: InvestorAllocation = {
       id: '_summary', investorUid: '', investorName: '', investorEmail: '',
@@ -73,7 +82,7 @@ export default function InvestorsPage() {
     const latestRev = [...data.revenueData].reverse().find(r => r.aktual > 0)
     const summaryResult = calculateDistribution({
       reportData: { period: latestActualPeriod ?? '', revenue: latestRev?.aktual ?? 0, netProfit: lastProfit, grossProfit: 0 },
-      config: config.investorConfig,
+      config: periodInvestorConfig ?? config.investorConfig,
       allocation: mockAlloc,
       portfolio,
       socialFundPercent,
@@ -90,7 +99,7 @@ export default function InvestorsPage() {
     const result = config?.investorConfig && portfolio
       ? calculateDistribution({
           reportData: { period: latestActualPeriod ?? '', revenue: latestRevForRows?.aktual ?? 0, netProfit: lastProfit, grossProfit: 0 },
-          config: config.investorConfig,
+          config: periodInvestorConfig ?? config.investorConfig,
           allocation: alloc,
           portfolio,
           isArunamiTeam: investorUser?.isArunamiTeam,
