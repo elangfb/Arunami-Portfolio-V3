@@ -680,7 +680,7 @@ export default function ProjectionsPage() {
               }
               const renderStandardRow = (row: { label: string; key: string; bold?: boolean; className?: string; editable?: boolean }) => (
                 <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
-                  <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''}`}>
+                  <td className={`fin-col-pinned px-4 py-2 border-r ${row.bold ? 'font-semibold fin-tint-strong' : 'fin-tint-plain'}`}>
                     {row.label}
                   </td>
                   {sorted.map(r => {
@@ -710,7 +710,7 @@ export default function ProjectionsPage() {
                     <table className="w-full text-sm border-collapse">
                       <thead>
                         <tr className="bg-muted/50 border-b">
-                          <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
+                          <th className="fin-col-pinned fin-tint-head px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
                             Variable
                           </th>
                           {sorted.map(r => (
@@ -773,7 +773,7 @@ export default function ProjectionsPage() {
                             const key = `opex:${opexName}`
                             return (
                               <tr key={`body-opex-${opexName}`} className="hover:bg-muted/10">
-                                <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r pl-8 text-xs text-muted-foreground">
+                                <td className="fin-col-pinned fin-tint-plain px-4 py-2 border-r pl-8 text-xs text-muted-foreground">
                                   <div className="flex items-center gap-1">
                                     <div className="flex flex-col shrink-0">
                                       <button
@@ -852,7 +852,7 @@ export default function ProjectionsPage() {
 
                         {/* Net Profit row */}
                         <tr className="bg-muted/20">
-                          <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+                          <td className="fin-col-pinned fin-tint-strong px-4 py-2 border-r font-semibold">
                             {netProfitRow.label}
                           </td>
                           {sorted.map(r => {

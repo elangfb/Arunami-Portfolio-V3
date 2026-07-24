@@ -344,7 +344,7 @@ export function ProjectionReviewTable({
     const canDelete = DELETABLE_STANDARD_KEYS.has(row.key)
     return (
       <tr key={row.key} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
-        <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.isBold ? 'font-semibold bg-muted/20' : ''}`}>
+        <td className={`fin-col-pinned px-4 py-2 border-r ${row.isBold ? 'font-semibold fin-tint-strong' : 'fin-tint-plain'}`}>
           <div className="flex items-center gap-1 group">
             <div className="flex-1 min-w-0">
               {renderEditableLabel(row.key, row.label)}
@@ -409,7 +409,7 @@ export function ProjectionReviewTable({
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted/50 border-b">
-                <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
+                <th className="fin-col-pinned fin-tint-head px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
                   Variable
                 </th>
                 {months.map((m, monthIdx) => (
@@ -448,7 +448,7 @@ export function ProjectionReviewTable({
                   const total = getTotal(key)
                   return (
                     <tr key={`body-opex-${opexName}`} className="hover:bg-muted/10">
-                      <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r pl-8 text-muted-foreground text-xs">
+                      <td className="fin-col-pinned fin-tint-plain px-4 py-2 border-r pl-8 text-muted-foreground text-xs">
                         <div className="flex items-center gap-1">
                           {onRowOrderChange && (
                             <div className="flex flex-col shrink-0">
@@ -534,7 +534,7 @@ export function ProjectionReviewTable({
 
               {/* Net Profit row (readOnly, auto-calculated) */}
               <tr className="bg-muted/20">
-                <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+                <td className="fin-col-pinned fin-tint-strong px-4 py-2 border-r font-semibold">
                   {renderEditableLabel(netProfitRow.key, netProfitRow.label)}
                 </td>
                 {months.map(m => {

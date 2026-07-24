@@ -98,7 +98,7 @@ export function CustomCategoryBlock({
     <Fragment>
       {/* Category header row — shows per-column subtotals */}
       <tr className="bg-muted/20">
-        <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+        <td className="fin-col-pinned fin-tint-strong px-4 py-2 border-r font-semibold">
           <div className="flex items-center gap-1">
             {onToggleExpand && (
               <button
@@ -193,7 +193,7 @@ export function CustomCategoryBlock({
         const isLastSub = subIdx === cat.subItems.length - 1
         return (
           <tr key={`sub-${cat.id}-${sub.id}`} className="hover:bg-muted/10">
-            <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r pl-8 text-xs text-muted-foreground">
+            <td className="fin-col-pinned fin-tint-plain px-4 py-2 border-r pl-8 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 {onMoveSubItem && (
                   <div className="flex flex-col shrink-0">

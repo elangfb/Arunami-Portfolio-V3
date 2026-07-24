@@ -932,7 +932,7 @@ export default function PnLPage() {
 
               const renderComputedRow = (row: { label: string; key: string; bold?: boolean; className?: string }) => (
                 <tr key={row.key} className={row.bold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
-                  <td className={`sticky left-0 z-10 bg-white px-4 py-2 border-r ${row.bold ? 'font-semibold bg-muted/20' : ''}`}>
+                  <td className={`fin-col-pinned px-4 py-2 border-r ${row.bold ? 'font-semibold fin-tint-strong' : 'fin-tint-plain'}`}>
                     {row.label}
                   </td>
                   {sorted.map(r => {
@@ -951,7 +951,7 @@ export default function PnLPage() {
               )
               const renderEditableRow = (row: { label: string; key: string; className?: string }) => (
                 <tr key={row.key} className="hover:bg-muted/10">
-                  <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r">
+                  <td className="fin-col-pinned fin-tint-plain px-4 py-2 border-r">
                     <div className="flex items-center gap-1">
                       <span className="flex-1 truncate">{row.label}</span>
                       <Button
@@ -993,7 +993,7 @@ export default function PnLPage() {
                 parentId: '__revenue__' | '__cogs__',
               ) => (
                 <tr key={`flat-${parentId}`} className="bg-muted/20">
-                  <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+                  <td className="fin-col-pinned fin-tint-strong px-4 py-2 border-r font-semibold">
                     <div className="flex items-center gap-1">
                       <span className="flex-1 truncate">{label}</span>
                       {inlineEditId && (
@@ -1036,7 +1036,7 @@ export default function PnLPage() {
                     <table className="w-full text-sm border-collapse">
                       <thead>
                         <tr className="bg-muted/50 border-b">
-                          <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
+                          <th className="fin-col-pinned fin-tint-head px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
                             Variable
                           </th>
                           {sorted.map(r => (
@@ -1225,7 +1225,7 @@ export default function PnLPage() {
                           <tr>
                             <td
                               colSpan={sorted.length + 1}
-                              className="sticky left-0 z-10 bg-muted/5 px-4 py-1 border-r"
+                              className="fin-col-pinned fin-tint-faint px-4 py-1 border-r"
                             >
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <span>Disembunyikan:</span>

@@ -91,6 +91,47 @@
   }
 }
 
+/* ─── Financial Matrix Tables (PnL / Proyeksi) ──────────────────────────── */
+/*
+ * These tables pin their first column (the line-item labels) while the month
+ * columns scroll horizontally underneath. The row tints they used before were
+ * translucent (`bg-muted/20` and friends), so scrolled-under figures bled
+ * straight through the pinned cell and collided with the label text. The
+ * classes below are the same tints pre-composited against the card background,
+ * which is what an overlaying column actually needs: full opacity.
+ */
+
+.fin-col-pinned {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  /* Reads as a floating column rather than a cell that happens to sit still. */
+  box-shadow: 3px 0 5px -3px rgb(0 0 0 / 0.16);
+}
+
+.fin-tint-head {
+  background-color: color-mix(in srgb, hsl(var(--muted)) 50%, hsl(var(--background)));
+}
+
+.fin-tint-strong {
+  background-color: color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)));
+}
+
+.fin-tint-faint {
+  background-color: color-mix(in srgb, hsl(var(--muted)) 5%, hsl(var(--background)));
+}
+
+.fin-tint-plain {
+  background-color: hsl(var(--background));
+}
+
+/* The pinned cell is opaque, so a translucent row hover can't show through it.
+   Restore the highlight explicitly — tracking a line item across a dozen month
+   columns is exactly when you need the row you're on to stand out. */
+tbody tr:hover > .fin-col-pinned {
+  background-color: color-mix(in srgb, hsl(var(--muted)) 45%, hsl(var(--background)));
+}
+
 /* ─── Print-Ready Report Styles ─────────────────────────────────────────── */
 
 @media print {

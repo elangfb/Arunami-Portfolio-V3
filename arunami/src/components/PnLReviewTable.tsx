@@ -309,7 +309,7 @@ export function PnLReviewTable({
     const total = months.reduce((s, m) => s + (Number(m[row.key]) || 0), 0)
     return (
       <tr key={row.key} className={row.isBold ? 'bg-muted/20' : ''}>
-        <td className={`sticky left-0 z-10 px-4 py-2 border-r ${row.isBold ? 'font-semibold bg-muted/20' : 'bg-white'}`}>
+        <td className={`fin-col-pinned px-4 py-2 border-r ${row.isBold ? 'font-semibold fin-tint-strong' : 'fin-tint-plain'}`}>
           {row.label}
         </td>
         {months.map(m => {
@@ -342,7 +342,7 @@ export function PnLReviewTable({
     const canToggleHidden = !!onRowOrderChange
     return (
       <tr key={row.key} className="hover:bg-muted/10">
-        <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r">
+        <td className="fin-col-pinned fin-tint-plain px-4 py-2 border-r">
           <div className="flex items-center gap-1">
             <span className="flex-1 truncate">{row.label}</span>
             {canToggleHidden && (
@@ -421,7 +421,7 @@ export function PnLReviewTable({
     const total = months.reduce((s, m) => s + (Number(m[args.flatKey]) || 0), 0)
     return (
       <tr key={`pinned-${args.role}-flat`} className="bg-muted/20">
-        <td className="sticky left-0 z-10 bg-muted/20 px-4 py-2 border-r font-semibold">
+        <td className="fin-col-pinned fin-tint-strong px-4 py-2 border-r font-semibold">
           <div className="flex items-center gap-1">
             <span className="flex-1 truncate">{args.label}</span>
             <Button
@@ -496,7 +496,7 @@ export function PnLReviewTable({
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted/50 border-b">
-                <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[220px] border-r">
+                <th className="fin-col-pinned fin-tint-head px-4 py-2.5 text-left font-medium min-w-[220px] border-r">
                   Variable
                 </th>
                 {months.map(m => (
@@ -620,7 +620,7 @@ export function PnLReviewTable({
                 <tr>
                   <td
                     colSpan={months.length + (showGrandTotal ? 2 : 1)}
-                    className="sticky left-0 z-10 bg-muted/5 px-4 py-1 border-r"
+                    className="fin-col-pinned fin-tint-faint px-4 py-1 border-r"
                   >
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>Disembunyikan:</span>

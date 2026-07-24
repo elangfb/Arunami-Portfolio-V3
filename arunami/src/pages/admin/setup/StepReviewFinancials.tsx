@@ -348,7 +348,7 @@ function ProjectionTab({
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted/50 border-b">
-                <th className="sticky left-0 z-10 bg-muted/50 px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
+                <th className="fin-col-pinned fin-tint-head px-4 py-2.5 text-left font-medium min-w-[180px] border-r">
                   <div className="flex items-center justify-between">
                     <span>Variable</span>
                     <Button type="button" variant="ghost" size="sm" onClick={addOpex} className="h-6 text-xs">
@@ -373,7 +373,7 @@ function ProjectionTab({
                   <tr key={ri} className={row.isBold ? 'bg-muted/20' : 'hover:bg-muted/10'}>
                     {/* Label cell */}
                     <td className={cn(
-                      'sticky left-0 z-10 bg-white px-4 py-1.5 border-r',
+                      'fin-col-pinned fin-tint-plain px-4 py-1.5 border-r',
                       row.isBold && 'font-semibold bg-muted/20',
                       row.type === 'opex' && 'pl-8',
                     )}>
