@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
 import { getFinancialData, getReports, getHealthRules, updatePortfolioHealth } from '@/lib/firestore'
-import { computeHealth, DEFAULT_HEALTH_RULES, HEALTH_SOP } from '@/lib/health'
-import { formatCurrencyCompact, formatCurrencyExact, formatPercent, calcMoM } from '@/lib/utils'
+import { computeHealth, DEFAULT_HEALTH_RULES, HEALTH_SOP, healthFreshness } from '@/lib/health'
+import { formatCurrencyCompact, formatCurrencyExact, formatPercent, calcMoM, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import {
@@ -16,7 +17,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2, AlertTriangle } from 'lucide-react'
-import { formatPeriod, previousPeriod } from '@/lib/dateUtils'
+import { formatPeriod, comparePeriods, formatFullDate } from '@/lib/dateUtils'
 import { buildThreeColRows } from '@/lib/reportHtml'
 import type { FinancialData, Portfolio, PnLExtractedData, ProjectionExtractedData, PortfolioReport, HealthRules } from '@/types'
 
@@ -30,12 +31,19 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true)
   const [pnlReports, setPnlReports] = useState<PortfolioReport[]>([])
   const [projReports, setProjReports] = useState<PortfolioReport[]>([])
+  // Which two months the comparison table puts side by side (both YYYY-MM).
+  const [comparePeriodA, setComparePeriodA] = useState('')
+  const [comparePeriodB, setComparePeriodB] = useState('')
   // Wanprestasi / health
   const [rules, setRules] = useState<HealthRules>(DEFAULT_HEALTH_RULES)
   const [latenessDays, setLatenessDays] = useState(0)
   const [lastContactDate, setLastContactDate] = useState('')
   const [wanprestasiOpen, setWanprestasiOpen] = useState(false)
   const [savingHealth, setSavingHealth] = useState(false)
+  // When the stored level was last saved. Tracked locally because the layout
+  // fetches the portfolio once — without this the stamp would keep showing the
+  // pre-save timestamp until a full page reload.
+  const [healthComputedAt, setHealthComputedAt] = useState<{ seconds: number } | Date | null>(null)
 
   useEffect(() => {
     if (portfolioId) getFinancialData(portfolioId).then(d => { setData(d); setLoading(false) })
@@ -46,6 +54,7 @@ export default function OverviewPage() {
   useEffect(() => {
     setLatenessDays(portfolio?.latenessDays ?? 0)
     setLastContactDate(portfolio?.lastContactDate ?? '')
+    setHealthComputedAt(portfolio?.healthComputedAt ?? null)
   }, [portfolio])
 
   // Live health — recomputed from the manual inputs + PnL-vs-projection series.
@@ -53,6 +62,10 @@ export default function OverviewPage() {
     () => computeHealth({ latenessDays, lastContactDate, profitData: data?.profitData, rules }),
     [latenessDays, lastContactDate, data, rules],
   )
+
+  // How old the *saved* level is — this is what every dashboard badge reads,
+  // and it only refreshes when someone saves the modal below.
+  const freshness = useMemo(() => healthFreshness(healthComputedAt), [healthComputedAt])
 
   const saveWanprestasi = async () => {
     if (!portfolioId) return
@@ -65,6 +78,7 @@ export default function OverviewPage() {
         healthLevel: result.level,
         healthReasons: result.reasons,
       })
+      setHealthComputedAt(new Date())
       toast.success('Status wanprestasi diperbarui')
       setWanprestasiOpen(false)
     } catch (err) {
@@ -86,24 +100,33 @@ export default function OverviewPage() {
     })
   }, [portfolioId])
 
-  // Three-column comparison rows (current / previous / projection) — same data
-  // shape as the investor report's Laporan Keuangan section. Declared here,
-  // above the early returns below, so the hook count stays stable across the
-  // loading → loaded transition (otherwise React throws error #310).
+  // Periods the analyst can compare — only those with an actual PnL, newest
+  // first, so the dropdowns never offer a month that would render as all "—".
+  const pnlPeriods = useMemo(
+    () => [...new Set(pnlReports.map(r => r.period))].sort(comparePeriods).reverse(),
+    [pnlReports],
+  )
+
+  // Seed the pickers with the two newest reported months, and re-seed if the
+  // current pick disappears (e.g. a report was deleted). Functional updates so
+  // a manual choice survives unrelated re-renders.
+  useEffect(() => {
+    if (!pnlPeriods.length) return
+    setComparePeriodA(prev => (pnlPeriods.includes(prev) ? prev : pnlPeriods[0]))
+    setComparePeriodB(prev => (pnlPeriods.includes(prev) ? prev : pnlPeriods[1] ?? pnlPeriods[0]))
+  }, [pnlPeriods])
+
+  // Three-column comparison rows (month A / month B / projection for A) — same
+  // data shape as the investor report's Laporan Keuangan section. Declared
+  // here, above the early returns below, so the hook count stays stable across
+  // the loading → loaded transition (otherwise React throws error #310).
   const comparisonRows = useMemo(() => {
-    if (!data) return []
-    const txs = data.transactionData
-    let latest: string | undefined = txs[txs.length - 1]?.month
-    if (!latest) {
-      latest = [...data.revenueData].reverse().find(r => r.aktual !== 0)?.month
-    }
-    if (!latest) return []
-    const prevKey = previousPeriod(latest)
-    const cur  = (pnlReports.find(r => r.period === latest)?.extractedData as PnLExtractedData | undefined) ?? null
-    const prev = (pnlReports.find(r => r.period === prevKey)?.extractedData as PnLExtractedData | undefined) ?? null
-    const proj = (projReports.find(r => r.period === latest)?.extractedData as ProjectionExtractedData | undefined) ?? null
-    return buildThreeColRows(cur, prev, proj)
-  }, [data, pnlReports, projReports])
+    if (!comparePeriodA) return []
+    const pnlOf = (period: string) =>
+      (pnlReports.find(r => r.period === period)?.extractedData as PnLExtractedData | undefined) ?? null
+    const proj = (projReports.find(r => r.period === comparePeriodA)?.extractedData as ProjectionExtractedData | undefined) ?? null
+    return buildThreeColRows(pnlOf(comparePeriodA), pnlOf(comparePeriodB), proj)
+  }, [comparePeriodA, comparePeriodB, pnlReports, projReports])
 
   if (loading) return <div className="p-8"><div className="h-40 animate-pulse rounded-lg bg-muted" /></div>
 
@@ -168,6 +191,12 @@ export default function OverviewPage() {
   const totalInvestment = portfolio?.investasiAwal ?? 0
   const totalInvestmentROI = totalInvestment > 0 ? (netForInvestor / totalInvestment) * 100 : 0
 
+  // Every KPI below reads a single month, so stamp the cards with which one —
+  // a bare "Rp 1.2M" says nothing about the period it belongs to.
+  const kpiPeriodLabel = latestPeriod ? formatPeriod(latestPeriod) : null
+
+  const sameMonthSelected = comparePeriodA !== '' && comparePeriodA === comparePeriodB
+
   const kpis = [
     {
       label: 'Revenue', value: formatCurrencyCompact(lastRevenue),
@@ -192,13 +221,29 @@ export default function OverviewPage() {
       <h2 className="text-xl font-bold">Overview Portofolio</h2>
 
       {/* Wanprestasi / health banner */}
-      <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+      <div
+        className={cn(
+          'flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between',
+          freshness.isStale && 'border-amber-300 bg-amber-50/50',
+        )}
+      >
+        <div className="flex items-start gap-3">
           <HealthBadge level={health.level} reasons={health.reasons} size="md" />
           <div>
             <p className="text-sm font-medium">Status Wanprestasi</p>
             <p className="text-xs text-muted-foreground">
               {health.reasons.length ? health.reasons.join(' · ') : 'Semua sinyal dalam batas aman'}
+            </p>
+            <p
+              className={cn(
+                'mt-1 flex items-center gap-1 text-xs',
+                freshness.isStale ? 'font-medium text-amber-700' : 'text-muted-foreground',
+              )}
+            >
+              {freshness.isStale && <AlertTriangle className="h-3 w-3 shrink-0" />}
+              {freshness.label}
+              {freshness.date && ` (${formatFullDate(freshness.date)})`}
+              {freshness.isStale && ' — perlu ditinjau ulang'}
             </p>
           </div>
         </div>
@@ -211,9 +256,16 @@ export default function OverviewPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpis.map(({ label, value, change, icon: Icon }) => (
           <Card key={label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
-              <Icon className="h-4 w-4 text-[#38a169]" />
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+              <div className="min-w-0">
+                <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
+                {kpiPeriodLabel && (
+                  <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground/70">
+                    {kpiPeriodLabel}
+                  </p>
+                )}
+              </div>
+              <Icon className="h-4 w-4 shrink-0 text-[#38a169]" />
             </CardHeader>
             <CardContent>
               <div className="text-xl font-bold">{value}</div>
@@ -228,22 +280,38 @@ export default function OverviewPage() {
         ))}
       </div>
 
-      {/* Three-column comparison: current / last month / projection */}
-      {comparisonRows.length > 0 && latestPeriod && (
+      {/* Three-column comparison: month A / month B / projection for A */}
+      {comparisonRows.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">
-              Perbandingan {formatPeriod(latestPeriod)} vs Bulan Lalu vs Proyeksi
-            </CardTitle>
+          <CardHeader className="space-y-3">
+            <CardTitle className="text-sm">Perbandingan Bulanan</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={comparePeriodA} onValueChange={setComparePeriodA}>
+                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Bulan A" /></SelectTrigger>
+                <SelectContent>
+                  {pnlPeriods.map(p => <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">dibandingkan</span>
+              <Select value={comparePeriodB} onValueChange={setComparePeriodB}>
+                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Bulan B" /></SelectTrigger>
+                <SelectContent>
+                  {pnlPeriods.map(p => <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {sameMonthSelected && (
+                <span className="text-xs text-amber-700">Pilih dua bulan berbeda untuk melihat selisih.</span>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead className="text-right">Aktual {formatPeriod(latestPeriod)}</TableHead>
-                  <TableHead className="text-right">Aktual Bulan Lalu</TableHead>
-                  <TableHead className="text-right">Proyeksi {formatPeriod(latestPeriod)}</TableHead>
+                  <TableHead className="text-right">Aktual {formatPeriod(comparePeriodA)}</TableHead>
+                  <TableHead className="text-right">Aktual {formatPeriod(comparePeriodB)}</TableHead>
+                  <TableHead className="text-right">Proyeksi {formatPeriod(comparePeriodA)}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -252,7 +320,9 @@ export default function OverviewPage() {
                     if (cur == null || base == null || base === 0) return null
                     return ((cur - base) / Math.abs(base)) * 100
                   }
-                  const dPrev = delta(r.current, r.previous)
+                  // Both deltas describe month A relative to that column, so
+                  // comparing a month against itself would just print +0.0%.
+                  const dPrev = sameMonthSelected ? null : delta(r.current, r.previous)
                   const dProj = delta(r.current, r.projection)
                   const cell = (v: number | null, d: number | null) => (
                     v == null
@@ -277,6 +347,9 @@ export default function OverviewPage() {
                 })}
               </TableBody>
             </Table>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Persentase menunjukkan perubahan {formatPeriod(comparePeriodA)} terhadap kolom tersebut.
+            </p>
           </CardContent>
         </Card>
       )}
