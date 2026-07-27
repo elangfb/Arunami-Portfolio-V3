@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
-  getAnalystPortfolios, getFinancialData, getPortfolioConfigOrDefault, saveNote,
+  getAnalystPortfolios, getFinancialData, getPortfolioConfigOrDefault, getConfigTimeline, saveNote,
 } from '@/lib/firestore'
 import { computePortfolioMetric, type PortfolioMetric } from '@/lib/analystMetrics'
 import { useAuthStore } from '@/store/authStore'
@@ -77,11 +77,17 @@ export default function MeetingMode() {
     if (!portfolioId) { setMetric(null); setFinancial(null); return }
     setLoadingData(true)
     const target = portfolios.find(p => p.id === portfolioId)
-    Promise.all([getFinancialData(portfolioId), getPortfolioConfigOrDefault(portfolioId)])
-      .then(([fd, cfg]) => {
+    Promise.all([
+      getFinancialData(portfolioId),
+      getPortfolioConfigOrDefault(portfolioId),
+      getConfigTimeline(portfolioId),
+    ])
+      .then(([fd, cfg, timeline]) => {
         setFinancial(fd)
         setConfig(cfg)
-        const m = target ? computePortfolioMetric(target, fd, cfg) : null
+        // Each month is calculated against the terms in force for it, so a
+        // future-dated profit-sharing change never restates an earlier period.
+        const m = target ? computePortfolioMetric(target, fd, cfg, undefined, timeline) : null
         setMetric(m)
         const months = (m?.monthly ?? []).map(r => r.month).sort((a, b) => comparePeriods(b, a))
         setPeriodB(months[0] ?? '')
