@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getAnalystPortfolios, getFinancialData, getPortfolioConfigOrDefault, getConfigTimeline, saveNote,
+  getMeetingRecaps, saveMeetingRecap, deleteMeetingRecap,
 } from '@/lib/firestore'
 import { computePortfolioMetric, type PortfolioMetric } from '@/lib/analystMetrics'
 import { useAuthStore } from '@/store/authStore'
 import { formatCurrencyExact, formatCurrencyCompact, formatPercent } from '@/lib/utils'
-import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
+import {
+  formatPeriod, comparePeriods, isoWeekKey, isoWeekRange, formatWeekLabel, recentWeekKeys, toDateKey,
+} from '@/lib/dateUtils'
 import { brandOf } from '@/lib/portfolioName'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { HEALTH_LABELS, healthFreshness } from '@/lib/health'
@@ -23,8 +26,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import {
   Presentation, X, Check, Circle, ArrowRight, Plus, Trash2, Copy, Save,
   DollarSign, TrendingUp, Wallet, Percent, ListChecks, ArrowUp, ArrowDown,
+  Lock, CalendarDays, ChevronDown, ChevronRight, Share2,
 } from 'lucide-react'
-import type { Portfolio, FinancialData, PortfolioConfig } from '@/types'
+import type { Portfolio, FinancialData, PortfolioConfig, MeetingRecap } from '@/types'
 
 interface LiveNote { id: string; text: string }
 interface LiveAction { id: string; text: string; assignee: string; done: boolean }
@@ -35,7 +39,11 @@ const SECTIONS = [
   { id: 'update', label: 'Update Mingguan' },
   { id: 'catatan', label: 'Catatan & Action Items' },
   { id: 'kesimpulan', label: 'Kesimpulan' },
+  { id: 'recap', label: 'Recap Rapat' },
 ] as const
+
+/** How many weeks back the recap week picker offers. */
+const WEEK_CHOICES = 12
 type SectionId = typeof SECTIONS[number]['id']
 
 // Session-only monotonic id (Date.now/Math.random are fine in a page component).
@@ -64,6 +72,15 @@ export default function MeetingMode() {
   const [actionDraft, setActionDraft] = useState('')
   const [actionAssignee, setActionAssignee] = useState('')
   const [committing, setCommitting] = useState(false)
+
+  // Weekly internal recap (portfolios/{id}/meetingRecaps, one doc per ISO week)
+  const [weekKey, setWeekKey] = useState(() => isoWeekKey())
+  const [recaps, setRecaps] = useState<MeetingRecap[]>([])
+  const [loadingRecaps, setLoadingRecaps] = useState(false)
+  const [savingRecap, setSavingRecap] = useState(false)
+  const [openRecap, setOpenRecap] = useState<string | null>(null)
+
+  const weekOptions = useMemo(() => recentWeekKeys(WEEK_CHOICES), [])
 
   const portfolio = portfolios.find(p => p.id === portfolioId) ?? null
 
@@ -95,6 +112,16 @@ export default function MeetingMode() {
       })
       .finally(() => setLoadingData(false))
   }, [portfolioId, portfolios])
+
+  const refreshRecaps = useCallback(async () => {
+    if (!portfolioId) { setRecaps([]); return }
+    setLoadingRecaps(true)
+    try { setRecaps(await getMeetingRecaps(portfolioId)) }
+    catch { toast.error('Gagal memuat recap rapat') }
+    finally { setLoadingRecaps(false) }
+  }, [portfolioId])
+
+  useEffect(() => { refreshRecaps(); setOpenRecap(null) }, [refreshRecaps])
 
   const goto = (id: SectionId) => {
     setActive(id)
@@ -156,8 +183,47 @@ export default function MeetingMode() {
     catch { toast.error('Gagal menyalin') }
   }
 
+  /** Internal weekly recap — staff-only, never shown to investors. */
+  const saveRecap = async () => {
+    if (!portfolioId || !summaryText.trim()) return
+    if (recaps.some(r => r.id === weekKey)
+      && !window.confirm(`Recap ${formatWeekLabel(weekKey)} sudah ada. Ganti dengan isi rapat ini?`)) return
+    setSavingRecap(true)
+    try {
+      const range = isoWeekRange(weekKey)
+      await saveMeetingRecap(portfolioId, weekKey, {
+        weekStart: range ? toDateKey(range.start) : '',
+        periodA, periodB,
+        weeklyUpdate: weeklyUpdate.trim(),
+        notes: notes.map(n => n.text),
+        actions: actions.map(({ text, assignee, done }) => ({ text, assignee, done })),
+        summary: summaryText,
+        createdBy: user?.uid ?? '',
+      })
+      toast.success(`Recap ${formatWeekLabel(weekKey)} tersimpan (internal)`)
+      await refreshRecaps()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan recap')
+    } finally {
+      setSavingRecap(false)
+    }
+  }
+
+  const removeRecap = async (key: string) => {
+    if (!portfolioId || !window.confirm(`Hapus recap ${formatWeekLabel(key)}?`)) return
+    try {
+      await deleteMeetingRecap(portfolioId, key)
+      toast.success('Recap dihapus')
+      await refreshRecaps()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus recap')
+    }
+  }
+
+  /** Optional share-out: the portfolio Catatan tab IS visible to investors. */
   const commit = async () => {
     if (!portfolioId || !summaryText.trim()) return
+    if (!window.confirm('Catatan portofolio terlihat oleh investor portofolio ini. Bagikan notulen ini ke sana?')) return
     setCommitting(true)
     try {
       await saveNote(portfolioId, { content: summaryText, attachments: [], createdBy: user?.uid ?? '' })
@@ -269,11 +335,48 @@ export default function MeetingMode() {
                   <SectionTitle>Kesimpulan</SectionTitle>
                   <p className="text-sm text-muted-foreground">Notulen otomatis dari sesi rapat ini.</p>
                   <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/40 p-4 text-sm">{summaryText}</pre>
+
+                  <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-muted/20 p-3">
+                    <div className="space-y-1">
+                      <Label className="flex items-center gap-1.5 text-xs font-medium">
+                        <CalendarDays className="h-3.5 w-3.5" />Simpan sebagai recap minggu
+                      </Label>
+                      <Select value={weekKey} onValueChange={setWeekKey}>
+                        <SelectTrigger className="w-72"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {weekOptions.map(w => (
+                            <SelectItem key={w} value={w}>
+                              {formatWeekLabel(w)}{recaps.some(r => r.id === w) ? ' · sudah ada' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={saveRecap} disabled={savingRecap}>
+                      <Save className="mr-1 h-4 w-4" />{savingRecap ? 'Menyimpan…' : 'Simpan Recap Rapat'}
+                    </Button>
+                    <p className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
+                      <Lock className="h-3.5 w-3.5" />Internal — hanya admin & analis portofolio ini. Investor tidak melihatnya.
+                    </p>
+                  </div>
+
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={copySummary}><Copy className="mr-1 h-4 w-4" />Salin Notulen</Button>
-                    <Button onClick={commit} disabled={committing}><Save className="mr-1 h-4 w-4" />{committing ? 'Menyimpan…' : 'Simpan ke Catatan Portofolio'}</Button>
+                    <Button variant="outline" onClick={commit} disabled={committing}>
+                      <Share2 className="mr-1 h-4 w-4" />{committing ? 'Menyimpan…' : 'Bagikan ke Catatan Portofolio'}
+                    </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Catatan portofolio tampil di portal investor — pakai hanya untuk notulen yang memang boleh dibaca investor.
+                  </p>
                 </section>
+              )}
+              {active === 'recap' && (
+                <RecapSection
+                  recaps={recaps} loading={loadingRecaps}
+                  openRecap={openRecap} setOpenRecap={setOpenRecap}
+                  removeRecap={removeRecap}
+                />
               )}
 
               {/* Section footer nav */}
@@ -412,6 +515,93 @@ function PerbandinganSection({
         </Table>
       </Card>
       <p className="text-xs text-muted-foreground">Δ = B − A. Kolom terakhir membandingkan aktual periode B terhadap proyeksinya.</p>
+    </section>
+  )
+}
+
+function RecapSection({
+  recaps, loading, openRecap, setOpenRecap, removeRecap,
+}: {
+  recaps: MeetingRecap[]; loading: boolean
+  openRecap: string | null; setOpenRecap: (id: string | null) => void
+  removeRecap: (id: string) => void
+}) {
+  const stamp = (ts: MeetingRecap['updatedAt']) => ts
+    ? new Date(ts.seconds * 1000).toLocaleString('id-ID', {
+        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      })
+    : '—'
+
+  const copyRecap = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success('Recap disalin') }
+    catch { toast.error('Gagal menyalin') }
+  }
+
+  return (
+    <section className="space-y-4">
+      <SectionTitle>Recap Rapat</SectionTitle>
+      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Lock className="h-4 w-4 shrink-0" />
+        Arsip mingguan rapat portofolio ini. Internal — tidak terlihat oleh investor.
+      </p>
+
+      {loading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />)}</div>
+      ) : recaps.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-lg border py-12 text-muted-foreground">
+          <CalendarDays className="h-10 w-10 opacity-30" />
+          <p className="text-sm">Belum ada recap tersimpan.</p>
+          <p className="text-xs">Simpan dari agenda Kesimpulan setelah rapat selesai.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {recaps.map(r => {
+            const open = openRecap === r.id
+            const pending = r.actions?.filter(a => !a.done).length ?? 0
+            return (
+              <Card key={r.id} className="overflow-hidden">
+                <div className="flex items-center gap-2 p-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setOpenRecap(open ? null : r.id)}
+                    className="flex h-auto min-w-0 flex-1 items-center justify-start gap-2 px-1 py-1 text-left"
+                  >
+                    {open ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{formatWeekLabel(r.id)}</span>
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        Diperbarui {stamp(r.updatedAt)}
+                        {pending > 0 && ` · ${pending} action item terbuka`}
+                      </span>
+                    </span>
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => copyRecap(r.summary)} className="h-8 w-8 shrink-0 text-muted-foreground">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => removeRecap(r.id)} className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                {open && (
+                  <CardContent className="space-y-3 border-t bg-muted/20 pt-4">
+                    <pre className="whitespace-pre-wrap text-sm">{r.summary}</pre>
+                    {r.actions?.length > 0 && (
+                      <div className="space-y-1 border-t pt-3">
+                        <Label className="flex items-center gap-1.5 text-xs font-medium"><ListChecks className="h-3.5 w-3.5" />Action Items</Label>
+                        {r.actions.map((a, i) => (
+                          <p key={i} className={`text-sm ${a.done ? 'text-muted-foreground line-through' : ''}`}>
+                            {a.done ? '✓' : '○'} {a.text}{a.assignee && <span className="text-xs text-muted-foreground"> @{a.assignee}</span>}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }

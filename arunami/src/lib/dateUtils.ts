@@ -205,6 +205,64 @@ export function formatFullDate(date: Date): string {
   return `${date.getDate()} ${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`
 }
 
+// ─── ISO Weeks ──────────────────────────────────────────────────────────
+// Weekly meeting recaps are keyed by ISO-8601 week ("2026-W30", Monday-start)
+// so one meeting per week lands on one document, and the keys sort
+// lexicographically in chronological order.
+
+const WEEK_KEY_RE = /^(\d{4})-W(\d{2})$/
+
+/** Local date → "YYYY-MM-DD" (no UTC shift, unlike toISOString). */
+export function toDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** ISO-8601 week key of a date, e.g. "2026-W30". */
+export function isoWeekKey(date: Date = new Date()): string {
+  // Shift to the Thursday of that week — its calendar year is the ISO year.
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7))
+  const jan1 = new Date(d.getFullYear(), 0, 1)
+  const week = Math.ceil(((d.getTime() - jan1.getTime()) / 86_400_000 + 1) / 7)
+  return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`
+}
+
+/** Monday…Sunday of an ISO week key; null if the key is malformed. */
+export function isoWeekRange(weekKey: string): { start: Date; end: Date } | null {
+  const m = WEEK_KEY_RE.exec(weekKey)
+  if (!m) return null
+  const [year, week] = [Number(m[1]), Number(m[2])]
+  // 4 January always falls in ISO week 1, so its Monday anchors the year.
+  const jan4 = new Date(year, 0, 4)
+  const start = new Date(year, 0, 4 - ((jan4.getDay() || 7) - 1) + (week - 1) * 7)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return { start, end }
+}
+
+/** "Minggu 30 · 20–26 Juli 2026" — full label for a week key. */
+export function formatWeekLabel(weekKey: string): string {
+  const range = isoWeekRange(weekKey)
+  if (!range) return weekKey
+  const { start, end } = range
+  const week = Number(WEEK_KEY_RE.exec(weekKey)![2])
+  const startLabel = start.getMonth() === end.getMonth()
+    ? String(start.getDate())
+    : `${start.getDate()} ${INDONESIAN_MONTHS[start.getMonth()]}`
+  return `Minggu ${week} · ${startLabel}–${formatFullDate(end)}`
+}
+
+/** The `count` most recent ISO week keys, newest first (current week included). */
+export function recentWeekKeys(count: number, from: Date = new Date()): string[] {
+  const keys: string[] = []
+  const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  for (let i = 0; i < count; i++) {
+    keys.push(isoWeekKey(cursor))
+    cursor.setDate(cursor.getDate() - 7)
+  }
+  return keys
+}
+
 // ─── Period Grouping Helpers ────────────────────────────────────────────
 
 import type { PeriodType } from '@/store/reportFilterStore'

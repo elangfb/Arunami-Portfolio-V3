@@ -725,6 +725,41 @@ export interface Note {
   createdAt: Timestamp
 }
 
+// ─── Meeting Recaps (internal weekly recap from Mode Rapat) ───────────────
+//
+// Subcollection /portfolios/{id}/meetingRecaps, one document per ISO week —
+// the doc id IS the week key ("2026-W30"), so saving the same week twice
+// updates that week instead of piling up duplicates.
+//
+// Deliberately separate from /notes: notes are rendered in the investor
+// portal, whereas recaps are internal (admin + the portfolio's analysts only,
+// enforced in firestore.rules) and never reach investors.
+
+export interface MeetingRecapAction {
+  text: string
+  /** Free-text owner; empty when unassigned. */
+  assignee: string
+  done: boolean
+}
+
+export interface MeetingRecap {
+  /** Doc id = ISO week key, e.g. "2026-W30". */
+  id: string
+  /** Monday of the week (YYYY-MM-DD) — kept for range queries and sorting. */
+  weekStart: string
+  /** Periods compared during the meeting (YYYY-MM); empty when not reviewed. */
+  periodA: string
+  periodB: string
+  weeklyUpdate: string
+  notes: string[]
+  actions: MeetingRecapAction[]
+  /** Rendered notulen — what the analyst reads back and copies. */
+  summary: string
+  createdBy: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
 // ─── Milestones & Covenants (Phase 4, per-portfolio governance) ───────────
 //
 // Subcollections /portfolios/{id}/milestones and /portfolios/{id}/covenants.

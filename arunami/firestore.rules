@@ -141,6 +141,15 @@ service cloud.firestore {
         allow write: if canWritePortfolio(portfolioId);
       }
 
+      // Weekly meeting recaps from Mode Rapat — INTERNAL ONLY.
+      // Narrower than /notes on purpose: only admin + the portfolio's own
+      // analysts. Investors and Investor Relations get no read at all, so a
+      // recap can never surface in the investor portal.
+      match /meetingRecaps/{weekKey} {
+        allow read, list: if canWritePortfolio(portfolioId);
+        allow write: if canWritePortfolio(portfolioId);
+      }
+
       // Milestones & Covenants — BA-PM CRUD, investors read-only
       match /milestones/{milestoneId} {
         allow read: if canReadPortfolio(portfolioId);

@@ -17,7 +17,7 @@ import type {
   InvestorTransferProof, InvestorNotification, BagiHasilManualEntry,
   AdminOverrideScope, AdminOverrideLog,
   HealthRules, HealthLevel,
-  Milestone, Covenant,
+  MeetingRecap, Milestone, Covenant,
   KycDocument, KycStatus, InvestorType, KycDocSlot,
   Announcement, LibraryDocument, DocumentCategory,
   SystemSettings, DistributionBatch, DistributionBatchLine, BatchStatus,
@@ -426,6 +426,39 @@ export async function saveNote(portfolioId: string, note: Omit<Note, 'id' | 'cre
 
 export async function deleteNote(portfolioId: string, id: string) {
   await deleteDoc(doc(db, 'portfolios', portfolioId, 'notes', id))
+}
+
+// ─── Meeting Recaps (internal, one per ISO week) ──────────────────────────
+
+/** Weekly recaps for a portfolio, newest week first. Staff-only by rule. */
+export async function getMeetingRecaps(portfolioId: string): Promise<MeetingRecap[]> {
+  const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'meetingRecaps'))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }) as MeetingRecap)
+    .sort((a, b) => b.id.localeCompare(a.id))
+}
+
+/**
+ * Upsert the recap of one ISO week. `weekKey` doubles as the doc id, so a
+ * re-save replaces that week's recap; `createdAt` survives the overwrite.
+ */
+export async function saveMeetingRecap(
+  portfolioId: string,
+  weekKey: string,
+  data: Omit<MeetingRecap, 'id' | 'createdAt' | 'updatedAt'>,
+) {
+  const ref = doc(db, 'portfolios', portfolioId, 'meetingRecaps', weekKey)
+  const existing = await getDoc(ref)
+  await setDoc(ref, {
+    ...data,
+    createdAt: existing.exists() ? existing.data().createdAt : serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return weekKey
+}
+
+export async function deleteMeetingRecap(portfolioId: string, weekKey: string) {
+  await deleteDoc(doc(db, 'portfolios', portfolioId, 'meetingRecaps', weekKey))
 }
 
 // ─── Milestones (per-portfolio governance) ────────────────────────────────
