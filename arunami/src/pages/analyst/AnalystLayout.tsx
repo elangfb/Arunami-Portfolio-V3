@@ -8,7 +8,7 @@ import { ResponsiveSidebarShell } from '@/components/layout/ResponsiveSidebarShe
 import { BrandMark } from '@/components/BrandMark'
 import {
   LayoutDashboard, Briefcase, LogOut, Table2, BarChart3,
-  FileClock, Mail, StickyNote, Presentation,
+  FileClock, Mail, StickyNote, Presentation, CalendarDays,
 } from 'lucide-react'
 
 export default function AnalystLayout() {
@@ -24,6 +24,7 @@ export default function AnalystLayout() {
     { to: '/analyst/engagement', label: 'Engagement', icon: Mail },
     { to: '/analyst/notes', label: 'Catatan Global', icon: StickyNote },
     { to: '/analyst/meeting', label: 'Mode Rapat', icon: Presentation },
+    { to: '/analyst/recaps', label: 'Recap Rapat', icon: CalendarDays },
   ]
 
   const handleLogout = async () => {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getAnalystPortfolios, getFinancialData, getPortfolioConfigOrDefault, getConfigTimeline, saveNote,
-  getMeetingRecaps, saveMeetingRecap, deleteMeetingRecap,
+  getMeetingRecaps, saveMeetingRecap, deleteMeetingRecap, firestoreErrorMessage,
 } from '@/lib/firestore'
 import { computePortfolioMetric, type PortfolioMetric } from '@/lib/analystMetrics'
 import { useAuthStore } from '@/store/authStore'
@@ -13,6 +13,7 @@ import {
 } from '@/lib/dateUtils'
 import { brandOf } from '@/lib/portfolioName'
 import { HealthBadge } from '@/components/shared/HealthBadge'
+import { MeetingRecapCard } from '@/components/shared/MeetingRecapCard'
 import { HEALTH_LABELS, healthFreshness } from '@/lib/health'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,7 +27,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import {
   Presentation, X, Check, Circle, ArrowRight, Plus, Trash2, Copy, Save,
   DollarSign, TrendingUp, Wallet, Percent, ListChecks, ArrowUp, ArrowDown,
-  Lock, CalendarDays, ChevronDown, ChevronRight, Share2,
+  Lock, CalendarDays, Share2,
 } from 'lucide-react'
 import type { Portfolio, FinancialData, PortfolioConfig, MeetingRecap } from '@/types'
 
@@ -117,7 +118,10 @@ export default function MeetingMode() {
     if (!portfolioId) { setRecaps([]); return }
     setLoadingRecaps(true)
     try { setRecaps(await getMeetingRecaps(portfolioId)) }
-    catch { toast.error('Gagal memuat recap rapat') }
+    catch (err) {
+      console.error('getMeetingRecaps', err)
+      toast.error(firestoreErrorMessage(err, 'Gagal memuat recap rapat'))
+    }
     finally { setLoadingRecaps(false) }
   }, [portfolioId])
 
@@ -203,7 +207,8 @@ export default function MeetingMode() {
       toast.success(`Recap ${formatWeekLabel(weekKey)} tersimpan (internal)`)
       await refreshRecaps()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan recap')
+      console.error('saveMeetingRecap', err)
+      toast.error(firestoreErrorMessage(err, 'Gagal menyimpan recap'))
     } finally {
       setSavingRecap(false)
     }
@@ -216,7 +221,8 @@ export default function MeetingMode() {
       toast.success('Recap dihapus')
       await refreshRecaps()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal menghapus recap')
+      console.error('deleteMeetingRecap', err)
+      toast.error(firestoreErrorMessage(err, 'Gagal menghapus recap'))
     }
   }
 
@@ -526,17 +532,6 @@ function RecapSection({
   openRecap: string | null; setOpenRecap: (id: string | null) => void
   removeRecap: (id: string) => void
 }) {
-  const stamp = (ts: MeetingRecap['updatedAt']) => ts
-    ? new Date(ts.seconds * 1000).toLocaleString('id-ID', {
-        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
-    : '—'
-
-  const copyRecap = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); toast.success('Recap disalin') }
-    catch { toast.error('Gagal menyalin') }
-  }
-
   return (
     <section className="space-y-4">
       <SectionTitle>Recap Rapat</SectionTitle>
@@ -555,51 +550,15 @@ function RecapSection({
         </div>
       ) : (
         <div className="space-y-2">
-          {recaps.map(r => {
-            const open = openRecap === r.id
-            const pending = r.actions?.filter(a => !a.done).length ?? 0
-            return (
-              <Card key={r.id} className="overflow-hidden">
-                <div className="flex items-center gap-2 p-3">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setOpenRecap(open ? null : r.id)}
-                    className="flex h-auto min-w-0 flex-1 items-center justify-start gap-2 px-1 py-1 text-left"
-                  >
-                    {open ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{formatWeekLabel(r.id)}</span>
-                      <span className="block text-xs font-normal text-muted-foreground">
-                        Diperbarui {stamp(r.updatedAt)}
-                        {pending > 0 && ` · ${pending} action item terbuka`}
-                      </span>
-                    </span>
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => copyRecap(r.summary)} className="h-8 w-8 shrink-0 text-muted-foreground">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => removeRecap(r.id)} className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                {open && (
-                  <CardContent className="space-y-3 border-t bg-muted/20 pt-4">
-                    <pre className="whitespace-pre-wrap text-sm">{r.summary}</pre>
-                    {r.actions?.length > 0 && (
-                      <div className="space-y-1 border-t pt-3">
-                        <Label className="flex items-center gap-1.5 text-xs font-medium"><ListChecks className="h-3.5 w-3.5" />Action Items</Label>
-                        {r.actions.map((a, i) => (
-                          <p key={i} className={`text-sm ${a.done ? 'text-muted-foreground line-through' : ''}`}>
-                            {a.done ? '✓' : '○'} {a.text}{a.assignee && <span className="text-xs text-muted-foreground"> @{a.assignee}</span>}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-            )
-          })}
+          {recaps.map(r => (
+            <MeetingRecapCard
+              key={r.id}
+              recap={r}
+              open={openRecap === r.id}
+              onToggle={() => setOpenRecap(openRecap === r.id ? null : r.id)}
+              onDelete={() => removeRecap(r.id)}
+            />
+          ))}
         </div>
       )}
     </section>

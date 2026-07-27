@@ -430,6 +430,19 @@ export async function deleteNote(portfolioId: string, id: string) {
 
 // ─── Meeting Recaps (internal, one per ISO week) ──────────────────────────
 
+/**
+ * Human-readable message for a failed Firestore call. A rules rejection is
+ * called out by name — it is silent in the console once caught, and the usual
+ * cause is a rules change that has not been deployed yet.
+ */
+export function firestoreErrorMessage(err: unknown, fallback: string): string {
+  const code = (err as { code?: string } | null)?.code
+  if (code === 'permission-denied') {
+    return `${fallback}: akses ditolak aturan Firestore (jalankan "firebase deploy --only firestore:rules").`
+  }
+  return err instanceof Error ? `${fallback}: ${err.message}` : fallback
+}
+
 /** Weekly recaps for a portfolio, newest week first. Staff-only by rule. */
 export async function getMeetingRecaps(portfolioId: string): Promise<MeetingRecap[]> {
   const snap = await getDocs(collection(db, 'portfolios', portfolioId, 'meetingRecaps'))

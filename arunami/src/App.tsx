@@ -35,6 +35,7 @@ import AnalystOverview from '@/pages/analyst/AnalystOverview'
 import AnalystMonthly from '@/pages/analyst/AnalystMonthly'
 import AnalystBenchmarking from '@/pages/analyst/AnalystBenchmarking'
 import MeetingMode from '@/pages/analyst/MeetingMode'
+import MeetingRecaps from '@/pages/analyst/MeetingRecaps'
 import AnalystEngagement from '@/pages/analyst/AnalystEngagement'
 import AnalystNotes from '@/pages/analyst/AnalystNotes'
 import AnalystPortfolioLayout from '@/pages/analyst/portfolio/AnalystPortfolioLayout'
@@ -142,6 +143,7 @@ export default function App() {
             <Route path="renewals" element={<AnalystRenewals />} />
             <Route path="engagement" element={<AnalystEngagement />} />
             <Route path="notes" element={<AnalystNotes />} />
+            <Route path="recaps" element={<MeetingRecaps />} />
           </Route>
 
           {/* Full-screen presentation mode — no sidebar rail */}
