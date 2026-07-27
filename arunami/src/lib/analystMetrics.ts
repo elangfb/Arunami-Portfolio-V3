@@ -7,6 +7,12 @@ import { getFinancialData, getPortfolioConfigOrDefault, getConfigTimeline } from
 // distribution engine with a "whole portfolio" allocation (100% ownership on the
 // total investment) so a portfolio-level yield falls straight out of the same
 // per-investor math used everywhere else.
+//
+// Analyst views report bagi hasil GROSS — the investor pool's full share of the
+// split, before the Arunami fee. That is the figure that reconciles with the
+// configured percentage: a 50% split on a 30.739.009 net profit reads
+// 15.369.504, not the 13.832.554 an investor nets after a 10% fee. The investor
+// pages deliberately differ; they report actual payouts, which are net.
 
 export interface MonthlyMetricRow {
   portfolioId: string
@@ -14,6 +20,7 @@ export interface MonthlyMetricRow {
   month: string
   revenue: number
   netProfit: number
+  /** Gross of the Arunami fee — see the note at the top of this file. */
   bagiHasil: number
   monthlyYield: number
   annualizedYield: number
@@ -25,6 +32,7 @@ export interface PortfolioMetric {
   latestPeriod?: string
   revenue: number
   netProfit: number
+  /** Gross of the Arunami fee — see the note at the top of this file. */
   bagiHasil: number
   monthlyYield: number
   annualizedYield: number
@@ -63,6 +71,7 @@ export function computePortfolioMetric(
   if (!financialData || !config) return empty
 
   const alloc = wholePortfolioAllocation(portfolio)
+  const invested = alloc.investedAmount
   const returnsPrincipal = config.returnsPrincipal !== false // default true unless explicitly off
   const adjFactor = returnsPrincipal ? 1 : 0.8
 
@@ -79,16 +88,23 @@ export function computePortfolioMetric(
       allocation: alloc,
       portfolio,
     })
+    // Gross basis: result.roiPercent/annualRoiPercent are derived from the
+    // post-fee amount, so re-derive both from the gross share instead of
+    // reusing them. One profitData row is one month, matching the strategy's
+    // own annualisation when monthsInPeriod is left at its default of 1.
+    const gross = result.grossInvestorAmount
+    const monthlyYield = invested > 0 ? (gross / invested) * 100 : 0
+    const annualizedYield = monthlyYield * 12
     monthly.push({
       portfolioId: portfolio.id,
       brandName: portfolio.brandName || portfolio.name,
       month: p.month,
       revenue,
       netProfit: p.aktual,
-      bagiHasil: result.perInvestorAmount,
-      monthlyYield: result.roiPercent,
-      annualizedYield: result.annualRoiPercent,
-      adjustedAnnualizedYield: result.annualRoiPercent * adjFactor,
+      bagiHasil: gross,
+      monthlyYield,
+      annualizedYield,
+      adjustedAnnualizedYield: annualizedYield * adjFactor,
     })
   }
 
