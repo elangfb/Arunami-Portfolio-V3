@@ -4,7 +4,9 @@ import { toast } from 'sonner'
 import {
   getUser, getAllocationsForInvestor, getPortfolioConfigOrDefault, getConfigTimeline,
   getFinancialData, getCommunicationsForInvestor, getPortfolio, getPublishedInvestorReports,
+  getEquityHistoryForPortfolios,
 } from '@/lib/firestore'
+import { staleReportMap } from '@/lib/reportStaleness'
 import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
 import { resolveInvestorConfigForPeriod } from '@/lib/configTimeline'
 import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
@@ -23,6 +25,7 @@ import InvestorReportHistory from './components/InvestorReportHistory'
 import type {
   AppUser, InvestorAllocation, FinancialData as FinancialDataType,
   PortfolioConfig, InvestorCommunication, Portfolio, InvestorReportDoc,
+  EquityChangeEntry,
 } from '@/types'
 
 interface PortfolioEnriched {
@@ -54,6 +57,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
   const [portfolios, setPortfolios] = useState<PortfolioEnriched[]>([])
   const [communications, setCommunications] = useState<InvestorCommunication[]>([])
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
+  const [changesByPortfolio, setChangesByPortfolio] = useState<Record<string, EquityChangeEntry[]>>({})
   const [loading, setLoading] = useState(true)
 
   // Report dialog
@@ -167,6 +171,12 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
     )
 
     setPortfolios(enriched)
+    // Accumulated and all-time reports span every portfolio the investor holds,
+    // so a backdated correction on any one of them can invalidate the combined
+    // report — collect all the change trails, not just this portfolio's.
+    setChangesByPortfolio(
+      await getEquityHistoryForPortfolios(allocations.map(a => a.portfolioId)),
+    )
     setLoading(false)
   }
 
@@ -175,6 +185,11 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
   const resolveBrand = useMemo(
     () => makeBrandResolver(portfolios.map(p => p.portfolio).filter((x): x is Portfolio => !!x)),
     [portfolios],
+  )
+
+  const staleness = useMemo(
+    () => staleReportMap(reports, changesByPortfolio),
+    [reports, changesByPortfolio],
   )
 
   const totalInvested = portfolios.reduce((s, p) => s + p.allocation.investedAmount, 0)
@@ -382,7 +397,14 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
       </Card>
 
       {/* Report History */}
-      {showReporting && <InvestorReportHistory reports={reports} resolveBrand={resolveBrand} onChanged={loadData} />}
+      {showReporting && (
+        <InvestorReportHistory
+          reports={reports}
+          resolveBrand={resolveBrand}
+          staleness={staleness}
+          onChanged={loadData}
+        />
+      )}
 
       {/* Communication History */}
       <Card>

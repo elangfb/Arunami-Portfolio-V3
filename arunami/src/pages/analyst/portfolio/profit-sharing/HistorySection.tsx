@@ -11,6 +11,19 @@ function formatDate(seconds?: number): string {
   return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/**
+ * True when the change took effect before the month it was recorded in — i.e.
+ * it restated periods that had already closed. Worth calling out in the trail:
+ * it's the one kind of row that can explain why an old report's numbers moved.
+ */
+function isBackdated(row: EquityChangeEntry): boolean {
+  const seconds = row.changedAt?.seconds
+  if (!seconds || !row.effectiveFromPeriod) return false
+  const d = new Date(seconds * 1000)
+  const changedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return row.effectiveFromPeriod < changedMonth
+}
+
 const KIND_LABEL: Record<ConfigChangeKind, string> = {
   investor_share: 'Investor Share',
   arunami_fee: 'Arunami Fee',
@@ -80,6 +93,11 @@ export default function HistorySection({ history }: { history: EquityChangeEntry
                       </TableCell>
                       <TableCell className="py-3 pr-3 whitespace-nowrap">
                         {row.effectiveFromPeriod ? formatPeriod(row.effectiveFromPeriod) : '-'}
+                        {isBackdated(row) && (
+                          <Badge variant="outline" className="ml-2 border-red-500/50 bg-red-50 text-red-700">
+                            Lampau
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="py-3 pr-3">
                         <div className="text-black">{row.reasonNote || '-'}</div>

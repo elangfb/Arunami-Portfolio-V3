@@ -29,6 +29,15 @@ export function isQuarterPeriod(period: string): boolean {
   return /^\d{4}-Q[1-4]$/.test(period)
 }
 
+/**
+ * True for a real reporting-period key — "2026-04" or "2026-Q2". Filters out the
+ * ALL_TIME sentinel and unparseable legacy period strings before they reach
+ * {@link comparePeriods}, which would otherwise order them arbitrarily.
+ */
+export function isReportingPeriodKey(period: string | null | undefined): period is string {
+  return !!period && /^\d{4}-(\d{2}|Q[1-4])$/.test(period)
+}
+
 /** "2026-Q1" → ["2026-01", "2026-02", "2026-03"] */
 export function quarterToMonths(period: string): string[] {
   const match = period.match(/^(\d{4})-Q([1-4])$/)
@@ -165,9 +174,7 @@ const FREQUENCY_STEP_MONTHS: Record<'bulanan' | 'kuartalan' | 'semesteran', numb
 
 /**
  * The next `count` reporting periods (YYYY-MM), starting at
- * {@link getNextReportingPeriod}. Backs the "Berlaku Mulai Periode" picker in
- * Profit Sharing: a config change may only take effect from a future period,
- * so reports already issued can never be restated.
+ * {@link getNextReportingPeriod}.
  */
 export function listUpcomingReportingPeriods(
   frequency: 'bulanan' | 'kuartalan' | 'semesteran',
@@ -177,6 +184,49 @@ export function listUpcomingReportingPeriods(
   const first = getNextReportingPeriod(frequency, from)
   const step = FREQUENCY_STEP_MONTHS[frequency]
   return Array.from({ length: Math.max(1, count) }, (_, i) => addMonthOffset(first, i * step))
+}
+
+/** How many months back the picker will walk, whatever `earliestPeriod` says. */
+const MAX_BACKDATE_MONTHS = 240
+
+/**
+ * Every reporting period from the one covering `earliestPeriod` through the next
+ * `forwardCount` upcoming ones — ascending, and aligned to the frequency's own
+ * grid (quarterly lands on Jan/Apr/Jul/Okt, semesterly on Jan/Jul).
+ *
+ * Backs the "Berlaku Mulai Periode" picker in Profit Sharing. Past periods are
+ * offered so an analyst can correct terms that were wrong from the portfolio's
+ * very first month; the picker deliberately doesn't decide what is safe to
+ * restate — the dialog warns about the published reports a backdated change
+ * would invalidate, and `recordConfigChange` flags them.
+ *
+ * Pass a falsy or malformed `earliestPeriod` to get the upcoming periods only.
+ */
+export function listReportingPeriodsFrom(
+  frequency: 'bulanan' | 'kuartalan' | 'semesteran',
+  earliestPeriod: string | null | undefined,
+  forwardCount = 12,
+  from: Date = new Date(),
+): string[] {
+  const next = getNextReportingPeriod(frequency, from)
+  const step = FREQUENCY_STEP_MONTHS[frequency]
+  const forward = Array.from(
+    { length: Math.max(1, forwardCount) },
+    (_, i) => addMonthOffset(next, i * step),
+  )
+  if (!earliestPeriod || !/^\d{4}-\d{2}$/.test(earliestPeriod)) return forward
+
+  // Walk back on the grid, keeping a period whose coverage window still reaches
+  // `earliestPeriod` — so a quarterly portfolio whose first month is February
+  // can still be corrected from the January quarter that contains it.
+  const past: string[] = []
+  let cursor = addMonthOffset(next, -step)
+  for (let i = 0; i < MAX_BACKDATE_MONTHS / step; i++) {
+    if (addMonthOffset(cursor, step) <= earliestPeriod) break
+    past.unshift(cursor)
+    cursor = addMonthOffset(cursor, -step)
+  }
+  return [...past, ...forward]
 }
 
 // ─── Relative Time ──────────────────────────────────────────────────────

@@ -13,8 +13,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { formatPeriod, listUpcomingReportingPeriods } from '@/lib/dateUtils'
-import { getPortfolioConfig, recordConfigChange } from '@/lib/firestore'
+import {
+  formatPeriod, listReportingPeriodsFrom, getNextReportingPeriod,
+  normalizePeriod, isReportingPeriodKey,
+} from '@/lib/dateUtils'
+import {
+  getPortfolioConfig, recordConfigChange, getReports, getManagementReports,
+  getAllInvestorReportsForPortfolio,
+} from '@/lib/firestore'
+import { backdateImpact } from '@/lib/reportStaleness'
+import BackdateNotice from './BackdateNotice'
 import { ModelPicker } from '@/pages/admin/setup/StepInvestorModel'
 import {
   buildInvestorConfig,
@@ -22,7 +30,7 @@ import {
 } from '@/pages/admin/setup/PortfolioSetupWizard'
 import type {
   PortfolioConfig, ReturnModelType, ReportingFrequency,
-  InvestorConfigUnion,
+  InvestorConfigUnion, InvestorReportDoc,
 } from '@/types'
 import type { SectionUser } from './types'
 
@@ -114,6 +122,10 @@ export default function ChangeReturnModelDialog({
   const [currentConfig, setCurrentConfig] = useState<PortfolioConfig | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [effectiveFrom, setEffectiveFrom] = useState('')
+  const [acknowledged, setAcknowledged] = useState(false)
+  const [earliestPeriod, setEarliestPeriod] = useState<string | null>(null)
+  const [investorReports, setInvestorReports] = useState<InvestorReportDoc[]>([])
+  const [reportsLoading, setReportsLoading] = useState(false)
 
   const form = useForm<DialogFormData>({
     resolver: zodResolver(dialogSchema) as never,
@@ -130,9 +142,35 @@ export default function ChangeReturnModelDialog({
     mode: 'onBlur',
   })
 
+  // How far back the picker reaches, and what a backdate would invalidate.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setReportsLoading(true)
+    Promise.all([
+      getReports(portfolioId, 'pnl'),
+      getReports(portfolioId, 'projection'),
+      getManagementReports(portfolioId),
+      getAllInvestorReportsForPortfolio(portfolioId),
+    ]).then(([pnls, projs, mgmts, reports]) => {
+      if (cancelled) return
+      const months = [...pnls, ...projs, ...mgmts]
+        .map(r => normalizePeriod(r.period ?? ''))
+        .filter(p => isReportingPeriodKey(p) && /^\d{4}-\d{2}$/.test(p))
+        .sort()
+      setEarliestPeriod(months[0] ?? null)
+      setInvestorReports(reports)
+    }).catch(err => {
+      console.error(err)
+      if (!cancelled) { setEarliestPeriod(null); setInvestorReports([]) }
+    }).finally(() => { if (!cancelled) setReportsLoading(false) })
+    return () => { cancelled = true }
+  }, [open, portfolioId])
+
   useEffect(() => {
     if (!open) return
     setReasonText('')
+    setAcknowledged(false)
     form.reset({
       returnModel: 'net_profit_share',
       investorSharePercent: 70,
@@ -154,18 +192,24 @@ export default function ChangeReturnModelDialog({
       .finally(() => setLoadingConfig(false))
   }, [open, portfolioId, form])
 
-  // Only future periods: switching models must never restate an issued report.
-  const periodOptions = useMemo(
-    () => currentConfig
-      ? listUpcomingReportingPeriods(currentConfig.reportingFrequency, 12)
-      : [],
+  const nextPeriod = useMemo(
+    () => currentConfig ? getNextReportingPeriod(currentConfig.reportingFrequency) : '',
     [currentConfig],
   )
 
-  // Default to the earliest selectable period once the config lands.
+  // Past periods are offered so a model recorded wrongly at setup can be fixed
+  // from the start; BackdateNotice spells out what that restates.
+  const periodOptions = useMemo(
+    () => currentConfig
+      ? listReportingPeriodsFrom(currentConfig.reportingFrequency, earliestPeriod, 12)
+      : [],
+    [currentConfig, earliestPeriod],
+  )
+
+  // Default to the next period, never to a backdate.
   useEffect(() => {
-    setEffectiveFrom(periodOptions[0] ?? '')
-  }, [periodOptions])
+    setEffectiveFrom(periodOptions.find(p => p >= nextPeriod) ?? nextPeriod)
+  }, [periodOptions, nextPeriod])
 
   const selectedModel = form.watch('returnModel')
   const normalizedCurrent: ReturnModelType | null = currentConfig
@@ -210,7 +254,12 @@ export default function ChangeReturnModelDialog({
         changedByName: currentUser.displayName,
       })
 
-      toast.success('Model distribusi berhasil diubah')
+      const affected = backdateImpact(investorReports, effectiveFrom).reportCount
+      toast.success(
+        affected > 0
+          ? `Model distribusi diubah. ${affected} laporan investor perlu terbit ulang.`
+          : 'Model distribusi berhasil diubah',
+      )
       await onSaved()
       onOpenChange(false)
     } catch (err) {
@@ -222,8 +271,10 @@ export default function ChangeReturnModelDialog({
   }
 
   const reasonValid = reasonText.trim().length > 0
+  const isBackdated = !!effectiveFrom && !!nextPeriod && effectiveFrom < nextPeriod
   const saveEnabled =
-    modelChanged && reasonValid && !!effectiveFrom && !saving && !!currentUser && !!currentConfig
+    modelChanged && reasonValid && !!effectiveFrom && !saving && !!currentUser
+    && !!currentConfig && (!isBackdated || acknowledged)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -264,15 +315,27 @@ export default function ChangeReturnModelDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {periodOptions.map(p => (
-                      <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
+                      <SelectItem key={p} value={p}>
+                        {formatPeriod(p)}
+                        {p < nextPeriod ? ' — lampau' : ''}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Hanya periode mendatang. Laporan periode sebelumnya tetap memakai
-                  model lama.
+                  Periode sebelum {formatPeriod(nextPeriod)} akan menghitung ulang
+                  laporan yang sudah lewat. Pilih hanya bila model lama memang salah.
                 </p>
               </div>
+
+              <BackdateNotice
+                effectiveFrom={effectiveFrom}
+                nextPeriod={nextPeriod}
+                reports={investorReports}
+                loading={reportsLoading}
+                acknowledged={acknowledged}
+                onAcknowledgedChange={setAcknowledged}
+              />
 
               <div className="space-y-1">
                 <Label className="text-xs text-black">Alasan Perubahan *</Label>

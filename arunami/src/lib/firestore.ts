@@ -25,7 +25,7 @@ import type {
 import { ACCUMULATED_PORTFOLIO_ID, ALL_TIME_PERIOD } from '@/types'
 import { normalizePeriod, comparePeriods } from '@/lib/dateUtils'
 import { DEFAULT_HEALTH_RULES } from '@/lib/health'
-import { buildConfigTimeline, type ConfigVersion } from '@/lib/configTimeline'
+import { buildConfigTimeline, resolveConfigForPeriod, type ConfigVersion } from '@/lib/configTimeline'
 
 // ─── Users ────────────────────────────────────────────────────────────────
 
@@ -247,10 +247,25 @@ export async function getConfigTimeline(portfolioId: string): Promise<ConfigVers
 }
 
 /**
- * Generic config change recorder. Merges the new investorConfig into the
- * portfolio config and appends an audit row to equityHistory, all in one
- * batch. Use for any change to the per-model return config (yield %, revenue
- * share %, scheduled payments, dividends, custom formula, etc).
+ * Generic config change recorder. Appends an audit row to equityHistory and —
+ * when the change governs the newest terms — merges the new investorConfig into
+ * `config/current`. Use for any change to the per-model return config (yield %,
+ * revenue share %, scheduled payments, dividends, custom formula, etc).
+ *
+ * `effectiveFromPeriod` may be in the past. Backdating is what makes the two
+ * reads below necessary, because neither the "from" snapshot nor `config/current`
+ * can be taken from the live config any more:
+ *
+ *  - The snapshot must be the config that was in force *at that period*. Writing
+ *    today's config as `fromInvestorConfig` on a row that lands earliest in the
+ *    trail would make it the timeline's baseline, silently restating every
+ *    period before it — the opposite of what backdating one period should do.
+ *  - `config/current` must stay whatever the latest-effective change set. A
+ *    correction backdated to January cannot clobber terms that already took
+ *    effect in May.
+ *
+ * Published reports the change invalidates are not touched here at all — that
+ * staleness is derived on read, see `src/lib/reportStaleness.ts`.
  */
 export async function recordConfigChange(params: {
   portfolioId: string
@@ -271,14 +286,31 @@ export async function recordConfigChange(params: {
     changedByUid, changedByName, newReturnModel,
   } = params
 
+  const history = await getEquityHistory(portfolioId)
+  const priorConfig = resolveConfigForPeriod(
+    currentConfig, buildConfigTimeline(history), effectiveFromPeriod,
+  )
+  // No recorded change takes effect later than this one → it sets the live terms.
+  const latestRecorded = history.reduce(
+    (max, h) => (h.effectiveFromPeriod ?? '') > max ? h.effectiveFromPeriod : max,
+    '',
+  )
+  const governsLatestTerms = effectiveFromPeriod >= latestRecorded
+
   const batch = writeBatch(db)
   const configRef = doc(db, 'portfolios', portfolioId, 'config', 'current')
-  const mergedConfig: PortfolioConfig = {
-    ...currentConfig,
-    investorConfig: newInvestorConfig,
-    ...(newReturnModel ? { returnModel: newReturnModel } : {}),
+  if (governsLatestTerms) {
+    const mergedConfig: PortfolioConfig = {
+      ...currentConfig,
+      investorConfig: newInvestorConfig,
+      ...(newReturnModel ? { returnModel: newReturnModel } : {}),
+    }
+    batch.set(configRef, mergedConfig, { merge: true })
+  } else {
+    // A later change already owns investorConfig/returnModel. reportingFrequency
+    // isn't period-versioned, so carry only that across.
+    batch.set(configRef, { reportingFrequency: currentConfig.reportingFrequency }, { merge: true })
   }
-  batch.set(configRef, mergedConfig, { merge: true })
 
   const historyRef = doc(collection(db, 'portfolios', portfolioId, 'equityHistory'))
   const entry: Omit<EquityChangeEntry, 'id' | 'changedAt'> & {
@@ -287,9 +319,9 @@ export async function recordConfigChange(params: {
     changedAt: serverTimestamp(),
     changedByUid,
     changedByName,
-    fromInvestorPercent: currentConfig.investorConfig.investorSharePercent,
+    fromInvestorPercent: priorConfig.investorConfig.investorSharePercent,
     toInvestorPercent: newInvestorConfig.investorSharePercent,
-    fromArunamiPercent: currentConfig.investorConfig.arunamiFeePercent,
+    fromArunamiPercent: priorConfig.investorConfig.arunamiFeePercent,
     toArunamiPercent: newInvestorConfig.arunamiFeePercent,
     reasonCategory: 'other',
     effectiveFromPeriod,
@@ -298,15 +330,28 @@ export async function recordConfigChange(params: {
     toValue,
     // Before/after snapshots — these make the trail replayable, so reports for
     // periods before `effectiveFromPeriod` keep using the old terms.
-    fromInvestorConfig: currentConfig.investorConfig,
+    fromInvestorConfig: priorConfig.investorConfig,
     toInvestorConfig: newInvestorConfig,
-    fromReturnModel: currentConfig.returnModel,
+    fromReturnModel: priorConfig.returnModel,
     toReturnModel: newReturnModel ?? currentConfig.returnModel,
     ...(reasonNote && reasonNote.trim() ? { reasonNote: reasonNote.trim() } : {}),
   }
   batch.set(historyRef, entry)
 
   await batch.commit()
+}
+
+/**
+ * `equityHistory` for several portfolios at once, keyed by portfolio id. Feeds
+ * `staleReportMap` on the pages that show accumulated and all-time reports,
+ * which span every portfolio an investor holds.
+ */
+export async function getEquityHistoryForPortfolios(
+  portfolioIds: string[],
+): Promise<Record<string, EquityChangeEntry[]>> {
+  const unique = [...new Set(portfolioIds)].filter(Boolean)
+  const histories = await Promise.all(unique.map(id => getEquityHistory(id)))
+  return Object.fromEntries(unique.map((id, i) => [id, histories[i]]))
 }
 
 // ─── Financial Data ───────────────────────────────────────────────────────

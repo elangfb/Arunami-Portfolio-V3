@@ -23,7 +23,7 @@ function formatDate(t?: Timestamp): string {
 }
 
 export default function AnnualDividendSection({
-  config, investorConfig, portfolioId, currentUser, nextPeriod, onChanged,
+  config, investorConfig, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
 }: SectionProps<AnnualDividendConfig>) {
   const [open, setOpen] = useState(false)
   const history = investorConfig.dividendHistory ?? []
@@ -111,6 +111,7 @@ export default function AnnualDividendSection({
         currentUser={currentUser}
         currentConfig={config}
         nextPeriod={nextPeriod}
+        earliestPeriod={earliestPeriod}
         canSave={canSave}
         buildDraft={() => {
           if (!currentUser) return null

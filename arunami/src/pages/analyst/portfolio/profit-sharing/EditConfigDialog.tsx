@@ -10,12 +10,14 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { AlertTriangle } from 'lucide-react'
-import { formatPeriod, listUpcomingReportingPeriods } from '@/lib/dateUtils'
-import { recordConfigChange } from '@/lib/firestore'
+import { formatPeriod, listReportingPeriodsFrom } from '@/lib/dateUtils'
+import { recordConfigChange, getAllInvestorReportsForPortfolio } from '@/lib/firestore'
+import { backdateImpact } from '@/lib/reportStaleness'
 import type {
-  PortfolioConfig, InvestorConfigUnion, ConfigChangeKind,
+  PortfolioConfig, InvestorConfigUnion, ConfigChangeKind, InvestorReportDoc,
 } from '@/types'
 import type { SectionUser } from './types'
+import BackdateNotice from './BackdateNotice'
 
 interface Props {
   open: boolean
@@ -32,6 +34,11 @@ interface Props {
   } | null
   canSave: boolean
   nextPeriod: string
+  /**
+   * The portfolio's first month with data (YYYY-MM). Bounds how far back the
+   * effective-period picker reaches; omit to offer upcoming periods only.
+   */
+  earliestPeriod?: string | null
   reasonRequired?: boolean
   onSaved: () => Promise<void> | void
   children: React.ReactNode
@@ -39,28 +46,55 @@ interface Props {
 
 export default function EditConfigDialog({
   open, onOpenChange, title, portfolioId, currentUser, currentConfig,
-  buildDraft, canSave, nextPeriod, reasonRequired = true, onSaved, children,
+  buildDraft, canSave, nextPeriod, earliestPeriod, reasonRequired = true,
+  onSaved, children,
 }: Props) {
   const [reasonText, setReasonText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [acknowledged, setAcknowledged] = useState(false)
+  const [reports, setReports] = useState<InvestorReportDoc[]>([])
+  const [reportsLoading, setReportsLoading] = useState(false)
 
-  // Only future periods are offered: a change may never restate a report that
-  // has already been issued.
+  // Past periods are offered too — see BackdateNotice for what guards them.
   const periodOptions = useMemo(
-    () => listUpcomingReportingPeriods(currentConfig.reportingFrequency, 12),
-    [currentConfig.reportingFrequency],
+    () => listReportingPeriodsFrom(currentConfig.reportingFrequency, earliestPeriod, 12),
+    [currentConfig.reportingFrequency, earliestPeriod],
   )
-  const defaultPeriod = periodOptions[0] ?? nextPeriod
+  // Default to the next period, never to a backdate: correcting history has to
+  // be a deliberate act, not what happens when the analyst leaves it alone.
+  const defaultPeriod = periodOptions.find(p => p >= nextPeriod) ?? nextPeriod
   const [effectiveFrom, setEffectiveFrom] = useState(defaultPeriod)
 
   useEffect(() => {
     if (!open) return
     setReasonText('')
     setEffectiveFrom(defaultPeriod)
+    setAcknowledged(false)
   }, [open, defaultPeriod])
 
+  // Loaded once per open so switching periods re-costs nothing.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setReportsLoading(true)
+    getAllInvestorReportsForPortfolio(portfolioId)
+      .then(r => { if (!cancelled) setReports(r) })
+      .catch(err => {
+        console.error(err)
+        if (!cancelled) setReports([])
+      })
+      .finally(() => { if (!cancelled) setReportsLoading(false) })
+    return () => { cancelled = true }
+  }, [open, portfolioId])
+
+  const isBackdated = !!effectiveFrom && !!nextPeriod && effectiveFrom < nextPeriod
+  const affectedCount = useMemo(
+    () => backdateImpact(reports, effectiveFrom).reportCount,
+    [reports, effectiveFrom],
+  )
   const reasonValid = !reasonRequired || reasonText.trim().length > 0
-  const saveEnabled = canSave && reasonValid && !!effectiveFrom && !saving && !!currentUser
+  const saveEnabled = canSave && reasonValid && !!effectiveFrom && !saving
+    && !!currentUser && (!isBackdated || acknowledged)
 
   const handleSave = async () => {
     if (!saveEnabled || !currentUser) return
@@ -80,7 +114,11 @@ export default function EditConfigDialog({
         changedByUid: currentUser.uid,
         changedByName: currentUser.displayName,
       })
-      toast.success('Perubahan berhasil disimpan')
+      toast.success(
+        affectedCount > 0
+          ? `Perubahan disimpan. ${affectedCount} laporan investor perlu terbit ulang.`
+          : 'Perubahan berhasil disimpan',
+      )
       await onSaved()
       onOpenChange(false)
     } catch (err) {
@@ -108,15 +146,27 @@ export default function EditConfigDialog({
               </SelectTrigger>
               <SelectContent>
                 {periodOptions.map(p => (
-                  <SelectItem key={p} value={p}>{formatPeriod(p)}</SelectItem>
+                  <SelectItem key={p} value={p}>
+                    {formatPeriod(p)}
+                    {p < nextPeriod ? ' — lampau' : ''}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Hanya periode mendatang. Laporan periode sebelumnya tetap memakai
-              ketentuan lama.
+              Periode sebelum {formatPeriod(nextPeriod)} akan menghitung ulang
+              laporan yang sudah lewat. Pilih hanya bila ketentuan lama memang salah.
             </p>
           </div>
+
+          <BackdateNotice
+            effectiveFrom={effectiveFrom}
+            nextPeriod={nextPeriod}
+            reports={reports}
+            loading={reportsLoading}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
+          />
 
           {reasonRequired && (
             <div className="space-y-1">

@@ -3,9 +3,12 @@ import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getPortfolioConfig, getEquityHistory, updatePortfolio,
+  getReports, getManagementReports,
 } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
-import { formatPeriod, getNextReportingPeriod } from '@/lib/dateUtils'
+import {
+  formatPeriod, getNextReportingPeriod, normalizePeriod, isReportingPeriodKey,
+} from '@/lib/dateUtils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -36,16 +39,19 @@ const MODEL_LABEL: Record<ReturnModelType, string> = {
 }
 
 function ModelSection({
-  config, portfolio, portfolioId, currentUser, nextPeriod, onChanged,
+  config, portfolio, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
 }: {
   config: PortfolioConfig
   portfolio: Portfolio | null
   portfolioId: string
   currentUser: { uid: string; displayName: string } | null
   nextPeriod: string
+  earliestPeriod: string | null
   onChanged: () => Promise<void>
 }) {
-  const shared = { config, portfolio, portfolioId, currentUser, nextPeriod, onChanged }
+  const shared = {
+    config, portfolio, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
+  }
   const ic = config.investorConfig
 
   switch (ic.type) {
@@ -135,17 +141,28 @@ export default function ProfitSharingPage() {
   const { user } = useAuthStore()
   const [config, setConfig] = useState<PortfolioConfig | null>(null)
   const [history, setHistory] = useState<EquityChangeEntry[]>([])
+  const [dataPeriods, setDataPeriods] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
     if (!portfolioId) return
     setLoading(true)
-    const [cfg, hist] = await Promise.all([
+    const [cfg, hist, pnls, projs, mgmts] = await Promise.all([
       getPortfolioConfig(portfolioId),
       getEquityHistory(portfolioId),
+      getReports(portfolioId, 'pnl'),
+      getReports(portfolioId, 'projection'),
+      getManagementReports(portfolioId),
     ])
     setConfig(cfg)
     setHistory(hist)
+    // Every period the portfolio holds data for, in any form — during grace
+    // there are no P&L uploads, so management reports are the only signal.
+    setDataPeriods(
+      [...pnls, ...projs, ...mgmts]
+        .map(r => normalizePeriod(r.period ?? ''))
+        .filter(isReportingPeriodKey),
+    )
     setLoading(false)
   }
 
@@ -155,6 +172,19 @@ export default function ProfitSharingPage() {
     () => config ? getNextReportingPeriod(config.reportingFrequency) : null,
     [config],
   )
+
+  /**
+   * How far back a config change may be backdated: the portfolio's first month
+   * with data, falling back to the month its config was created. Null when
+   * neither is known, which leaves the picker showing upcoming periods only.
+   */
+  const earliestPeriod = useMemo(() => {
+    const months = dataPeriods.filter(p => /^\d{4}-\d{2}$/.test(p)).sort()
+    if (months.length > 0) return months[0]
+    const created = config?.createdAt?.toDate?.()
+    if (!created) return null
+    return `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
+  }, [dataPeriods, config])
 
   // A saved change lands in the live config straight away but only governs
   // reports from its effective period on. Without this the card would read
@@ -220,6 +250,7 @@ export default function ProfitSharingPage() {
         portfolioId={portfolioId ?? ''}
         currentUser={currentUser}
         nextPeriod={nextPeriod ?? ''}
+        earliestPeriod={earliestPeriod}
         onChanged={load}
       />
 
@@ -227,13 +258,19 @@ export default function ProfitSharingPage() {
         <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-700" />
         <div className="text-sm text-black font-bold">
           <p>
-            Setiap perubahan berlaku mulai periode yang Anda pilih saat menyimpan —
-            paling awal{' '}
-            <span className="underline">{nextPeriod ? formatPeriod(nextPeriod) : '-'}</span>.
+            Setiap perubahan berlaku mulai periode yang Anda pilih saat menyimpan.
+            Standarnya{' '}
+            <span className="underline">{nextPeriod ? formatPeriod(nextPeriod) : '-'}</span>,
+            dan periode sebelumnya tetap memakai ketentuan yang berlaku saat itu.
           </p>
           <p className="mt-1">
-            Data historis dan laporan periode sebelumnya tetap memakai ketentuan
-            yang berlaku saat itu.
+            Bila ketentuan lama memang salah, Anda boleh memilih periode lampau —
+            paling awal{' '}
+            <span className="underline">
+              {earliestPeriod ? formatPeriod(earliestPeriod) : 'periode data pertama'}
+            </span>
+            . Perhitungan sejak periode itu dihitung ulang, dan laporan investor
+            yang sudah terbit ditandai perlu terbit ulang.
           </p>
         </div>
       </div>

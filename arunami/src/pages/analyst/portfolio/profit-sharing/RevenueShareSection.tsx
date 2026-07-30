@@ -10,7 +10,7 @@ import type { SectionProps } from './types'
 import type { RevenueShareConfig } from '@/types'
 
 export default function RevenueShareSection({
-  config, investorConfig, portfolioId, currentUser, nextPeriod, onChanged,
+  config, investorConfig, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
 }: SectionProps<RevenueShareConfig>) {
   const [open, setOpen] = useState(false)
   const sharePct = investorConfig.revenueSharePercent
@@ -52,6 +52,7 @@ export default function RevenueShareSection({
         currentUser={currentUser}
         currentConfig={config}
         nextPeriod={nextPeriod}
+        earliestPeriod={earliestPeriod}
         canSave={canSave}
         buildDraft={() => ({
           newInvestorConfig: { ...investorConfig, revenueSharePercent: newShare },

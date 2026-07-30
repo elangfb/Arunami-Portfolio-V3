@@ -77,7 +77,7 @@ export function buildConfigTimeline(history: EquityChangeEntry[]): ConfigVersion
  * mid-quarter applies from the following quarter rather than restating one
  * already under way.
  */
-function periodAnchorMonth(period: string): string | null {
+export function periodAnchorMonth(period: string): string | null {
   if (isQuarterPeriod(period)) return quarterToMonths(period)[0] ?? null
   return /^\d{4}-\d{2}$/.test(period) ? period : null
 }

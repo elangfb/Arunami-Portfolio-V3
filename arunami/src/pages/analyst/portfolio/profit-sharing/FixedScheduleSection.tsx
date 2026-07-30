@@ -25,7 +25,7 @@ function summarize(payments: ScheduledPayment[]): string {
 }
 
 export default function FixedScheduleSection({
-  config, investorConfig, portfolioId, currentUser, nextPeriod, onChanged,
+  config, investorConfig, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
 }: SectionProps<FixedScheduleConfig>) {
   const [open, setOpen] = useState(false)
   const [marking, setMarking] = useState<string | null>(null)
@@ -151,6 +151,7 @@ export default function FixedScheduleSection({
         currentUser={currentUser}
         currentConfig={config}
         nextPeriod={nextPeriod}
+        earliestPeriod={earliestPeriod}
         canSave={canSave}
         buildDraft={() => ({
           newInvestorConfig: { ...investorConfig, scheduledPayments: draft },

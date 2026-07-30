@@ -8,14 +8,22 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Eye, Undo2 } from 'lucide-react'
+import { Eye, Undo2, AlertTriangle } from 'lucide-react'
 import type { BrandResolver } from '@/lib/portfolioName'
+import type { StaleVerdict } from '@/lib/reportStaleness'
 import type { InvestorReportDoc } from '@/types'
 
 interface Props {
   reports: InvestorReportDoc[]
   /** Resolves a portfolio's Brand Name for the Portofolio column; falls back to the PT name. */
   resolveBrand?: BrandResolver
+  /**
+   * Reports invalidated by a profit-sharing change recorded after they were
+   * published, keyed by report id (see `staleReportMap`). Accumulated and
+   * all-time reports span every portfolio, so a backdated correction on any one
+   * of them lands here.
+   */
+  staleness?: Record<string, StaleVerdict>
   /**
    * DF-07: when provided, accumulated/all-time reports get a "Tarik" (unpublish)
    * action. Called after a successful unpublish so the parent can refresh.
@@ -49,7 +57,10 @@ function reportScopeLabel(r: InvestorReportDoc, resolveBrand?: BrandResolver): s
   return resolveBrand ? resolveBrand({ id: r.portfolioId, ptName: r.portfolioName }) : r.portfolioName
 }
 
-export default function InvestorReportHistory({ reports, resolveBrand, onChanged }: Props) {
+export default function InvestorReportHistory({
+  reports, resolveBrand, staleness, onChanged,
+}: Props) {
+  const staleCount = reports.filter(r => staleness?.[r.id]).length
   const [viewReport, setViewReport] = useState<InvestorReportDoc | null>(null)
   const [unpublishing, setUnpublishing] = useState<string | null>(null)
 
@@ -83,6 +94,16 @@ export default function InvestorReportHistory({ reports, resolveBrand, onChanged
           <CardTitle className="text-base">Riwayat Laporan ({reports.length})</CardTitle>
         </CardHeader>
         <CardContent>
+          {staleCount > 0 && (
+            <div className="mb-4 flex gap-3 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm text-black">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
+              <div>
+                Ketentuan bagi hasil salah satu portofolio diubah mundur setelah{' '}
+                {staleCount} laporan di bawah terbit, sehingga angkanya sudah
+                tidak sesuai. Terbitkan ulang untuk mengirim angka terkoreksi.
+              </div>
+            </div>
+          )}
           {reports.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Belum ada laporan
@@ -107,7 +128,15 @@ export default function InvestorReportHistory({ reports, resolveBrand, onChanged
                         <Badge variant="outline">{reportTypeLabel(r)}</Badge>
                       </TableCell>
                       <TableCell className="py-2.5 px-3">{reportScopeLabel(r, resolveBrand)}</TableCell>
-                      <TableCell className="py-2.5 px-3">{formatReportDate(r)}</TableCell>
+                      <TableCell className="py-2.5 px-3">
+                        {formatReportDate(r)}
+                        {staleness?.[r.id] && (
+                          <Badge variant="warning" className="ml-2 whitespace-nowrap">
+                            <AlertTriangle className="mr-1 h-3 w-3" />
+                            Perlu terbit ulang
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" onClick={() => setViewReport(r)}>

@@ -12,7 +12,7 @@ import type { NetProfitShareConfig, PercentageBasedConfig, FixedReturnConfig } f
 type Cfg = NetProfitShareConfig | PercentageBasedConfig | FixedReturnConfig
 
 export default function NetProfitShareSection({
-  config, investorConfig, portfolioId, currentUser, nextPeriod, onChanged,
+  config, investorConfig, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
 }: SectionProps<Cfg>) {
   const [open, setOpen] = useState(false)
   const investorPct = investorConfig.investorSharePercent
@@ -65,6 +65,7 @@ export default function NetProfitShareSection({
         currentUser={currentUser}
         currentConfig={config}
         nextPeriod={nextPeriod}
+        earliestPeriod={earliestPeriod}
         canSave={canSave}
         buildDraft={() => ({
           newInvestorConfig: {

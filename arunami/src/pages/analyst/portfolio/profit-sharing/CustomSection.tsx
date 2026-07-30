@@ -42,7 +42,7 @@ const FREQ_LABEL: Record<CustomConfig['distributionFrequency'], string> = {
 }
 
 export default function CustomSection({
-  config, investorConfig, portfolio, portfolioId, currentUser, nextPeriod, onChanged,
+  config, investorConfig, portfolio, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
 }: SectionProps<CustomConfig>) {
   const [open, setOpen] = useState(false)
 
@@ -264,6 +264,7 @@ export default function CustomSection({
         currentUser={currentUser}
         currentConfig={config}
         nextPeriod={nextPeriod}
+        earliestPeriod={earliestPeriod}
         canSave={canSave}
         buildDraft={() => ({
           newInvestorConfig: {

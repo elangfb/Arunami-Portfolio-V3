@@ -16,6 +16,8 @@ export interface SectionProps<T extends InvestorConfigUnion = InvestorConfigUnio
   portfolioId: string
   currentUser: SectionUser | null
   nextPeriod: string
+  /** First month the portfolio has data for — how far back a change may be backdated. */
+  earliestPeriod?: string | null
   onChanged: () => Promise<void> | void
   portfolio?: Portfolio | null
 }

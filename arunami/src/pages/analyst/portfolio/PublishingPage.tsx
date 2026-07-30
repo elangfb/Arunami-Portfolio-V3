@@ -3,14 +3,15 @@ import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   getReports, getManagementReports, getNotes,
-  getAllocationsForPortfolio, getPortfolioConfigOrDefault, getConfigTimeline,
-  getInvestorReportsForPortfolio,
+  getAllocationsForPortfolio, getPortfolioConfigOrDefault, getEquityHistory,
+  getAllInvestorReportsForPortfolio,
   upsertInvestorReportDraft, publishInvestorReport, publishAllInvestorReports,
   unpublishInvestorReport, unpublishAllInvestorReports,
   getAllUsers,
 } from '@/lib/firestore'
 import { buildInvestorReportHtml } from '@/lib/reportHtml'
-import type { ConfigVersion } from '@/lib/configTimeline'
+import { buildConfigTimeline, type ConfigVersion } from '@/lib/configTimeline'
+import { staleReportMap } from '@/lib/reportStaleness'
 import { formatPeriod, comparePeriods, extractAvailablePeriods } from '@/lib/dateUtils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,11 +20,11 @@ import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Send, Upload, FileCheck2, CheckCircle2, Undo2 } from 'lucide-react'
+import { Send, Upload, FileCheck2, CheckCircle2, Undo2, AlertTriangle } from 'lucide-react'
 import type {
   Portfolio, PortfolioConfig, InvestorAllocation, PortfolioReport,
   PnLExtractedData, ProjectionExtractedData, ManagementReport, Note,
-  InvestorReportDoc, AppUser,
+  InvestorReportDoc, AppUser, EquityChangeEntry,
 } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
@@ -41,6 +42,9 @@ export default function PublishingPage() {
   const [investorSharePercent, setInvestorSharePercent] = useState<number>(0)
   const [portfolioConfig, setPortfolioConfig] = useState<PortfolioConfig | null>(null)
   const [configTimeline, setConfigTimeline] = useState<ConfigVersion[]>([])
+  // The raw change trail, not just the timeline built from it: staleness needs
+  // each change's `changedAt` to compare against when a report was published.
+  const [equityHistory, setEquityHistory] = useState<EquityChangeEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   // Publishing state
@@ -48,6 +52,9 @@ export default function PublishingPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('')
   const [selectedInvestorUid, setSelectedInvestorUid] = useState<string>('')
   const [existingReports, setExistingReports] = useState<InvestorReportDoc[]>([])
+  // Every period's reports — only used to point at the ones a backdated config
+  // change invalidated, which are by definition not the period on screen.
+  const [allReports, setAllReports] = useState<InvestorReportDoc[]>([])
   const [publishing, setPublishing] = useState(false)
   const [investors, setInvestors] = useState<AppUser[]>([])
 
@@ -55,16 +62,18 @@ export default function PublishingPage() {
   useEffect(() => {
     if (!portfolioId) return
     ;(async () => {
-      const [pnls, projs, mgmts, n, allocs, config, timeline, usrs] = await Promise.all([
+      const [pnls, projs, mgmts, n, allocs, config, history, usrs] = await Promise.all([
         getReports(portfolioId, 'pnl'),
         getReports(portfolioId, 'projection'),
         getManagementReports(portfolioId),
         getNotes(portfolioId),
         getAllocationsForPortfolio(portfolioId),
         getPortfolioConfigOrDefault(portfolioId),
-        getConfigTimeline(portfolioId),
+        getEquityHistory(portfolioId),
         getAllUsers(),
       ])
+      const timeline = buildConfigTimeline(history)
+      setEquityHistory(history)
       setPnlReports(pnls)
       setProjReports(projs)
       setMgmtReports(mgmts)
@@ -85,12 +94,14 @@ export default function PublishingPage() {
 
   // Load existing publish state for the selected period
   const refreshExisting = async () => {
-    if (!portfolioId || !selectedPeriod) {
+    if (!portfolioId) {
       setExistingReports([])
+      setAllReports([])
       return
     }
-    const existing = await getInvestorReportsForPortfolio(portfolioId, selectedPeriod)
-    setExistingReports(existing)
+    const all = await getAllInvestorReportsForPortfolio(portfolioId)
+    setAllReports(all)
+    setExistingReports(selectedPeriod ? all.filter(r => r.period === selectedPeriod) : [])
   }
 
   useEffect(() => { refreshExisting() }, [portfolioId, selectedPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -149,6 +160,27 @@ export default function PublishingPage() {
 
   const statusFor = (uid: string) =>
     existingReports.find(r => r.investorUid === uid)?.status ?? null
+
+  // Published reports whose terms changed after they went out. Derived, so
+  // re-publishing clears it for free by moving `publishedAt` past the change.
+  const stale = useMemo(
+    () => portfolioId
+      ? staleReportMap(allReports, { [portfolioId]: equityHistory })
+      : {},
+    [allReports, equityHistory, portfolioId],
+  )
+
+  const isStaleFor = (uid: string) => {
+    const r = existingReports.find(x => x.investorUid === uid)
+    return !!r && !!stale[r.id]
+  }
+
+  const stalePeriods = useMemo(
+    () => [...new Set(
+      allReports.filter(r => stale[r.id]).map(r => r.period),
+    )].sort(comparePeriods),
+    [allReports, stale],
+  )
 
   const handlePublishIndividual = async () => {
     if (!portfolio || !portfolioId || !selectedAllocation || !selectedPeriod || !user) return
@@ -321,6 +353,29 @@ export default function PublishingPage() {
         </div>
       </div>
 
+      {stalePeriods.length > 0 && (
+        <div className="flex gap-3 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm text-black">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
+          <div>
+            Ketentuan bagi hasil diubah mundur, sehingga laporan terbit untuk
+            periode berikut sudah tidak sesuai:{' '}
+            {stalePeriods.map((p, i) => (
+              <span key={p}>
+                {i > 0 && ', '}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPeriod(p)}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  {formatPeriod(p)}
+                </button>
+              </span>
+            ))}
+            . Terbitkan ulang untuk mengirim angka yang sudah dikoreksi.
+          </div>
+        </div>
+      )}
+
       {availablePeriods.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-muted-foreground">
           {portfolio?.isGracePeriod
@@ -362,7 +417,11 @@ export default function PublishingPage() {
                               <p className="text-xs text-muted-foreground truncate">{alloc.investorEmail}</p>
                             )}
                           </div>
-                          {status === 'published' ? (
+                          {status === 'published' && isStaleFor(alloc.investorUid) ? (
+                            <Badge variant="warning" className="shrink-0">
+                              <AlertTriangle className="h-3 w-3 mr-1" />Perlu terbit ulang
+                            </Badge>
+                          ) : status === 'published' ? (
                             <Badge variant="success" className="shrink-0">
                               <CheckCircle2 className="h-3 w-3 mr-1" />Published
                             </Badge>

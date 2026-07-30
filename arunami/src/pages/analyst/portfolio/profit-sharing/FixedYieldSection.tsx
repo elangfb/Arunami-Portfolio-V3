@@ -18,7 +18,7 @@ const PRINCIPAL_LABEL: Record<FixedYieldConfig['principalReference'], string> = 
 }
 
 export default function FixedYieldSection({
-  config, investorConfig, portfolioId, currentUser, nextPeriod, onChanged,
+  config, investorConfig, portfolioId, currentUser, nextPeriod, earliestPeriod, onChanged,
 }: SectionProps<FixedYieldConfig>) {
   const [open, setOpen] = useState(false)
   const yieldPct = investorConfig.fixedYieldPercent
@@ -70,6 +70,7 @@ export default function FixedYieldSection({
         currentUser={currentUser}
         currentConfig={config}
         nextPeriod={nextPeriod}
+        earliestPeriod={earliestPeriod}
         canSave={canSave}
         buildDraft={() => ({
           newInvestorConfig: {

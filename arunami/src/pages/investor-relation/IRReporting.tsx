@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   getAllUsers, getAllAllocations, getInvestorReportSources, getPublishedInvestorReports,
+  getEquityHistoryForPortfolios,
 } from '@/lib/firestore'
 import type { InvestorReportSource } from '@/lib/firestore'
+import { staleReportMap } from '@/lib/reportStaleness'
 import { comparePeriods } from '@/lib/dateUtils'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { makeBrandResolver } from '@/lib/portfolioName'
@@ -15,7 +17,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { ArrowLeft, Search, FileText, ChevronRight } from 'lucide-react'
 import InvestorReportForm from '@/pages/admin/components/InvestorReportForm'
 import InvestorReportHistory from '@/pages/admin/components/InvestorReportHistory'
-import type { AppUser, InvestorAllocation, InvestorReportDoc, Portfolio } from '@/types'
+import type {
+  AppUser, InvestorAllocation, InvestorReportDoc, Portfolio, EquityChangeEntry,
+} from '@/types'
 
 type View = 'home' | 'investor' | 'generate'
 
@@ -37,10 +41,18 @@ export default function IRReporting() {
   const [investor, setInvestor] = useState<AppUser | null>(null)
   const [portfolioData, setPortfolioData] = useState<InvestorReportSource[]>([])
   const [reports, setReports] = useState<InvestorReportDoc[]>([])
+  // Profit-sharing change trails for every portfolio this investor holds —
+  // accumulated and all-time reports span all of them, so a backdated
+  // correction on any one invalidates the combined report.
+  const [changesByPortfolio, setChangesByPortfolio] = useState<Record<string, EquityChangeEntry[]>>({})
   const [investorLoading, setInvestorLoading] = useState(false)
   const resolveBrand = useMemo(
     () => makeBrandResolver(portfolioData.map(p => p.portfolio).filter((x): x is Portfolio => !!x)),
     [portfolioData],
+  )
+  const staleness = useMemo(
+    () => staleReportMap(reports, changesByPortfolio),
+    [reports, changesByPortfolio],
   )
 
   useEffect(() => {
@@ -80,6 +92,9 @@ export default function IRReporting() {
       ])
       setPortfolioData(data)
       setReports([...published].sort((a, b) => comparePeriods(b.period, a.period)))
+      setChangesByPortfolio(await getEquityHistoryForPortfolios(
+        data.map(d => d.portfolio?.id).filter((id): id is string => !!id),
+      ))
     } catch {
       toast.error('Gagal memuat data investor')
     } finally {
@@ -227,7 +242,12 @@ export default function IRReporting() {
         {investorLoading ? (
           <div className="h-64 animate-pulse rounded-lg bg-muted" />
         ) : (
-          <InvestorReportHistory reports={reports} resolveBrand={resolveBrand} onChanged={refreshReports} />
+          <InvestorReportHistory
+            reports={reports}
+            resolveBrand={resolveBrand}
+            staleness={staleness}
+            onChanged={refreshReports}
+          />
         )}
       </div>
     )
