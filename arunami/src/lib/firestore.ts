@@ -1526,8 +1526,12 @@ export interface CreateBagiHasilManualEntryInput {
   bagiHasilAmount: number
   principalAmount: number | null
   notes: string
-  /** Proof file (PDF/image) for the backfilled payout — required (DF-01). */
-  file: File
+  /**
+   * Proof file (PDF/image) for the backfilled payout. Optional — pre-app
+   * history often has no receipt left, and the amount is still worth
+   * recording. Entries without one are flagged internally only.
+   */
+  file?: File | null
   createdBy: string
   createdByName: string
 }
@@ -1536,19 +1540,25 @@ export async function createBagiHasilManualEntry(
   input: CreateBagiHasilManualEntryInput,
 ): Promise<string> {
   const { file, ...rest } = input
-  const { fileUrl, storagePath } = await uploadProofToStorage(input.investorUid, 'manual', file)
+  const uploaded = file
+    ? await uploadProofToStorage(input.investorUid, 'manual', file)
+    : null
   // DF-12: clean up the just-uploaded file if the doc write fails.
   try {
     const ref = await addDoc(collection(db, 'bagiHasilManualEntries'), {
       ...rest,
-      fileUrl,
-      fileName: file.name,
-      storagePath,
+      // Omit the file fields entirely when there's no proof — an absent
+      // fileUrl is what marks the entry as unevidenced.
+      ...(uploaded && file
+        ? { fileUrl: uploaded.fileUrl, fileName: file.name, storagePath: uploaded.storagePath }
+        : {}),
       createdAt: serverTimestamp(),
     })
     return ref.id
   } catch (e) {
-    try { await deleteObject(storageRef(storage, storagePath)) } catch { /* noop */ }
+    if (uploaded) {
+      try { await deleteObject(storageRef(storage, uploaded.storagePath)) } catch { /* noop */ }
+    }
     throw e
   }
 }

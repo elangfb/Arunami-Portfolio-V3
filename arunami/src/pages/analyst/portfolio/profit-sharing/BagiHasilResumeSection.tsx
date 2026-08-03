@@ -161,8 +161,6 @@ export default function BagiHasilResumeSection({
       ? Number(edit.principalAmount)
       : null
     if (principal != null && !(principal >= 0)) { toast.error('Nominal pengembalian pokok tidak valid.'); return }
-    // DF-01: new entries must carry a proof file; edits may keep the existing one.
-    if (!edit.id && !edit.file) { toast.error('Lampirkan file bukti transfer terlebih dahulu.'); return }
 
     setSaving(true)
     try {
@@ -189,7 +187,7 @@ export default function BagiHasilResumeSection({
           bagiHasilAmount: bagiHasil,
           principalAmount: principal,
           notes: edit.notes.trim(),
-          file: edit.file!,
+          file: edit.file,
           createdBy: currentUser.uid,
           createdByName: currentUser.displayName,
         })
@@ -224,7 +222,8 @@ export default function BagiHasilResumeSection({
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
               Catat riwayat bagi hasil yang dibayar sebelum portofolio masuk sistem. Periode berjalan
-              terisi otomatis dari bukti transfer.
+              terisi otomatis dari bukti transfer. Bukti transfer opsional — riwayat lama boleh
+              dicatat nominalnya saja.
             </p>
           </div>
         </div>
@@ -305,9 +304,19 @@ export default function BagiHasilResumeSection({
                             </Badge>
                           </a>
                         ) : (
-                          <Badge variant="outline" className="text-[10px]">
-                            {row.source === 'manual' ? 'Manual' : 'Otomatis'}
-                          </Badge>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline" className="text-[10px]">
+                              {row.source === 'manual' ? 'Manual' : 'Otomatis'}
+                            </Badge>
+                            {/* Internal-only marker — deliberately absent from every investor-facing view. */}
+                            <Badge
+                              variant="outline"
+                              className="border-amber-300 bg-amber-50 text-amber-700 text-[10px]"
+                              title="Nominal dicatat tanpa lampiran bukti transfer. Tanda ini hanya terlihat oleh tim."
+                            >
+                              Tanpa Bukti
+                            </Badge>
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="py-2.5 px-3 text-right">
@@ -329,6 +338,11 @@ export default function BagiHasilResumeSection({
                 </TableBody>
               </Table>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Tanda <span className="font-medium text-amber-700">Tanpa Bukti</span> menandai entri yang
+              dicatat nominalnya saja. Tanda ini internal — investor hanya melihat periode dan nominalnya.
+            </p>
           </>
         )}
       </CardContent>
@@ -368,12 +382,17 @@ export default function BagiHasilResumeSection({
                   onChange={e => setEdit({ ...edit, notes: e.target.value })} />
               </div>
               <ProofDropzone
-                label={edit.id ? 'Bukti Transfer (ganti — opsional)' : 'Bukti Transfer'}
+                label={edit.id ? 'Bukti Transfer (ganti — opsional)' : 'Bukti Transfer (opsional)'}
                 file={edit.file}
                 onFile={(f) => setEdit({ ...edit, file: f })}
               />
-              {edit.id && edit.hasExistingFile && !edit.file && (
+              {edit.id && edit.hasExistingFile && !edit.file ? (
                 <p className="text-xs text-muted-foreground">Bukti transfer saat ini tetap dipakai jika tidak diganti.</p>
+              ) : !edit.file && (
+                <p className="text-xs text-muted-foreground">
+                  Boleh dikosongkan jika bukti transfernya sudah tidak ada. Entri tanpa bukti ditandai
+                  di tabel ini saja — investor tidak melihat tandanya.
+                </p>
               )}
             </div>
           )}

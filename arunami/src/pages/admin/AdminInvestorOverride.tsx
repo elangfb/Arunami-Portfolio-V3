@@ -428,7 +428,19 @@ function PayoutsSection({ payouts, portfolios, onSaved, logOverride }: { payouts
                 <div key={e.id} className="rounded-md border p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium">{resolveBrand({ id: e.portfolioId, ptName: e.portfolioName })} — {formatPeriod(e.period)}</p>
+                      <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                        {resolveBrand({ id: e.portfolioId, ptName: e.portfolioName })} — {formatPeriod(e.period)}
+                        {/* Internal-only marker — never shown on investor-facing views. */}
+                        {!e.fileUrl && (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-300 bg-amber-50 text-[10px] font-normal text-amber-700"
+                            title="Nominal dicatat tanpa lampiran bukti transfer. Tanda ini hanya terlihat oleh tim."
+                          >
+                            Tanpa Bukti
+                          </Badge>
+                        )}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Bagi hasil {formatCurrencyCompact(e.bagiHasilAmount)}
                         {e.principalAmount != null && ` · Pokok ${formatCurrencyCompact(e.principalAmount)}`}

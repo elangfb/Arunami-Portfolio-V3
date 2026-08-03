@@ -889,8 +889,10 @@ export interface BagiHasilManualEntry {
   principalAmount: number | null
   notes: string
   /**
-   * Proof file (PDF/image) for the backfilled payout. Required for entries
-   * created after the DF-01 change; optional/absent on legacy rows.
+   * Proof file (PDF/image) for the backfilled payout. Optional: history that
+   * predates the app often has no receipt left. An absent fileUrl marks the
+   * entry "Tanpa Bukti" on internal views only — investor-facing recaps show
+   * the period and amount without any evidence marker.
    */
   fileUrl?: string
   fileName?: string

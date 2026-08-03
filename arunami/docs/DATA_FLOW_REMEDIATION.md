@@ -1,7 +1,7 @@
 # Data-Flow Remediation Roadmap
 
 > Tracking document for the data-integrity audit (stuck data / double input / compromised integrity).
-> Owner: _unassigned_ · Started: 2026-06-28 · Last updated: 2026-06-28
+> Owner: _unassigned_ · Started: 2026-06-28 · Last updated: 2026-08-03
 
 This is the single source of truth for the audit fixes. Update the **Status** and **Progress Tracker**
 as work lands. Keep the changelog at the bottom current.
@@ -61,17 +61,19 @@ The work is sequenced into 4 phases. Phase 1 stops active damage; later phases h
 
 ## Phase 1 — Stop the bleeding 🔴
 
-### DF-01 · Dedup Bagi Hasil recap — manual wins, manual requires a file 🔴 ✅
-- **Decision:** Manual entry **wins** on a period collision. Manual entries must now **upload a proof file** (PDF/image), becoming first-class backfilled proofs.
+### DF-01 · Dedup Bagi Hasil recap — manual wins, proof file optional 🔴 ✅
+- **Decision:** Manual entry **wins** on a period collision. Manual entries **may** upload a proof file (PDF/image), becoming first-class backfilled proofs.
+- **Amended 2026-08-03:** the proof file is **optional**, not required. Teams backfilling pre-app history typically only hold receipts for the most recent months, and the mandatory-file rule blocked them from entering older payouts at all — the exact data this feature exists to capture. Entries without a proof are flagged **"Tanpa Bukti"** on internal views only (analyst Resume Bagi Hasil, admin override); investor-facing recaps show period + amount with no evidence marker.
 - **Problem:** Both recap views merge `bagiHasilManualEntries` + `investorTransferProofs` with no dedup → a manual backfill for a period that also has a transfer proof double-counts the investor's "Total Bagi Hasil".
 - **Files:** `src/pages/analyst/portfolio/profit-sharing/BagiHasilResumeSection.tsx:102-112`, `src/pages/investor/portfolio/InvestorBagiHasilResumePage.tsx:52-64`, `src/lib/firestore.ts` (`createBagiHasilManualEntry`, `updateBagiHasilManualEntry`, `deleteBagiHasilManualEntry`), `src/types/index.ts` (`BagiHasilManualEntry`), `storage.rules`
 - **Fix approach:**
   1. Add file upload to the manual-entry form (reuse the proof upload validation: PNG/JPG/WEBP/PDF, ≤5 MB). Store `fileUrl`/`fileName`/`storagePath` on `BagiHasilManualEntry` (optional for legacy rows).
   2. On merge, build a set of manual `(period)` keys; **drop the automated proof row** when a manual row exists for the same period (manual wins). Count once.
   3. `deleteBagiHasilManualEntry` must also delete the uploaded Storage file (docs first, file best-effort — same ordering rule as DF-05).
-  4. Allow legacy manual rows without a file (don't force re-upload), but require a file on new entries.
+  4. Allow manual rows without a file (legacy rows and un-evidenced backfills alike); mark them internally.
 - **Acceptance criteria:**
-  - [ ] New manual entries require a valid proof file; it's viewable from both recap views.
+  - [ ] A manual entry's proof file, when present, is viewable from both recap views.
+  - [ ] A manual entry without a proof saves fine and is marked "Tanpa Bukti" on internal views only.
   - [ ] A period with both a proof and a manual entry shows **one** row (the manual one) and counts **once**.
   - [ ] Investor and analyst recap totals match for the same investor+portfolio.
   - [ ] Deleting a manual entry removes its Storage file.
@@ -217,7 +219,7 @@ The work is sequenced into 4 phases. Phase 1 stops active damage; later phases h
 
 ## Decisions (resolved 2026-06-28)
 
-- [x] **DF-01:** **Manual entry wins** on a period collision. Manual entries must **also upload a proof file** (PDF/image) — they become first-class backfilled proofs, not just numbers.
+- [x] **DF-01:** **Manual entry wins** on a period collision. Manual entries **may** upload a proof file (PDF/image) — with one they become first-class backfilled proofs. *(Amended 2026-08-03: the file was originally mandatory; it is now optional, with un-evidenced entries flagged internally only.)*
 - [x] **DF-04:** **Soft archive** — mark users/portfolios as archived and hide from UI; keep all data for audit history.
 - [x] **DF-08:** **Resolve on read** — stop trusting denormalized name/email copies; look up the live name when displaying.
 
@@ -248,6 +250,7 @@ The work is sequenced into 4 phases. Phase 1 stops active damage; later phases h
 | 2026-06-28 | DF-14 | `getNotificationsForInvestor` drops composite-index dependency (JS sort); removed `orderBy` import | – |
 | 2026-06-28 | DF-15 | `deleteReport`/`deleteAllReports` self-sync `financialData`; redundant caller syncs removed | – |
 | 2026-06-28 | – | Phase 4 verified: `tsc -b` clean (pre-existing eslint warnings only). 🎉 All phases done. | – |
+| 2026-08-03 | DF-01 | Proof file on manual bagi-hasil entries relaxed to optional (user feedback: pre-app history has no receipts); un-evidenced entries flagged "Tanpa Bukti" on internal views only | – |
 
 > ⚠️ **Deploy note:** DF-05 changed `firestore.rules`. Deploy rules (`firebase deploy --only firestore:rules`) for the IR delete fix to take effect. Runtime/manual QA of all flows is recommended before closing.
 > ℹ️ **DF-04 note:** archive/unarchive write the `archived` flag via existing admin update rules — no rules change needed. No Firestore index needed (filtering is client-side).
