@@ -23,6 +23,36 @@ service firebase.storage {
       return isSignedIn() && userDoc().role == 'investor';
     }
 
+    function isAdmin() {
+      return isSignedIn() && userDoc().role == 'admin';
+    }
+
+    function isAnalyst() {
+      return isSignedIn() && userDoc().role == 'analyst';
+    }
+
+    // Portfolio membership, mirroring the identically-named helpers in
+    // firestore.rules so a file and its report doc share one access model.
+    function lookupPortfolio(portfolioId) {
+      return firestore.get(/databases/(default)/documents/portfolios/$(portfolioId)).data;
+    }
+
+    function isAssignedAnalystOf(portfolioId) {
+      return isAnalyst() && request.auth.uid in lookupPortfolio(portfolioId).assignedAnalysts;
+    }
+
+    function isAssignedInvestorOf(portfolioId) {
+      return isInvestor() && request.auth.uid in lookupPortfolio(portfolioId).assignedInvestors;
+    }
+
+    function canReadPortfolio(portfolioId) {
+      return isAdmin() || isInvestorRelation() || isAssignedAnalystOf(portfolioId) || isAssignedInvestorOf(portfolioId);
+    }
+
+    function canWritePortfolio(portfolioId) {
+      return isAdmin() || isAssignedAnalystOf(portfolioId);
+    }
+
     // Bukti Transfer proofs (image or PDF). Path: transferProofs/{investorUid}/{reportId}/{file}
     // The {reportId} segment is "standalone" for proofs not tied to a report.
     // Staff/IR may write; the targeted investor may read their own.
@@ -33,6 +63,23 @@ service firebase.storage {
         request.resource.size < 5 * 1024 * 1024 &&
         (request.resource.contentType.matches('image/.*') ||
          request.resource.contentType == 'application/pdf');
+    }
+
+    // Management report photos/videos. Path: managementReports/{portfolioId}/{fileName}
+    // (written by uploadReportMedia in src/lib/storage.ts). Same access model as the
+    // /portfolios/{id}/managementReports doc it hangs off: the portfolio's assigned
+    // analysts + admin write, assigned investors + IR read.
+    //
+    // create/update and delete are split on purpose: `request.resource` is null on a
+    // delete, so folding the size/contentType checks into a blanket `write` would
+    // deny every deletion (deleteReportMedia).
+    match /managementReports/{portfolioId}/{fileName} {
+      allow read: if canReadPortfolio(portfolioId);
+      allow create, update: if canWritePortfolio(portfolioId) &&
+        request.resource.size <= 50 * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/.*') ||
+         request.resource.contentType.matches('video/.*'));
+      allow delete: if canWritePortfolio(portfolioId);
     }
   }
 }

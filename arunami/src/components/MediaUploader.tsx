@@ -1,5 +1,5 @@
 import { useDropzone } from 'react-dropzone'
-import { Upload, X, Film, Loader2 } from 'lucide-react'
+import { Upload, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ReportMedia } from '@/types'
 
@@ -10,11 +10,13 @@ interface MediaUploaderProps {
   onUpload: (file: File) => void
   onRemove: (id: string) => void
   uploading: boolean
+  /** 0–100 while a file is in flight; null when idle or progress is unknown. */
+  progress?: number | null
   disabled?: boolean
 }
 
 export default function MediaUploader({
-  media, onUpload, onRemove, uploading, disabled,
+  media, onUpload, onRemove, uploading, progress, disabled,
 }: MediaUploaderProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'image/*': [], 'video/*': [] },
@@ -38,12 +40,17 @@ export default function MediaUploader({
           {media.map(m => (
             <div key={m.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
               {m.type === 'image' ? (
-                <img src={m.fileUrl} alt={m.fileName} className="h-full w-full object-cover" />
+                <img src={m.fileUrl} alt={m.fileName} loading="lazy" className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center">
-                  <Film className="h-6 w-6 text-muted-foreground" />
-                  <span className="line-clamp-2 text-[10px] text-muted-foreground">{m.fileName}</span>
-                </div>
+                // preload="metadata" so opening a report fetches the poster frame,
+                // not the whole video — playback bytes are only pulled on play.
+                <video
+                  src={m.fileUrl}
+                  title={m.fileName}
+                  controls
+                  preload="metadata"
+                  className="h-full w-full bg-black object-contain"
+                />
               )}
               <button
                 type="button"
@@ -73,9 +80,26 @@ export default function MediaUploader({
             : <Upload className="h-6 w-6 text-gray-400" />}
         </div>
         <p className="text-sm font-medium">
-          {uploading ? 'Mengunggah...' : isDragActive ? 'Lepaskan di sini...' : 'Tambah foto / video'}
+          {uploading
+            ? `Mengunggah${progress != null ? ` ${progress}%` : '...'}`
+            : isDragActive ? 'Lepaskan di sini...' : 'Tambah foto / video'}
         </p>
-        <p className="text-xs text-muted-foreground">Foto atau video — maks 50MB. Bisa pilih beberapa.</p>
+        {uploading ? (
+          <div className="w-full max-w-xs space-y-1">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+              <div
+                className="h-full rounded-full bg-green-500 transition-[width] duration-200"
+                // Indeterminate until the first progress event lands.
+                style={{ width: progress != null ? `${progress}%` : '10%' }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Video besar bisa makan beberapa menit — jangan tutup halaman ini.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Foto atau video — maks 50MB. Bisa pilih beberapa.</p>
+        )}
       </div>
     </div>
   )

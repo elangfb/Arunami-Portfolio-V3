@@ -535,8 +535,15 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
     <h2>Dokumentasi</h2>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
       ${latestMgmt.media.map(m => m.type === 'image'
-        ? `<img src="${m.fileUrl}" alt="${m.fileName}" style="max-width:240px;max-height:180px;border-radius:6px;border:1px solid #e5e7eb;object-fit:cover" />`
-        : `<a href="${m.fileUrl}" style="display:inline-block;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;text-decoration:none">▶ ${m.fileName}</a>`,
+        ? `<img src="${m.fileUrl}" alt="${m.fileName}" loading="lazy" style="max-width:240px;max-height:180px;border-radius:6px;border:1px solid #e5e7eb;object-fit:cover" />`
+        // Plays inline: the report renders in an <iframe sandbox="">, which blocks
+        // scripts but not media, and native controls need no JS. preload="metadata"
+        // keeps a report view from pulling every video in full. The caption keeps
+        // the file identifiable on the print-to-PDF path, where video can't play.
+        : `<figure style="margin:0;max-width:240px">
+             <video src="${m.fileUrl}" controls preload="metadata" style="width:100%;max-height:180px;border-radius:6px;border:1px solid #e5e7eb;background:#000"></video>
+             <figcaption style="margin-top:4px;font-size:11px;color:#6b7280;word-break:break-word">▶ ${m.fileName}</figcaption>
+           </figure>`,
       ).join('')}
     </div>
   ` : ''

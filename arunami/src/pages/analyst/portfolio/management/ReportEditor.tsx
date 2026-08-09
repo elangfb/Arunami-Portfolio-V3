@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, PlusCircle, Trash2, Wand2 } from 'lucide-react'
 import { formatPeriod } from '@/lib/dateUtils'
-import { uploadReportMedia, deleteReportMedia } from '@/lib/storage'
+import { uploadReportMedia, deleteReportMedia, storageErrorMessage } from '@/lib/storage'
 import MediaUploader from '@/components/MediaUploader'
 import type { ManagementReport, Issue, ActionItem, IssueSeverity, ActionStatus, ActionCategory, ReportMedia } from '@/types'
 
@@ -35,6 +35,7 @@ export function ReportEditor({ mode, period, portfolioId, initial, saving, onRef
   const [refining, setRefining] = useState(false)
   const [media, setMedia] = useState<ReportMedia[]>(initial?.media ?? [])
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
 
   const { register, handleSubmit, control, setValue, watch, getValues } = useForm<ManagementFormData>({
     defaultValues: {
@@ -62,14 +63,16 @@ export function ReportEditor({ mode, period, portfolioId, initial, saving, onRef
 
   const handleUpload = async (file: File) => {
     setUploading(true)
+    setProgress(0)
     try {
-      const uploaded = await uploadReportMedia(portfolioId, file)
+      const uploaded = await uploadReportMedia(portfolioId, file, setProgress)
       setMedia(prev => [...prev, uploaded])
     } catch (err) {
       console.error(err)
-      toast.error(`Gagal mengunggah ${file.name}`)
+      toast.error(`${file.name}: ${storageErrorMessage(err)}`)
     } finally {
       setUploading(false)
+      setProgress(null)
     }
   }
 
@@ -226,6 +229,7 @@ export function ReportEditor({ mode, period, portfolioId, initial, saving, onRef
               onUpload={handleUpload}
               onRemove={handleRemoveMedia}
               uploading={uploading}
+              progress={progress}
               disabled={saving}
             />
           </CardContent>
