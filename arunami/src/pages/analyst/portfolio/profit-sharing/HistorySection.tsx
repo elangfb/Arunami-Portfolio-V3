@@ -27,6 +27,7 @@ function isBackdated(row: EquityChangeEntry): boolean {
 const KIND_LABEL: Record<ConfigChangeKind, string> = {
   investor_share: 'Investor Share',
   arunami_fee: 'Arunami Fee',
+  arunami_pool: 'Porsi Investor Arunami',
   fixed_yield: 'Fixed Yield',
   revenue_share: 'Revenue Share',
   scheduled_payment: 'Jadwal Pembayaran',

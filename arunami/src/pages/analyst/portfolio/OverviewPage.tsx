@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getFinancialData, getReports, getHealthRules, updatePortfolioHealth, getConfigTimeline } from '@/lib/firestore'
-import { findConfigVersionForPeriod, type ConfigVersion } from '@/lib/configTimeline'
+import {
+  getFinancialData, getReports, getHealthRules, updatePortfolioHealth,
+  getConfigTimeline, getPortfolioConfig,
+} from '@/lib/firestore'
+import { resolveInvestorConfigForPeriod, type ConfigVersion } from '@/lib/configTimeline'
+import { calculateDistribution } from '@/lib/distributionStrategies'
+import { wholePortfolioAllocation } from '@/lib/analystMetrics'
 import { computeHealth, DEFAULT_HEALTH_RULES, HEALTH_SOP, healthFreshness } from '@/lib/health'
 import { formatCurrencyCompact, formatCurrencyExact, formatPercent, calcMoM, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,7 +25,7 @@ import {
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart2, AlertTriangle } from 'lucide-react'
 import { formatPeriod, comparePeriods, formatFullDate } from '@/lib/dateUtils'
 import { buildThreeColRows } from '@/lib/reportHtml'
-import type { FinancialData, Portfolio, PnLExtractedData, ProjectionExtractedData, PortfolioReport, HealthRules } from '@/types'
+import type { FinancialData, Portfolio, PortfolioConfig, PnLExtractedData, ProjectionExtractedData, PortfolioReport, HealthRules } from '@/types'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -30,6 +35,7 @@ export default function OverviewPage() {
   const { portfolio, portfolioId } = useOutletContext<Context>()
   const [data, setData] = useState<FinancialData | null>(null)
   const [configTimeline, setConfigTimeline] = useState<ConfigVersion[]>([])
+  const [config, setConfig] = useState<PortfolioConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [pnlReports, setPnlReports] = useState<PortfolioReport[]>([])
   const [projReports, setProjReports] = useState<PortfolioReport[]>([])
@@ -53,6 +59,10 @@ export default function OverviewPage() {
 
   useEffect(() => {
     if (portfolioId) getConfigTimeline(portfolioId).then(setConfigTimeline).catch(() => {})
+  }, [portfolioId])
+
+  useEffect(() => {
+    if (portfolioId) getPortfolioConfig(portfolioId).then(setConfig).catch(() => {})
   }, [portfolioId])
 
   useEffect(() => { getHealthRules().then(setRules).catch(() => {}) }, [])
@@ -189,16 +199,30 @@ export default function OverviewPage() {
   const revenueChartData = trimToThreeMonthsAhead(data.revenueData)
   const profitChartData = trimToThreeMonthsAhead(data.profitData)
 
-  // Total Investment ROI: net-for-investor / total investment.
-  // `data.investorConfig` is a snapshot of the CURRENT terms, so prefer the
-  // version that was in force for the month these KPIs describe.
-  const cfg = findConfigVersionForPeriod(configTimeline, latestPeriod ?? '')?.investorConfig
-    ?? data.investorConfig
-  const investorShare = lastProfit * (cfg.investorSharePercent / 100)
-  const arunamiFee = investorShare * (cfg.arunamiFeePercent / 100)
-  const netForInvestor = investorShare - arunamiFee
+  // Total Investment ROI: run the one distribution engine over a whole-portfolio
+  // stand-in allocation, rather than re-deriving net_profit_share by hand. The
+  // inline version this replaces applied that one model regardless of
+  // `returnModel` and ignored grace periods entirely.
+  //
+  // `resolveInvestorConfigForPeriod` falls back to the live config doc when the
+  // timeline can't answer — which is every portfolio that has never had a config
+  // change. The old `data.investorConfig` fallback was a snapshot frozen at the
+  // first PnL upload (firestore.ts re-syncs only `returnModel`), so it went stale
+  // on the common path, not a rare one.
   const totalInvestment = portfolio?.investasiAwal ?? 0
-  const totalInvestmentROI = totalInvestment > 0 ? (netForInvestor / totalInvestment) * 100 : 0
+  const totalInvestmentROI = portfolio && config && totalInvestment > 0
+    ? calculateDistribution({
+        reportData: {
+          period: latestPeriod ?? '',
+          revenue: lastRevenue,
+          netProfit: lastProfit,
+          grossProfit: 0,
+        },
+        config: resolveInvestorConfigForPeriod(config, configTimeline, latestPeriod ?? ''),
+        allocation: wholePortfolioAllocation(portfolio),
+        portfolio,
+      }).roiPercent
+    : 0
 
   // Every KPI below reads a single month, so stamp the cards with which one —
   // a bare "Rp 1.2M" says nothing about the period it belongs to.

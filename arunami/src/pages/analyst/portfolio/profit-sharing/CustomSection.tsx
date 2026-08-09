@@ -173,6 +173,11 @@ export default function CustomSection({
               <Badge variant="outline">Frekuensi: {FREQ_LABEL[investorConfig.distributionFrequency]}</Badge>
               <Badge variant="outline">{investorConfig.variables.length} variabel</Badge>
               <Badge variant="outline">Arunami Fee: {investorConfig.arunamiFeePercent}%</Badge>
+              {(investorConfig.arunamiPoolPercent ?? 100) < 100 && (
+                <Badge variant="outline">
+                  Porsi Investor Arunami: {investorConfig.arunamiPoolPercent}%
+                </Badge>
+              )}
             </div>
             {investorConfig.variables.length > 0 && (
               <div className="overflow-x-auto">

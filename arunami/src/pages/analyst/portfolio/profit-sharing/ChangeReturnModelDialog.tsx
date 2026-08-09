@@ -71,6 +71,10 @@ const dialogSchema = z.object({
   ]),
   investorSharePercent: z.number().min(0).max(100),
   arunamiFeePercent: z.number().min(0).max(100),
+  arunamiPoolPercent: z.preprocess(
+    v => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 100 : v),
+    z.number().min(0.01, 'Porsi harus lebih dari 0').max(100),
+  ),
   fixedYieldPercent: z.number().min(0).optional(),
   principalReference: z.enum(['invested_amount', 'investasi_awal']).optional(),
   revenueSharePercent: z.number().min(0).optional(),
@@ -133,6 +137,7 @@ export default function ChangeReturnModelDialog({
       returnModel: 'net_profit_share',
       investorSharePercent: 70,
       arunamiFeePercent: 10,
+      arunamiPoolPercent: 100,
       principalReference: 'invested_amount',
       scheduledPayments: [],
       customVariables: [],
@@ -175,6 +180,7 @@ export default function ChangeReturnModelDialog({
       returnModel: 'net_profit_share',
       investorSharePercent: 70,
       arunamiFeePercent: 10,
+      arunamiPoolPercent: 100,
       principalReference: 'invested_amount',
       scheduledPayments: [],
       customVariables: [],
@@ -183,7 +189,15 @@ export default function ChangeReturnModelDialog({
     })
     setLoadingConfig(true)
     getPortfolioConfig(portfolioId)
-      .then(cfg => setCurrentConfig(cfg))
+      .then(cfg => {
+        setCurrentConfig(cfg)
+        // Carry the pool share across a model switch. The reset above seeds the
+        // form from hardcoded defaults, so without this a portfolio configured at
+        // 80% would silently snap back to 100% — quietly restoring full payouts —
+        // the moment an analyst changed its return model.
+        const pool = cfg?.investorConfig?.arunamiPoolPercent
+        if (pool != null) form.setValue('arunamiPoolPercent', pool)
+      })
       .catch(err => {
         console.error(err)
         toast.error('Gagal memuat konfigurasi portofolio')

@@ -9,6 +9,13 @@ import type {
 
 export interface DistributionResult {
   totalDistribution: number
+  /**
+   * The slice of `totalDistribution` funded by Arunami's own investors —
+   * `totalDistribution × arunamiPoolPercent/100`. Equals `totalDistribution`
+   * when the portfolio has no outside co-investors. Absent for fixed_yield,
+   * where no pool is divided at all.
+   */
+  arunamiPoolAmount?: number
   perInvestorAmount: number
   grossInvestorAmount: number
   arunamiFeeAmount: number
@@ -71,6 +78,25 @@ export function ownershipFraction(allocation: InvestorAllocation, portfolio: Por
   return 0
 }
 
+/**
+ * Fraction of the whole investor pool that belongs to Arunami's own investors.
+ * Deals co-funded by investors outside Arunami set this below 1; the remainder
+ * of the pool is theirs and is settled off this platform entirely.
+ *
+ * Anything that is not a number in (0, 100] resolves to 1 — absent (legacy
+ * portfolios, and every equityHistory snapshot frozen before this field
+ * existed), null, NaN, negative, >100, and 0. Failing to 1 is deliberate and
+ * one-directional: an unset or corrupt value pays exactly what the pre-pool
+ * code paid, and can never silently pay zero. A literal 0 is unreachable in
+ * practice — `AdminPortfolioOverride`'s `num()` yields 0 for any unparseable
+ * input, and `buildInvestorConfig` force-writes 0 percentages for two models.
+ * Forms reject 0 up front so a genuine intent to zero cannot be swallowed here.
+ */
+export function arunamiPoolFraction(config: { arunamiPoolPercent?: number }): number {
+  const pct = config.arunamiPoolPercent
+  return typeof pct === 'number' && pct > 0 && pct <= 100 ? pct / 100 : 1
+}
+
 function emptyResult(label: string): DistributionResult {
   return {
     totalDistribution: 0,
@@ -100,10 +126,14 @@ const netProfitShareStrategy: DistributionStrategy = {
     const investorPoolShare = config.investorSharePercent / 100
     const arunamiFeeRate = config.arunamiFeePercent / 100
     const ownership = ownershipFraction(allocation, portfolio)
+    const poolFraction = arunamiPoolFraction(config)
     const isFeeExempt = input.isArunamiTeam === true
 
     const investorPool = netProfit * investorPoolShare
-    const grossPerInvestor = investorPool * ownership
+    // Carve out Arunami's slice before ownership applies: `investorPool` funds
+    // every investor in the deal, including those outside Arunami.
+    const arunamiPool = investorPool * poolFraction
+    const grossPerInvestor = arunamiPool * ownership
     const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * arunamiFeeRate
     const perInvestor = grossPerInvestor - arunamiFee
 
@@ -113,6 +143,7 @@ const netProfitShareStrategy: DistributionStrategy = {
 
     return {
       totalDistribution: investorPool,
+      arunamiPoolAmount: arunamiPool,
       perInvestorAmount: perInvestor,
       grossInvestorAmount: grossPerInvestor,
       arunamiFeeAmount: arunamiFee,
@@ -122,6 +153,8 @@ const netProfitShareStrategy: DistributionStrategy = {
       breakdown: {
         netProfit,
         investorPool,
+        arunamiPoolPercent: poolFraction * 100,
+        arunamiPool,
         grossPerInvestor,
         arunamiFee,
         ownership: ownership * 100,
@@ -146,9 +179,11 @@ const fixedReturnStrategy: DistributionStrategy = {
     const investorPoolShare = config.investorSharePercent / 100
     const arunamiFeeRate = config.arunamiFeePercent / 100
     const ownership = ownershipFraction(allocation, portfolio)
+    const poolFraction = arunamiPoolFraction(config)
 
     const investorPool = netProfit * investorPoolShare
-    const grossPerInvestor = investorPool * ownership
+    const arunamiPool = investorPool * poolFraction
+    const grossPerInvestor = arunamiPool * ownership
     const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * arunamiFeeRate
     const perInvestor = grossPerInvestor - arunamiFee
 
@@ -158,13 +193,22 @@ const fixedReturnStrategy: DistributionStrategy = {
 
     return {
       totalDistribution: investorPool,
+      arunamiPoolAmount: arunamiPool,
       perInvestorAmount: perInvestor,
       grossInvestorAmount: grossPerInvestor,
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
       annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
-      breakdown: { netProfit, investorPool, grossPerInvestor, arunamiFee, perInvestor },
+      breakdown: {
+        netProfit,
+        investorPool,
+        arunamiPoolPercent: poolFraction * 100,
+        arunamiPool,
+        grossPerInvestor,
+        arunamiFee,
+        perInvestor,
+      },
       label: this.displayName,
     }
   },
@@ -185,6 +229,13 @@ const fixedYieldStrategy: DistributionStrategy = {
       : allocation.investedAmount
     const ownership = ownershipFraction(allocation, portfolio)
 
+    // No arunamiPoolFraction here, by design. On `invested_amount` the yield is
+    // a percentage of the investor's own principal — there is no pool to split,
+    // and scaling it would underpay a contractually fixed yield. On
+    // `investasi_awal` the principal is already Arunami's portion only, so
+    // `totalYield × ownership` (ownership summing to 100% across Arunami
+    // investors) distributes exactly the Arunami pot with no remainder;
+    // applying the pool fraction again would double-discount it.
     const totalYield = principal * (c.fixedYieldPercent / 100) * months
     const grossPerInvestor = c.principalReference === 'investasi_awal'
       ? totalYield * ownership
@@ -230,9 +281,11 @@ const revenueShareStrategy: DistributionStrategy = {
 
     const revenue = reportData.revenue
     const ownership = ownershipFraction(allocation, portfolio)
+    const poolFraction = arunamiPoolFraction(c)
 
     const totalShare = revenue * (c.revenueSharePercent / 100)
-    const grossPerInvestor = totalShare * ownership
+    const arunamiPool = totalShare * poolFraction
+    const grossPerInvestor = arunamiPool * ownership
     const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * (c.arunamiFeePercent / 100)
     const perInvestor = grossPerInvestor - arunamiFee
 
@@ -242,6 +295,7 @@ const revenueShareStrategy: DistributionStrategy = {
 
     return {
       totalDistribution: totalShare,
+      arunamiPoolAmount: arunamiPool,
       perInvestorAmount: perInvestor,
       grossInvestorAmount: grossPerInvestor,
       arunamiFeeAmount: arunamiFee,
@@ -252,6 +306,8 @@ const revenueShareStrategy: DistributionStrategy = {
         revenue,
         revenueSharePercent: c.revenueSharePercent,
         totalShare,
+        arunamiPoolPercent: poolFraction * 100,
+        arunamiPool,
         grossPerInvestor,
         arunamiFee,
         ownership: ownership * 100,
@@ -281,7 +337,9 @@ const fixedScheduleStrategy: DistributionStrategy = {
     if (matchedPayments.length === 0) return emptyResult(this.displayName)
     const totalScheduled = matchedPayments.reduce((s, p) => s + p.amount, 0)
 
-    const grossPerInvestor = totalScheduled * ownership
+    const poolFraction = arunamiPoolFraction(c)
+    const arunamiPool = totalScheduled * poolFraction
+    const grossPerInvestor = arunamiPool * ownership
     const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * (c.arunamiFeePercent / 100)
     const perInvestor = grossPerInvestor - arunamiFee
 
@@ -291,6 +349,7 @@ const fixedScheduleStrategy: DistributionStrategy = {
 
     return {
       totalDistribution: totalScheduled,
+      arunamiPoolAmount: arunamiPool,
       perInvestorAmount: perInvestor,
       grossInvestorAmount: grossPerInvestor,
       arunamiFeeAmount: arunamiFee,
@@ -299,6 +358,8 @@ const fixedScheduleStrategy: DistributionStrategy = {
       annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
       breakdown: {
         scheduledAmount: totalScheduled,
+        arunamiPoolPercent: poolFraction * 100,
+        arunamiPool,
         grossPerInvestor,
         arunamiFee,
         ownership: ownership * 100,
@@ -325,7 +386,9 @@ const annualDividendStrategy: DistributionStrategy = {
     const dividend = c.dividendHistory.find(d => d.year === year)
     if (!dividend) return emptyResult(this.displayName)
 
-    const grossPerInvestor = dividend.totalAmount * ownership
+    const poolFraction = arunamiPoolFraction(c)
+    const arunamiPool = dividend.totalAmount * poolFraction
+    const grossPerInvestor = arunamiPool * ownership
     const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * (c.arunamiFeePercent / 100)
     const perInvestor = grossPerInvestor - arunamiFee
 
@@ -335,6 +398,7 @@ const annualDividendStrategy: DistributionStrategy = {
 
     return {
       totalDistribution: dividend.totalAmount,
+      arunamiPoolAmount: arunamiPool,
       perInvestorAmount: perInvestor,
       grossInvestorAmount: grossPerInvestor,
       arunamiFeeAmount: arunamiFee,
@@ -344,6 +408,8 @@ const annualDividendStrategy: DistributionStrategy = {
       breakdown: {
         declaredDividend: dividend.totalAmount,
         year,
+        arunamiPoolPercent: poolFraction * 100,
+        arunamiPool,
         grossPerInvestor,
         arunamiFee,
         ownership: ownership * 100,
@@ -394,7 +460,9 @@ const customStrategy: DistributionStrategy = {
       totalDistribution = 0
     }
 
-    const grossPerInvestor = totalDistribution * ownership
+    const poolFraction = arunamiPoolFraction(c)
+    const arunamiPool = totalDistribution * poolFraction
+    const grossPerInvestor = arunamiPool * ownership
     const arunamiFee = isFeeExempt ? 0 : grossPerInvestor * (c.arunamiFeePercent / 100)
     const perInvestor = grossPerInvestor - arunamiFee
 
@@ -404,13 +472,22 @@ const customStrategy: DistributionStrategy = {
 
     return {
       totalDistribution,
+      arunamiPoolAmount: arunamiPool,
       perInvestorAmount: perInvestor,
       grossInvestorAmount: grossPerInvestor,
       arunamiFeeAmount: arunamiFee,
       isFeeExempt,
       roiPercent: monthlyROI,
       annualRoiPercent: (monthlyROI / (input.monthsInPeriod ?? 1)) * 12,
-      breakdown: { ...variableValues, formulaResult: totalDistribution, grossPerInvestor, arunamiFee, perInvestor },
+      breakdown: {
+        ...variableValues,
+        formulaResult: totalDistribution,
+        arunamiPoolPercent: poolFraction * 100,
+        arunamiPool,
+        grossPerInvestor,
+        arunamiFee,
+        perInvestor,
+      },
       label: this.displayName,
     }
   },
@@ -463,6 +540,10 @@ export function calculateDistribution(input: DistributionInput): DistributionRes
   if (input.portfolio.isGracePeriod) {
     const grace = input.portfolio.graceConfig
     if (grace?.returnMode === 'fixed_yield') {
+      // arunamiPoolPercent is deliberately not carried across: grace pays a
+      // yield on principal, not a share of a pool, so there is nothing for the
+      // Arunami pool fraction to scale. Revisit only if a pool-divided grace
+      // mode is ever added.
       const graceConfig: FixedYieldConfig = {
         type: 'fixed_yield',
         investorSharePercent: 0,

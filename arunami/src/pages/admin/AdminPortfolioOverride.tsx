@@ -298,6 +298,7 @@ function ConfigSection({ portfolioId, config, configExists, onSaved, logOverride
     arunamiFeePercent: ic.arunamiFeePercent != null ? String(ic.arunamiFeePercent) : '',
     fixedYieldPercent: (ic as { fixedYieldPercent?: number }).fixedYieldPercent != null ? String((ic as { fixedYieldPercent?: number }).fixedYieldPercent) : '',
     revenueSharePercent: (ic as { revenueSharePercent?: number }).revenueSharePercent != null ? String((ic as { revenueSharePercent?: number }).revenueSharePercent) : '',
+    arunamiPoolPercent: ic.arunamiPoolPercent != null ? String(ic.arunamiPoolPercent) : '',
     reportingFrequency: config.reportingFrequency,
     returnsPrincipal: config.returnsPrincipal ?? false,
   }), [config, ic])
@@ -324,6 +325,21 @@ function ConfigSection({ portfolioId, config, configExists, onSaved, logOverride
       ;(newIc as { arunamiFeePercent: number }).arunamiFeePercent = num(form.arunamiFeePercent)
     } else if (type === 'revenue_share') {
       ;(newIc as { revenueSharePercent: number }).revenueSharePercent = num(form.revenueSharePercent)
+    }
+
+    // Pool share applies to every model except fixed_yield, whose yield is a
+    // percentage of principal rather than a share of a pool. Blank removes the
+    // field (the engine reads absent as 100%); anything outside (0, 100] is
+    // dropped rather than written, because `num()` returns 0 for unparseable
+    // input and a stored 0 would be indistinguishable from a deliberate entry.
+    if (type !== 'fixed_yield') {
+      const raw = form.arunamiPoolPercent.trim()
+      const parsed = raw === '' ? null : num(raw)
+      if (parsed != null && parsed > 0 && parsed <= 100) {
+        ;(newIc as { arunamiPoolPercent?: number }).arunamiPoolPercent = parsed
+      } else {
+        delete (newIc as { arunamiPoolPercent?: number }).arunamiPoolPercent
+      }
     }
 
     const patch: Partial<PortfolioConfig> = {
@@ -358,6 +374,14 @@ function ConfigSection({ portfolioId, config, configExists, onSaved, logOverride
         Untuk mengganti model distribusi sepenuhnya, gunakan tombol "Ubah Model Distribusi" di halaman Manajemen Portofolio.
       </div>
 
+      <div className="rounded-md border border-amber-500/50 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <span className="font-semibold">Perubahan di sini berlaku surut ke semua periode.</span>{' '}
+        Form ini menulis langsung ke konfigurasi aktif tanpa mencatat periode berlaku,
+        sehingga seluruh laporan lampau ikut dihitung ulang — termasuk yang sudah terbit.
+        Untuk perubahan yang hanya berlaku mulai periode tertentu, gunakan halaman
+        Profit Sharing pada portofolio.
+      </div>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {(type === 'net_profit_share' || type === 'percentage_based' || type === 'fixed_return') && (
           <>
@@ -373,6 +397,15 @@ function ConfigSection({ portfolioId, config, configExists, onSaved, logOverride
         )}
         {type === 'revenue_share' && (
           <Field label="Revenue Share (%)"><Input type="number" value={form.revenueSharePercent} onChange={e => set('revenueSharePercent', e.target.value)} /></Field>
+        )}
+        {type !== 'fixed_yield' && (
+          <Field label="Porsi Investor Arunami (%)">
+            <Input
+              type="number" min={0.01} max={100} placeholder="100"
+              value={form.arunamiPoolPercent}
+              onChange={e => set('arunamiPoolPercent', e.target.value)}
+            />
+          </Field>
         )}
         <Field label="Frekuensi Laporan">
           <Select value={form.reportingFrequency} onValueChange={v => set('reportingFrequency', v as ReportingFrequency)}>

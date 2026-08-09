@@ -177,6 +177,17 @@ function buildDistributionSection(
     ? descRow('- Arunami Fee', result.isFeeExempt ? 'Tim Arunami — Bebas Fee.' : 'Management fee Arunami.', feeLabel(result))
     : ''
 
+  // Rendered only when the deal actually has co-investors outside Arunami. A
+  // portfolio at 100% (or with the field unset) must produce byte-identical
+  // HTML to what it produced before the Arunami pool step existed.
+  const poolPct = config.arunamiPoolPercent
+  const hasSubPool = typeof poolPct === 'number' && poolPct > 0 && poolPct < 100
+  const poolRows = hasSubPool
+    ? `
+          ${descRow('× Porsi Investor Arunami', 'Bagian pool investor yang didanai investor Arunami. Sisanya didanai investor di luar Arunami.', `${poolPct}%`)}
+          ${descRow('Pool Investor Arunami', 'Bagian pool yang dibagi di antara investor Arunami.', formatCurrencyExact(b.arunamiPool ?? 0))}`
+    : ''
+
   switch (modelType) {
     case 'net_profit_share':
     case 'percentage_based':
@@ -188,8 +199,8 @@ function buildDistributionSection(
         <table class="data">
           ${descRow('Net Profit', 'Laba bersih proyek setelah seluruh biaya, bunga, dan pajak.', formatCurrencyExact(b.netProfit ?? 0))}
           ${descRow('× Investor Share', 'Porsi Net Profit yang dialokasikan ke seluruh pool investor.', `${config.investorSharePercent}%`)}
-          ${descRow('Bagian Pool Investor', 'Net Profit × Investor Share.', formatCurrencyExact(b.investorPool ?? 0))}
-          ${descRow('× Kepemilikan Anda', 'Persentase modal Anda terhadap total pool investor.', formatPercent(b.ownership ?? 0))}
+          ${descRow('Bagian Pool Investor', 'Net Profit × Investor Share.', formatCurrencyExact(b.investorPool ?? 0))}${poolRows}
+          ${descRow('× Kepemilikan Anda', 'Persentase modal Anda terhadap pool investor Arunami.', formatPercent(b.ownership ?? 0))}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
           ${highlightRow('Net Investor', 'Bagian Anda untuk periode ini.', formatCurrencyExact(result.perInvestorAmount))}
@@ -218,7 +229,7 @@ function buildDistributionSection(
         <table class="data">
           ${descRow('Revenue', 'Pendapatan bruto proyek periode ini.', formatCurrencyExact(b.revenue ?? 0))}
           ${descRow('× Revenue Share', 'Persentase yang dialokasikan ke investor.', `${b.revenueSharePercent ?? 0}%`)}
-          ${descRow('Total Share', 'Revenue × Share %.', formatCurrencyExact(b.totalShare ?? 0))}
+          ${descRow('Total Share', 'Revenue × Share %.', formatCurrencyExact(b.totalShare ?? 0))}${poolRows}
           ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
@@ -229,7 +240,7 @@ function buildDistributionSection(
       return `
         <h2>Pembayaran Terjadwal — ${periodLabel}</h2>
         <table class="data">
-          ${descRow('Jumlah Terjadwal', 'Pembayaran sesuai kontrak.', formatCurrencyExact(b.scheduledAmount ?? 0))}
+          ${descRow('Jumlah Terjadwal', 'Pembayaran sesuai kontrak.', formatCurrencyExact(b.scheduledAmount ?? 0))}${poolRows}
           ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
@@ -240,7 +251,7 @@ function buildDistributionSection(
       return `
         <h2>Dividen Tahunan — ${b.year ?? ''}</h2>
         <table class="data">
-          ${descRow('Dividen Ditetapkan', 'Total dividen yang disetujui RUPS.', formatCurrencyExact(b.declaredDividend ?? 0))}
+          ${descRow('Dividen Ditetapkan', 'Total dividen yang disetujui RUPS.', formatCurrencyExact(b.declaredDividend ?? 0))}${poolRows}
           ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
@@ -251,7 +262,7 @@ function buildDistributionSection(
       return `
         <h2>Distribusi Kustom — ${periodLabel}</h2>
         <table class="data">
-          ${descRow('Hasil Formula', 'Kalkulasi berdasarkan formula kustom.', formatCurrencyExact(b.formulaResult ?? 0))}
+          ${descRow('Hasil Formula', 'Kalkulasi berdasarkan formula kustom.', formatCurrencyExact(b.formulaResult ?? 0))}${poolRows}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
           ${highlightRow('Bagian Anda', 'Distribusi Anda periode ini.', formatCurrencyExact(result.perInvestorAmount))}

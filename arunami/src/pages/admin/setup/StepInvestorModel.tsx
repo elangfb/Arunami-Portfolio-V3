@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { UseFormReturn } from 'react-hook-form'
+import type { UseFormReturn, UseFormRegister, UseFormWatch, FieldErrors } from 'react-hook-form'
 import {
   TrendingUp, Percent, DollarSign, CalendarClock, Users, Settings2,
   Plus, Trash2,
@@ -92,6 +92,48 @@ export function ModelPicker({ form }: { form: UseFormReturn<any> }) {
       )}
       {returnModel === 'custom' && (
         <CustomFields form={form} getValues={getValues} setValue={setValue} register={register} errors={errors} />
+      )}
+
+      {/* Shared across every pool-divided model, so it lives here rather than
+          being duplicated into each block above. Fixed Yield is the exception —
+          it pays a percentage of each investor's own principal, so there is no
+          pool for this to scale. */}
+      {returnModel !== 'fixed_yield' && (
+        <ArunamiPoolField register={register} watch={watch} errors={errors} />
+      )}
+    </div>
+  )
+}
+
+function ArunamiPoolField({ register, watch, errors }: {
+  register: UseFormRegister<WizardFormData>
+  watch: UseFormWatch<WizardFormData>
+  errors: FieldErrors<WizardFormData>
+}) {
+  const pct = Number(watch('arunamiPoolPercent'))
+  const hasOutside = Number.isFinite(pct) && pct > 0 && pct < 100
+
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="arunamiPoolPercent">Porsi Investor Arunami dari Pool Investor (%) *</Label>
+      <Input
+        id="arunamiPoolPercent"
+        type="number" step="1" min="0.01" max="100" placeholder="100"
+        {...register('arunamiPoolPercent', { valueAsNumber: true })}
+      />
+      <p className="text-xs text-muted-foreground">
+        Berapa persen dari pool investor yang didanai investor Arunami. Isi 100 bila
+        seluruhnya dari Arunami.
+      </p>
+      {hasOutside && (
+        <p className="text-xs text-amber-600">
+          {(100 - pct).toFixed(2).replace(/\.?0+$/, '')}% pool investor didanai investor di luar
+          Arunami dan diselesaikan di luar platform ini. Bagi hasil setiap investor Arunami
+          menjadi {pct}% dari nilai tanpa langkah ini.
+        </p>
+      )}
+      {errors?.arunamiPoolPercent && (
+        <p className="text-xs text-red-600">{String(errors.arunamiPoolPercent.message)}</p>
       )}
     </div>
   )

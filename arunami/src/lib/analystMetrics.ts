@@ -8,11 +8,16 @@ import { getFinancialData, getPortfolioConfigOrDefault, getConfigTimeline } from
 // total investment) so a portfolio-level yield falls straight out of the same
 // per-investor math used everywhere else.
 //
-// Analyst views report bagi hasil GROSS — the investor pool's full share of the
-// split, before the Arunami fee. That is the figure that reconciles with the
-// configured percentage: a 50% split on a 30.739.009 net profit reads
-// 15.369.504, not the 13.832.554 an investor nets after a 10% fee. The investor
-// pages deliberately differ; they report actual payouts, which are net.
+// Analyst views report bagi hasil GROSS of the Arunami fee but NET of the
+// outside-investor pool — i.e. what Arunami's own book earns before its fee.
+// A 50% split on a 30.739.009 net profit reads 15.369.504, not the 13.832.554
+// an investor nets after a 10% fee. Where outside investors co-fund the deal
+// (`arunamiPoolPercent` below 100), that figure is scaled down to Arunami's
+// slice — necessarily so, because the yields below divide by `investasiAwal`,
+// which is Arunami's principal only. Reporting the whole pool over Arunami-only
+// principal would overstate the yield by 1/poolFraction.
+//
+// The investor pages deliberately differ; they report actual payouts, net.
 
 export interface MonthlyMetricRow {
   portfolioId: string
@@ -44,8 +49,14 @@ export interface PortfolioMetric {
   monthly: MonthlyMetricRow[]
 }
 
-/** A whole-portfolio stand-in allocation: 100% of the total investment. */
-function wholePortfolioAllocation(portfolio: Portfolio): InvestorAllocation {
+/**
+ * A whole-portfolio stand-in allocation: 100% of the total investment.
+ *
+ * Exported so every "the portfolio as one investor" caller shares one
+ * definition instead of hand-rolling its own — see `OverviewPage`,
+ * `InvestorsPage`, and the custom-formula preview in `CustomSection`.
+ */
+export function wholePortfolioAllocation(portfolio: Portfolio): InvestorAllocation {
   return {
     id: '_portfolio',
     investorUid: '', investorName: '', investorEmail: '',

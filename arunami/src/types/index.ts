@@ -64,6 +64,20 @@ export interface KpiMetric {
 export interface InvestorConfigBase {
   investorSharePercent: number
   arunamiFeePercent: number
+  /**
+   * Share of the whole investor pool that Arunami's own investors funded, in
+   * percent (80 = Arunami investors funded 80%; the other 20% came from
+   * investors outside the system, who are not in the cap table and are paid off
+   * it). The pool is scaled by this BEFORE ownership is applied; per-investor
+   * `ownershipPercent` values still sum to 100% across Arunami investors, and
+   * `investasiAwal` still means Arunami's portion only.
+   *
+   * Optional on purpose. Absent = 100% — which is what every portfolio
+   * configured before this field existed means, and what every already-frozen
+   * `equityHistory` snapshot means. Resolve it ONLY through
+   * `arunamiPoolFraction()`; never read it raw.
+   */
+  arunamiPoolPercent?: number
 }
 
 export interface PercentageBasedConfig extends InvestorConfigBase {
@@ -369,6 +383,7 @@ export interface InvestorConfig {
   returnModel?: ReturnModelType
   investorSharePercent: number
   arunamiFeePercent: number
+  arunamiPoolPercent?: number
 }
 
 export interface FinancialData {
@@ -968,6 +983,7 @@ export type EquityReasonCategory =
 export type ConfigChangeKind =
   | 'investor_share'
   | 'arunami_fee'
+  | 'arunami_pool'
   | 'fixed_yield'
   | 'revenue_share'
   | 'scheduled_payment'
@@ -1003,6 +1019,13 @@ export interface EquityChangeEntry {
   toInvestorConfig?: InvestorConfigUnion
   fromReturnModel?: ReturnModelType
   toReturnModel?: ReturnModelType
+  /**
+   * Display scalars for the Arunami pool share, mirroring the investor/fee pair
+   * above. Not needed for correctness — the config snapshots already carry the
+   * value — and absent on rows where the portfolio never set a pool share.
+   */
+  fromArunamiPoolPercent?: number
+  toArunamiPoolPercent?: number
 }
 
 // ─── Admin Data Override Audit Log ────────────────────────────────────────

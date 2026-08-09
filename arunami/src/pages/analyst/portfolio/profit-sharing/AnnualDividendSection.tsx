@@ -68,6 +68,11 @@ export default function AnnualDividendSection({
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge variant="outline">Disetujui: {formatDate(latest.approvedAt)}</Badge>
                 <Badge variant="outline">Arunami Fee: {investorConfig.arunamiFeePercent}%</Badge>
+                {(investorConfig.arunamiPoolPercent ?? 100) < 100 && (
+                  <Badge variant="outline">
+                    Porsi Investor Arunami: {investorConfig.arunamiPoolPercent}%
+                  </Badge>
+                )}
               </div>
             </>
           ) : (

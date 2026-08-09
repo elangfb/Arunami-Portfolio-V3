@@ -95,6 +95,11 @@ export default function FixedScheduleSection({
             <Badge variant="outline">Dibayar: {formatCurrencyExact(paidAmount)}</Badge>
             <Badge variant="outline">Tertunda: {formatCurrencyExact(pendingAmount)}</Badge>
             <Badge variant="outline">{payments.length} pembayaran</Badge>
+            {(investorConfig.arunamiPoolPercent ?? 100) < 100 && (
+              <Badge variant="outline">
+                Porsi Investor Arunami: {investorConfig.arunamiPoolPercent}%
+              </Badge>
+            )}
           </div>
 
           {payments.length > 0 && (

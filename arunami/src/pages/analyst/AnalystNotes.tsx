@@ -35,6 +35,7 @@ const ACTION_CATEGORY: Record<ActionCategory, string> = {
 }
 const CHANGE_KIND: Record<ConfigChangeKind, string> = {
   investor_share: 'Porsi Investor', arunami_fee: 'Fee Arunami', fixed_yield: 'Fixed Yield',
+  arunami_pool: 'Porsi Investor Arunami',
   revenue_share: 'Revenue Share', scheduled_payment: 'Jadwal Pembayaran', dividend_declared: 'Dividen',
   custom_formula: 'Formula Kustom', return_model: 'Model Return',
 }

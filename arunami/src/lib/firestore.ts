@@ -183,6 +183,10 @@ const DEFAULT_PORTFOLIO_CONFIG: Omit<PortfolioConfig, 'createdAt'> = {
     type: 'net_profit_share',
     investorSharePercent: 70,
     arunamiFeePercent: 10,
+    // 100 = Arunami's investors fund the whole investor pool (no outside
+    // co-investors). Stated explicitly rather than left absent so the default
+    // documents itself.
+    arunamiPoolPercent: 100,
   },
   reportingFrequency: 'bulanan',
   kpiMetrics: [
@@ -208,6 +212,12 @@ export async function getPortfolioConfigOrDefault(portfolioId: string): Promise<
         type: 'net_profit_share',
         investorSharePercent: config.investorConfig.investorSharePercent,
         arunamiFeePercent: config.investorConfig.arunamiFeePercent,
+        // Carried explicitly: this branch rebuilds investorConfig from named
+        // fields, so anything not listed here is dropped on every read. Spread
+        // conditionally — an `undefined` would fail the next Firestore write.
+        ...(config.investorConfig.arunamiPoolPercent != null
+          ? { arunamiPoolPercent: config.investorConfig.arunamiPoolPercent }
+          : {}),
       },
     }
   }
@@ -334,6 +344,14 @@ export async function recordConfigChange(params: {
     toInvestorConfig: newInvestorConfig,
     fromReturnModel: priorConfig.returnModel,
     toReturnModel: newReturnModel ?? currentConfig.returnModel,
+    // Conditional — Firestore rejects `undefined`, and portfolios that never set
+    // a pool share carry neither field.
+    ...(priorConfig.investorConfig.arunamiPoolPercent != null
+      ? { fromArunamiPoolPercent: priorConfig.investorConfig.arunamiPoolPercent }
+      : {}),
+    ...(newInvestorConfig.arunamiPoolPercent != null
+      ? { toArunamiPoolPercent: newInvestorConfig.arunamiPoolPercent }
+      : {}),
     ...(reasonNote && reasonNote.trim() ? { reasonNote: reasonNote.trim() } : {}),
   }
   batch.set(historyRef, entry)

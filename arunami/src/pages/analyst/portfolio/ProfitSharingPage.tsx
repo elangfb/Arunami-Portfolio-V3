@@ -24,6 +24,7 @@ import RevenueShareSection from './profit-sharing/RevenueShareSection'
 import FixedScheduleSection from './profit-sharing/FixedScheduleSection'
 import AnnualDividendSection from './profit-sharing/AnnualDividendSection'
 import CustomSection from './profit-sharing/CustomSection'
+import ArunamiPoolSection from './profit-sharing/ArunamiPoolSection'
 
 interface Context { portfolio: Portfolio | null; portfolioId: string | undefined }
 
@@ -246,6 +247,17 @@ export default function ProfitSharingPage() {
 
       <ModelSection
         config={config}
+        portfolio={portfolio}
+        portfolioId={portfolioId ?? ''}
+        currentUser={currentUser}
+        nextPeriod={nextPeriod ?? ''}
+        earliestPeriod={earliestPeriod}
+        onChanged={load}
+      />
+
+      <ArunamiPoolSection
+        config={config}
+        investorConfig={config.investorConfig}
         portfolio={portfolio}
         portfolioId={portfolioId ?? ''}
         currentUser={currentUser}

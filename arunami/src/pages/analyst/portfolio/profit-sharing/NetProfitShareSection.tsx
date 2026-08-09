@@ -18,6 +18,10 @@ export default function NetProfitShareSection({
   const investorPct = investorConfig.investorSharePercent
   const arunamiPct = investorConfig.arunamiFeePercent
   const projectPct = Math.max(0, 100 - investorPct - arunamiPct)
+  // Surfaced only when below 100: the headline "70%" above is the whole investor
+  // pool, and when outside investors co-fund the deal that is not what Arunami's
+  // investors actually divide. Editing lives in ArunamiPoolSection.
+  const poolPct = investorConfig.arunamiPoolPercent ?? 100
 
   const [newInvestor, setNewInvestor] = useState(investorPct)
   const [newArunami, setNewArunami] = useState(arunamiPct)
@@ -53,6 +57,9 @@ export default function NetProfitShareSection({
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge variant="outline">Arunami Fee: {arunamiPct}%</Badge>
             <Badge variant="outline">Sisa Proyek: {projectPct}%</Badge>
+            {poolPct < 100 && (
+              <Badge variant="outline">Porsi Investor Arunami: {poolPct}%</Badge>
+            )}
           </div>
         </CardContent>
       </Card>

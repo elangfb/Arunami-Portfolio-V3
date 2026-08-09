@@ -84,6 +84,13 @@ const wizardSchema = z.object({
   ]),
   investorSharePercent: z.number().min(0).max(100),
   arunamiFeePercent: z.number().min(0).max(100),
+  // Blank coerces to 100 rather than undefined: Firestore is initialised without
+  // `ignoreUndefinedProperties`, so an undefined here would throw on save. 100 is
+  // also the correct meaning of "not specified" — Arunami funded the whole pool.
+  arunamiPoolPercent: z.preprocess(
+    v => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 100 : v),
+    z.number().min(0.01, 'Porsi harus lebih dari 0').max(100),
+  ),
 
   // Fixed Yield
   fixedYieldPercent: optionalNumber(0),
@@ -115,21 +122,21 @@ export type WizardFormData = z.infer<typeof wizardSchema>
 
 const STEP_FIELDS: (keyof WizardFormData)[][] = [
   ['name', 'brandName', 'code', 'industryType', 'stage', 'periode', 'investasiAwal'],
-  ['returnModel', 'investorSharePercent', 'arunamiFeePercent'],
+  ['returnModel', 'investorSharePercent', 'arunamiFeePercent', 'arunamiPoolPercent'],
 ]
 
 // Fields that should be validated on final submit, per selected distribution model.
 // Other model fields are skipped so a stale value from a previously-viewed model
 // (e.g. NaN on fixedYieldPercent after toggling cards) doesn't block submission.
 const MODEL_SPECIFIC_FIELDS: Record<ReturnModelType, (keyof WizardFormData)[]> = {
-  net_profit_share:  ['investorSharePercent', 'arunamiFeePercent'],
-  percentage_based:  ['investorSharePercent', 'arunamiFeePercent'], // legacy alias → net_profit_share
+  net_profit_share:  ['investorSharePercent', 'arunamiFeePercent', 'arunamiPoolPercent'],
+  percentage_based:  ['investorSharePercent', 'arunamiFeePercent', 'arunamiPoolPercent'], // legacy alias → net_profit_share
   fixed_return:      ['fixedYieldPercent', 'principalReference', 'arunamiFeePercent'], // legacy → fixed_yield
-  fixed_yield:       ['fixedYieldPercent', 'principalReference', 'arunamiFeePercent'],
-  revenue_share:     ['revenueSharePercent', 'investorSharePercent', 'arunamiFeePercent'],
-  fixed_schedule:    ['scheduledPayments', 'arunamiFeePercent'],
-  annual_dividend:   ['arunamiFeePercent'],
-  custom:            ['customVariables', 'formula', 'distributionFrequency', 'arunamiFeePercent'],
+  fixed_yield:       ['fixedYieldPercent', 'principalReference', 'arunamiFeePercent'], // pool step N/A — yield is on principal
+  revenue_share:     ['revenueSharePercent', 'investorSharePercent', 'arunamiFeePercent', 'arunamiPoolPercent'],
+  fixed_schedule:    ['scheduledPayments', 'arunamiFeePercent', 'arunamiPoolPercent'],
+  annual_dividend:   ['arunamiFeePercent', 'arunamiPoolPercent'],
+  custom:            ['customVariables', 'formula', 'distributionFrequency', 'arunamiFeePercent', 'arunamiPoolPercent'],
 }
 
 const STEPS = [
@@ -142,6 +149,7 @@ export type InvestmentFormData = Pick<
   | 'returnModel'
   | 'investorSharePercent'
   | 'arunamiFeePercent'
+  | 'arunamiPoolPercent'
   | 'fixedYieldPercent'
   | 'principalReference'
   | 'revenueSharePercent'
@@ -152,9 +160,14 @@ export type InvestmentFormData = Pick<
 >
 
 export function buildInvestorConfig(data: InvestmentFormData): InvestorConfigUnion {
+  // Deliberately in `base`, not in the per-model branches: the fixed_schedule and
+  // annual_dividend branches below zero out investorSharePercent/arunamiFeePercent
+  // after spreading base, and the pool share must survive that. Never `undefined` —
+  // Firestore rejects it — so fall back to 100 (Arunami funded the whole pool).
   const base = {
     investorSharePercent: data.investorSharePercent,
     arunamiFeePercent: data.arunamiFeePercent,
+    arunamiPoolPercent: data.arunamiPoolPercent ?? 100,
   }
 
   switch (data.returnModel) {
@@ -233,6 +246,7 @@ export default function PortfolioSetupWizard() {
       returnModel: 'net_profit_share',
       investorSharePercent: 70,
       arunamiFeePercent: 10,
+      arunamiPoolPercent: 100,
       principalReference: 'invested_amount',
       scheduledPayments: [],
       customVariables: [],
@@ -296,6 +310,7 @@ export default function PortfolioSetupWizard() {
         investasiAwal: 'Total Investasi',
         investorSharePercent: 'Investor Share',
         arunamiFeePercent: 'Arunami Fee',
+        arunamiPoolPercent: 'Porsi Investor Arunami',
         returnModel: 'Model Distribusi',
       }
       const missing = erroredFields
