@@ -378,7 +378,8 @@ function PayoutsSection({ payouts, portfolios, onSaved, logOverride }: { payouts
     if (!Number.isFinite(amount) || amount < 0) { toast.error('Jumlah bagi hasil tidak valid.'); return }
     if (!/^\d{4}-\d{2}$/.test(editPeriod)) { toast.error('Periode harus format YYYY-MM.'); return }
     const principal = editPrincipal.trim() === '' ? null : Number(editPrincipal)
-    if (principal != null && !Number.isFinite(principal)) { toast.error('Pokok tidak valid.'); return }
+    if (principal != null && (!Number.isFinite(principal) || principal < 0)) { toast.error('Pokok tidak valid.'); return }
+    if (amount === 0 && (principal ?? 0) === 0) { toast.error('Isi minimal salah satu: bagi hasil atau pokok.'); return }
     setBusy(true)
     try {
       const patch = { bagiHasilAmount: amount, principalAmount: principal, period: editPeriod, notes: editNotes }

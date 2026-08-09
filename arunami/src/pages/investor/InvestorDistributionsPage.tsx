@@ -53,8 +53,12 @@ export default function InvestorDistributionsPage() {
         proofUrl: m.fileUrl ?? null,
       }))
       // DF-01: a manual entry wins over an automated proof for the same
-      // (portfolio × period) so a backfilled payout isn't double-counted.
-      const manualKeys = new Set(manual.map(m => `${m.portfolioId}_${m.period}`))
+      // (portfolio × period) so a backfilled payout isn't double-counted — but only
+      // on the bagi-hasil dimension. A pokok-only entry asserts nothing about bagi
+      // hasil, so it must not suppress that period's proof.
+      const manualKeys = new Set(
+        manual.filter(m => m.bagiHasilAmount > 0).map(m => `${m.portfolioId}_${m.period}`),
+      )
       const proofRows: LedgerRow[] = proofs
         .filter(p => !manualKeys.has(`${p.portfolioId}_${p.period}`))
         .map(p => ({
@@ -148,7 +152,7 @@ export default function InvestorDistributionsPage() {
                     <TableRow key={r.key}>
                       <TableCell className="font-medium">{formatPeriod(r.period)}</TableCell>
                       <TableCell className="text-muted-foreground">{r.portfolioName}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrencyExact(r.bagiHasil)}</TableCell>
+                      <TableCell className="text-right font-medium">{r.bagiHasil > 0 ? formatCurrencyExact(r.bagiHasil) : <span className="text-muted-foreground">—</span>}</TableCell>
                       {hasPrincipal && <TableCell className="text-right text-muted-foreground">{r.principal != null ? formatCurrencyExact(r.principal) : '—'}</TableCell>}
                       <TableCell className="text-center"><Badge variant="success">Dibayar</Badge></TableCell>
                       <TableCell className="text-right">

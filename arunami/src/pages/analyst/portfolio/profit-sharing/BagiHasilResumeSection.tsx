@@ -119,12 +119,20 @@ export default function BagiHasilResumeSection({
       proofUrl: m.fileUrl ?? null,
       entry: m,
     }))
-    // DF-01: manual entry wins on a period collision — drop the automated proof
-    // row for any period that also has a manual entry, so totals count once.
-    const manualPeriods = new Set(manualEntries.map(m => m.period))
+    // DF-01: manual entry wins on a period collision — but only on the bagi-hasil
+    // dimension. A pokok-only entry asserts nothing about bagi hasil, so it must
+    // not suppress that period's proof (which would silently erase a paid payout).
+    const manualPeriods = new Set(
+      manualEntries.filter(m => m.bagiHasilAmount > 0).map(m => m.period),
+    )
     const dedupedLinked = linkedRows.filter(r => !manualPeriods.has(r.period))
     return [...manualRows, ...dedupedLinked].sort((a, b) => comparePeriods(b.period, a.period))
   }, [manualEntries, linkedRows])
+
+  // The form gate stays on the config toggle, but the table keeps showing pokok
+  // whenever a row actually has one — so turning the toggle off later never hides
+  // money that was already recorded.
+  const showPrincipalColumn = returnsPrincipal || rows.some(r => (r.principal ?? 0) > 0)
 
   const togglePrincipal = async () => {
     setTogglingPrincipal(true)
@@ -155,12 +163,31 @@ export default function BagiHasilResumeSection({
   const saveEntry = async () => {
     if (!edit || !currentUser || !selectedInvestor) return
     if (!/^\d{4}-\d{2}$/.test(edit.period)) { toast.error('Pilih periode (bulan) yang valid.'); return }
-    const bagiHasil = Number(edit.bagiHasilAmount)
-    if (!(bagiHasil > 0)) { toast.error('Nominal bagi hasil harus lebih dari 0.'); return }
-    const principal = returnsPrincipal && edit.principalAmount.trim() !== ''
-      ? Number(edit.principalAmount)
-      : null
-    if (principal != null && !(principal >= 0)) { toast.error('Nominal pengembalian pokok tidak valid.'); return }
+
+    // Bagi hasil dan pokok masing-masing opsional: boleh bagi hasil saja, pokok
+    // saja, atau dua-duanya. Hanya "dua-duanya kosong" yang ditolak.
+    const bagiHasilRaw = edit.bagiHasilAmount.trim()
+    const bagiHasil = bagiHasilRaw === '' ? 0 : Number(bagiHasilRaw)
+    if (!Number.isFinite(bagiHasil) || bagiHasil < 0) {
+      toast.error('Nominal bagi hasil tidak valid.'); return
+    }
+
+    const principalRaw = returnsPrincipal ? edit.principalAmount.trim() : ''
+    const principalInput = principalRaw === '' ? null : Number(principalRaw)
+    if (principalInput != null && (!Number.isFinite(principalInput) || principalInput < 0)) {
+      toast.error('Nominal pengembalian pokok tidak valid.'); return
+    }
+    // Simpan 0 sebagai null supaya tabel menampilkan "—", bukan "Rp 0".
+    const principal = principalInput === 0 ? null : principalInput
+
+    if (bagiHasil === 0 && principal == null) {
+      // Saat toggle pokok nonaktif, kolomnya tidak ada di layar — jangan suruh
+      // analis mengisi field yang tidak terlihat.
+      toast.error(returnsPrincipal
+        ? 'Isi minimal salah satu: nominal bagi hasil atau pengembalian pokok.'
+        : 'Nominal bagi hasil harus lebih dari 0.')
+      return
+    }
 
     setSaving(true)
     try {
@@ -223,7 +250,8 @@ export default function BagiHasilResumeSection({
             <p className="text-sm text-muted-foreground mt-1">
               Catat riwayat bagi hasil yang dibayar sebelum portofolio masuk sistem. Periode berjalan
               terisi otomatis dari bukti transfer. Bukti transfer opsional — riwayat lama boleh
-              dicatat nominalnya saja.
+              dicatat nominalnya saja. Satu entri boleh berisi bagi hasil saja, pokok saja, atau
+              keduanya.
             </p>
           </div>
         </div>
@@ -275,21 +303,23 @@ export default function BagiHasilResumeSection({
                   <TableRow>
                     <TableHead className="text-left py-2.5 px-3 font-medium">Periode</TableHead>
                     <TableHead className="text-right py-2.5 px-3 font-medium">Bagi Hasil</TableHead>
-                    {returnsPrincipal && <TableHead className="text-right py-2.5 px-3 font-medium">Pengembalian Pokok</TableHead>}
+                    {showPrincipalColumn && <TableHead className="text-right py-2.5 px-3 font-medium">Pengembalian Pokok</TableHead>}
                     <TableHead className="text-left py-2.5 px-3 font-medium">Sumber</TableHead>
                     <TableHead className="text-right py-2.5 px-3 font-medium w-24">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loadingRows ? (
-                    <TableRow><TableCell colSpan={returnsPrincipal ? 5 : 4} className="py-6 text-center text-muted-foreground">Memuat…</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={showPrincipalColumn ? 5 : 4} className="py-6 text-center text-muted-foreground">Memuat…</TableCell></TableRow>
                   ) : rows.length === 0 ? (
-                    <TableRow><TableCell colSpan={returnsPrincipal ? 5 : 4} className="py-6 text-center text-muted-foreground">Belum ada catatan.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={showPrincipalColumn ? 5 : 4} className="py-6 text-center text-muted-foreground">Belum ada catatan.</TableCell></TableRow>
                   ) : rows.map(row => (
                     <TableRow key={row.key} className="hover:bg-muted/30">
                       <TableCell className="py-2.5 px-3 font-medium">{formatPeriod(row.period)}</TableCell>
-                      <TableCell className="py-2.5 px-3 text-right">{formatCurrencyExact(row.bagiHasil)}</TableCell>
-                      {returnsPrincipal && (
+                      <TableCell className="py-2.5 px-3 text-right">
+                        {row.bagiHasil > 0 ? formatCurrencyExact(row.bagiHasil) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      {showPrincipalColumn && (
                         <TableCell className="py-2.5 px-3 text-right">
                           {row.principal != null ? formatCurrencyExact(row.principal) : '—'}
                         </TableCell>
@@ -363,18 +393,26 @@ export default function BagiHasilResumeSection({
                   onChange={e => setEdit({ ...edit, period: e.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="bh-amount">Nominal Bagi Hasil (Rp)</Label>
-                <Input id="bh-amount" type="number" min="0" step="1" placeholder="Contoh: 1500000"
+                <Label htmlFor="bh-amount">
+                  Nominal Bagi Hasil (Rp){returnsPrincipal ? ' — opsional' : ''}
+                </Label>
+                <Input id="bh-amount" type="number" min="0" step="1"
+                  placeholder={returnsPrincipal ? 'Kosongkan jika hanya pengembalian pokok' : 'Contoh: 1500000'}
                   value={edit.bagiHasilAmount}
                   onChange={e => setEdit({ ...edit, bagiHasilAmount: e.target.value })} />
               </div>
               {returnsPrincipal && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="bh-principal">Pengembalian Pokok (Rp) — opsional</Label>
-                  <Input id="bh-principal" type="number" min="0" step="1" placeholder="Kosongkan jika tidak ada"
-                    value={edit.principalAmount}
-                    onChange={e => setEdit({ ...edit, principalAmount: e.target.value })} />
-                </div>
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bh-principal">Pengembalian Pokok (Rp) — opsional</Label>
+                    <Input id="bh-principal" type="number" min="0" step="1" placeholder="Kosongkan jika tidak ada"
+                      value={edit.principalAmount}
+                      onChange={e => setEdit({ ...edit, principalAmount: e.target.value })} />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Isi salah satu atau keduanya — boleh bagi hasil saja, pokok saja, atau dua-duanya.
+                  </p>
+                </>
               )}
               <div className="space-y-1.5">
                 <Label htmlFor="bh-notes">Catatan (opsional)</Label>

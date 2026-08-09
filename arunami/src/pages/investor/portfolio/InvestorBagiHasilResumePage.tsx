@@ -25,7 +25,9 @@ export default function InvestorBagiHasilResumePage() {
   const [rows, setRows] = useState<ResumeRow[]>([])
   const [loading, setLoading] = useState(true)
 
-  const showPrincipal = !!portfolioConfig?.returnsPrincipal
+  // Keep showing pokok whenever a row actually has one, so switching the portfolio
+  // toggle off later never hides money that was already recorded.
+  const showPrincipal = !!portfolioConfig?.returnsPrincipal || rows.some(r => (r.principal ?? 0) > 0)
 
   useEffect(() => {
     if (!portfolioId || !user) return
@@ -51,9 +53,12 @@ export default function InvestorBagiHasilResumePage() {
         source: 'manual',
         proofUrl: m.fileUrl ?? null,
       }))
-      // DF-01: manual entry wins on a period collision — drop the automated proof
-      // row for any period that also has a manual entry so the total counts once.
-      const manualPeriods = new Set(manual.map(m => m.period))
+      // DF-01: manual entry wins on a period collision — but only on the bagi-hasil
+      // dimension. A pokok-only entry asserts nothing about bagi hasil, so it must
+      // not suppress that period's proof (which would silently erase a paid payout).
+      const manualPeriods = new Set(
+        manual.filter(m => m.bagiHasilAmount > 0).map(m => m.period),
+      )
       const dedupedLinked = linkedRows.filter(r => !manualPeriods.has(r.period))
       const merged = [...dedupedLinked, ...manualRows].sort(
         (a, b) => comparePeriods(b.period, a.period),
@@ -125,7 +130,9 @@ export default function InvestorBagiHasilResumePage() {
                 {rows.map(row => (
                   <TableRow key={row.key}>
                     <TableCell className="font-medium">{formatPeriod(row.period)}</TableCell>
-                    <TableCell className="text-right">{formatCurrencyExact(row.bagiHasil)}</TableCell>
+                    <TableCell className="text-right">
+                      {row.bagiHasil > 0 ? formatCurrencyExact(row.bagiHasil) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
                     {showPrincipal && (
                       <TableCell className="text-right">
                         {row.principal != null ? formatCurrencyExact(row.principal) : '—'}

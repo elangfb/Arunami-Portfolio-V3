@@ -251,6 +251,7 @@ The work is sequenced into 4 phases. Phase 1 stops active damage; later phases h
 | 2026-06-28 | DF-15 | `deleteReport`/`deleteAllReports` self-sync `financialData`; redundant caller syncs removed | – |
 | 2026-06-28 | – | Phase 4 verified: `tsc -b` clean (pre-existing eslint warnings only). 🎉 All phases done. | – |
 | 2026-08-03 | DF-01 | Proof file on manual bagi-hasil entries relaxed to optional (user feedback: pre-app history has no receipts); un-evidenced entries flagged "Tanpa Bukti" on internal views only | – |
+| 2026-08-09 | DF-01 | **Invariant amended:** manual entries now win a period collision only on the bagi-hasil dimension. Manual bagi hasil + pokok are each optional (pokok-only entries allowed), and a pokok-only row carries no bagi-hasil claim — so it must not suppress that period's proof, which would silently erase a paid payout from investor totals. Dedupe sets in `BagiHasilResumeSection`, `InvestorBagiHasilResumePage`, `InvestorDistributionsPage`, `InvestorPerformancePage` now filter on `bagiHasilAmount > 0` | – |
 
 > ⚠️ **Deploy note:** DF-05 changed `firestore.rules`. Deploy rules (`firebase deploy --only firestore:rules`) for the IR delete fix to take effect. Runtime/manual QA of all flows is recommended before closing.
 > ℹ️ **DF-04 note:** archive/unarchive write the `archived` flag via existing admin update rules — no rules change needed. No Firestore index needed (filtering is client-side).

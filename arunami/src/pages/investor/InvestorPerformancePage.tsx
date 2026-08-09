@@ -41,9 +41,12 @@ export default function InvestorPerformancePage() {
       setPortfolios(ports)
       setAllocations(allocs)
       // Manual wins per (portfolio × period) so a backfill isn't double-counted.
-      const manualKeys = new Set(manual.map(m => `${m.portfolioId}_${m.period}`))
+      // Payouts here are purely a bagi-hasil concept: a pokok-only entry neither
+      // contributes to yield nor suppresses the period's proof.
+      const bagiHasilManual = manual.filter(m => m.bagiHasilAmount > 0)
+      const manualKeys = new Set(bagiHasilManual.map(m => `${m.portfolioId}_${m.period}`))
       const merged: Payout[] = [
-        ...manual.map(m => ({ portfolioId: m.portfolioId, period: m.period, amount: m.bagiHasilAmount })),
+        ...bagiHasilManual.map(m => ({ portfolioId: m.portfolioId, period: m.period, amount: m.bagiHasilAmount })),
         ...proofs
           .filter(p => !manualKeys.has(`${p.portfolioId}_${p.period}`))
           .map(p => ({ portfolioId: p.portfolioId, period: p.period, amount: p.amount })),
