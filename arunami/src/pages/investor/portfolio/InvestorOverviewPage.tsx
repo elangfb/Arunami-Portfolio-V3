@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getFinancialData, getAllocationsForInvestor, getPortfolioConfigOrDefault, getConfigTimeline } from '@/lib/firestore'
-import { calculateDistribution } from '@/lib/distributionStrategies'
+import { calculateDistribution, displayOwnershipPercent } from '@/lib/distributionStrategies'
 import { resolveInvestorConfigForPeriod, type ConfigVersion } from '@/lib/configTimeline'
-import { formatCurrencyCompact, formatPercent } from '@/lib/utils'
+import { formatCurrencyCompact, formatPercent, formatOwnershipPercent } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -75,15 +75,12 @@ export default function InvestorOverviewPage() {
     })
   }
 
-  const ownershipPct = allocation?.ownershipPercent
-    ?? (portfolio && portfolio.investasiAwal > 0 && allocation
-      ? (allocation.investedAmount / portfolio.investasiAwal) * 100
-      : 0)
+  const ownershipPct = allocation ? displayOwnershipPercent(allocation, portfolio) : 0
 
   const kpis = [
     { label: `Revenue (${periodLabel})`, value: formatCurrencyCompact(lastRevenue), icon: DollarSign },
     { label: `Net Profit (${periodLabel})`, value: formatCurrencyCompact(lastProfit), icon: TrendingUp },
-    { label: 'Kepemilikan', value: `${ownershipPct.toFixed(1)}%`, icon: PieChart },
+    { label: 'Kepemilikan', value: formatOwnershipPercent(ownershipPct), icon: PieChart },
     { label: `Earning Saya (${periodLabel})`, value: formatCurrencyCompact(myResult?.perInvestorAmount ?? 0), icon: BarChart2 },
   ]
 

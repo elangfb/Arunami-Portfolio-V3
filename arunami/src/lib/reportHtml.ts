@@ -1,6 +1,6 @@
-import { formatCurrencyExact, formatPercent } from './utils'
+import { formatCurrencyExact, formatPercent, formatOwnershipPercent } from './utils'
 import { formatPeriod, comparePeriods, isQuarterPeriod, quarterToMonths, previousPeriod } from './dateUtils'
-import { calculateDistribution } from './distributionStrategies'
+import { calculateDistribution, displayOwnershipPercent } from './distributionStrategies'
 import type { DistributionResult } from './distributionStrategies'
 import { resolveConfigForPeriod, type ConfigVersion } from './configTimeline'
 import type {
@@ -230,7 +230,7 @@ function buildDistributionSection(
           ${descRow('Revenue', 'Pendapatan bruto proyek periode ini.', formatCurrencyExact(b.revenue ?? 0))}
           ${descRow('× Revenue Share', 'Persentase yang dialokasikan ke investor.', `${b.revenueSharePercent ?? 0}%`)}
           ${descRow('Total Share', 'Revenue × Share %.', formatCurrencyExact(b.totalShare ?? 0))}${poolRows}
-          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
+          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatOwnershipPercent(b.ownership ?? 0))}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
           ${highlightRow('Bagian Anda', 'Revenue share Anda untuk periode ini.', formatCurrencyExact(result.perInvestorAmount))}
@@ -241,7 +241,7 @@ function buildDistributionSection(
         <h2>Pembayaran Terjadwal — ${periodLabel}</h2>
         <table class="data">
           ${descRow('Jumlah Terjadwal', 'Pembayaran sesuai kontrak.', formatCurrencyExact(b.scheduledAmount ?? 0))}${poolRows}
-          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
+          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatOwnershipPercent(b.ownership ?? 0))}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
           ${highlightRow('Pembayaran Anda', 'Bagian Anda periode ini.', formatCurrencyExact(result.perInvestorAmount))}
@@ -252,7 +252,7 @@ function buildDistributionSection(
         <h2>Dividen Tahunan — ${b.year ?? ''}</h2>
         <table class="data">
           ${descRow('Dividen Ditetapkan', 'Total dividen yang disetujui RUPS.', formatCurrencyExact(b.declaredDividend ?? 0))}${poolRows}
-          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatPercent(b.ownership ?? 0))}
+          ${descRow('× Kepemilikan Anda', 'Porsi Anda.', formatOwnershipPercent(b.ownership ?? 0))}
           ${descRow('Gross Investor', 'Bagian kotor sebelum fee.', formatCurrencyExact(result.grossInvestorAmount))}
           ${feeRow}
           ${highlightRow('Dividen Anda', 'Bagian dividen Anda.', formatCurrencyExact(result.perInvestorAmount))}
@@ -276,6 +276,7 @@ function buildDistributionSection(
 function buildKpiBlock(
   result: DistributionResult,
   allocation: InvestorAllocation,
+  portfolio: Portfolio,
   modelType: string,
   monthsInPeriod: number = 1,
 ): string {
@@ -285,7 +286,7 @@ function buildKpiBlock(
     <h2>Ringkasan Saya</h2>
     <div class="kpi">
       <div><span>Total Investasi</span><strong>${formatCurrencyExact(allocation.investedAmount)}</strong></div>
-      <div><span>Kepemilikan</span><strong>${formatPercent(allocation.ownershipPercent ?? 0)}</strong></div>
+      <div><span>Kepemilikan</span><strong>${formatOwnershipPercent(displayOwnershipPercent(allocation, portfolio))}</strong></div>
       <div><span>Distribusi Periode Ini</span><strong>${formatCurrencyExact(result.perInvestorAmount)}</strong></div>
       <div><span>${periodRoiLabel}</span><strong>${formatPercent(result.roiPercent, true)}</strong></div>
       ${modelType !== 'annual_dividend'
@@ -475,7 +476,7 @@ export function buildInvestorReportSections(args: BuildArgs): InvestorReportSect
       : !!latestPnl || ['fixed_yield', 'fixed_schedule', 'annual_dividend'].includes(modelType)
 
     if (shouldShowDistribution) {
-      investorKpiBlock = buildKpiBlock(distributionResult, allocation, effectiveModel, monthsInPeriod)
+      investorKpiBlock = buildKpiBlock(distributionResult, allocation, portfolio, effectiveModel, monthsInPeriod)
       distributionSection = buildDistributionSection(
         effectiveModel, distributionResult, investorConfig, allocation, formatPeriod(period),
       )

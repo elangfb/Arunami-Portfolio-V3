@@ -683,8 +683,15 @@ async function refreshPortfolioInvestors(portfolioId: string) {
 
 // DF-03: a portfolio's allocations must not over-distribute (>100% ownership),
 // which would pay out more than the profit pool. Validated at the data layer so
-// no caller (or concurrent writer) can bypass it. Small epsilon for FP noise.
+// no caller (or concurrent writer) can bypass it.
 const OWNERSHIP_EPSILON = 0.01
+// Each ownershipPercent is entered/derived at 2 decimals, so it carries up to
+// ±0.005 of rounding error against the true nominal ÷ target. Summing N of them
+// accumulates up to N × that — an evenly-split cap table (e.g. 18 equal units of
+// 5.5555…% stored as 5.56%) legitimately sums past 100 without over-allocating a
+// single rupiah. A flat epsilon would reject the last investor of such a split,
+// so scale the tolerance with the number of rounded terms being added up.
+const OWNERSHIP_ROUNDING_PER_ROW = 0.005
 
 function assertOwnershipWithinLimit(
   newPercent: number | undefined,
@@ -692,11 +699,17 @@ function assertOwnershipWithinLimit(
   excludeAllocationId?: string,
 ) {
   if (newPercent == null) return
-  const othersSum = allocations
-    .filter(a => a.id !== excludeAllocationId)
-    .reduce((s, a) => s + (a.ownershipPercent ?? 0), 0)
-  if (othersSum + newPercent > 100 + OWNERSHIP_EPSILON) {
-    const remaining = Math.max(0, 100 - othersSum)
+  const others = allocations.filter(a => a.id !== excludeAllocationId)
+  const othersSum = others.reduce((s, a) => s + (a.ownershipPercent ?? 0), 0)
+  // +1 for newPercent itself, which is rounded the same way.
+  const tolerance = Math.max(
+    OWNERSHIP_EPSILON,
+    (others.length + 1) * OWNERSHIP_ROUNDING_PER_ROW,
+  )
+  if (othersSum + newPercent > 100 + tolerance) {
+    // Report what is actually accepted, tolerance included, so the number in the
+    // message is one the admin can really enter.
+    const remaining = Math.max(0, 100 + tolerance - othersSum)
     throw new Error(
       `Total kepemilikan akan melebihi 100% (saat ini ${othersSum.toFixed(2)}% terpakai, tersisa ${remaining.toFixed(2)}%).`,
     )

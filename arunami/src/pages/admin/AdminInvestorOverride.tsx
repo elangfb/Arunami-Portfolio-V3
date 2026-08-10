@@ -19,7 +19,8 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import OverrideSection from '@/components/admin/OverrideSection'
 import { useAuthStore } from '@/store/authStore'
-import { formatCurrencyCompact } from '@/lib/utils'
+import { formatCurrencyCompact, formatOwnershipPercent } from '@/lib/utils'
+import { displayOwnershipPercent } from '@/lib/distributionStrategies'
 import { makeBrandResolver } from '@/lib/portfolioName'
 import { formatPeriod } from '@/lib/dateUtils'
 import { ArrowLeft, AlertTriangle, Pencil, Trash2, UserPlus } from 'lucide-react'
@@ -296,7 +297,7 @@ function AllocationsSection({ investor, allocations, portfolios, onSaved, logOve
                       <TableCell className="py-2.5 px-3 text-center">
                         {editing
                           ? <Input type="number" value={editPercent} onChange={e => setEditPercent(e.target.value)} className="h-8 w-20 text-center mx-auto" />
-                          : (a.ownershipPercent != null ? `${a.ownershipPercent}%` : '—')}
+                          : formatOwnershipPercent(displayOwnershipPercent(a, portfolios.find(p => p.id === a.portfolioId)))}
                       </TableCell>
                       <TableCell className="py-2.5 px-3 text-right">
                         {editing ? (

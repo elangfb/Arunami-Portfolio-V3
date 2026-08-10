@@ -7,9 +7,9 @@ import {
   getEquityHistoryForPortfolios,
 } from '@/lib/firestore'
 import { staleReportMap } from '@/lib/reportStaleness'
-import { calculateDistribution, ownershipFraction } from '@/lib/distributionStrategies'
+import { calculateDistribution, displayOwnershipPercent } from '@/lib/distributionStrategies'
 import { resolveInvestorConfigForPeriod } from '@/lib/configTimeline'
-import { formatCurrencyExact, formatPercent, MONTH_NAMES_ID } from '@/lib/utils'
+import { formatCurrencyExact, formatPercent, formatOwnershipPercent, MONTH_NAMES_ID } from '@/lib/utils'
 import { brandOf, makeBrandResolver } from '@/lib/portfolioName'
 import { formatPeriod, comparePeriods } from '@/lib/dateUtils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -351,9 +351,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
                 </TableHeader>
                 <TableBody className="divide-y">
                   {portfolios.map(p => {
-                    const ownershipPct = p.portfolio
-                      ? ownershipFraction(p.allocation, p.portfolio) * 100
-                      : (p.allocation.ownershipPercent ?? 0)
+                    const ownershipPct = displayOwnershipPercent(p.allocation, p.portfolio)
 
                     return (
                       <TableRow key={p.allocation.id} className="hover:bg-muted/30">
@@ -362,7 +360,7 @@ export default function AdminInvestorDetail({ backPath = '/admin/investors', sho
                           <p className="text-xs text-muted-foreground">{p.allocation.portfolioCode}</p>
                         </TableCell>
                         <TableCell className="py-2.5 px-3 text-right">
-                          {formatPercent(ownershipPct)}
+                          {formatOwnershipPercent(ownershipPct)}
                         </TableCell>
                         <TableCell className="py-2.5 px-3 text-right">
                           {formatCurrencyExact(p.allocation.investedAmount)}

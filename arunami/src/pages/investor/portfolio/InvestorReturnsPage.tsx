@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getFinancialData, getAllocationsForInvestor, getPortfolioConfigOrDefault, getConfigTimeline } from '@/lib/firestore'
-import { calculateDistribution } from '@/lib/distributionStrategies'
+import { calculateDistribution, displayOwnershipPercent } from '@/lib/distributionStrategies'
 import type { DistributionResult } from '@/lib/distributionStrategies'
 import { resolveInvestorConfigForPeriod, type ConfigVersion } from '@/lib/configTimeline'
-import { formatCurrencyExact, formatCurrencyCompact, formatPercent } from '@/lib/utils'
+import { formatCurrencyExact, formatCurrencyCompact, formatPercent, formatOwnershipPercent } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -70,10 +70,7 @@ export default function InvestorReturnsPage() {
     })
   }
 
-  const ownershipPct = allocation?.ownershipPercent
-    ?? (portfolio && portfolio.investasiAwal > 0 && allocation
-      ? (allocation.investedAmount / portfolio.investasiAwal) * 100
-      : 0)
+  const ownershipPct = allocation ? displayOwnershipPercent(allocation, portfolio) : 0
 
   // Monthly breakdown — gated to only published periods
   const publishedSet = new Set(availablePeriods)
@@ -109,7 +106,7 @@ export default function InvestorReturnsPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          ['Kepemilikan', `${ownershipPct.toFixed(1)}%`],
+          ['Kepemilikan', formatOwnershipPercent(ownershipPct)],
           ['Investasi Saya', formatCurrencyCompact(allocation?.investedAmount ?? 0)],
           [`Earning ${periodLabel}`, formatCurrencyCompact(myResult?.perInvestorAmount ?? 0)],
           ['Total Earning', formatCurrencyCompact(totalEarnings)],

@@ -79,6 +79,38 @@ export function ownershipFraction(allocation: InvestorAllocation, portfolio: Por
 }
 
 /**
+ * A stored `ownershipPercent` may sit this far from nominal ÷ target and still
+ * be the same number — it is written rounded to 2 decimals, so it carries up to
+ * ±0.005 of rounding. Anything beyond that is a deliberate admin override.
+ */
+const OWNERSHIP_DISPLAY_TOLERANCE = 0.01
+
+/**
+ * Ownership share for DISPLAY, in percent.
+ *
+ * Prefer this over reading `allocation.ownershipPercent` directly. The stored
+ * value is a rounded copy of nominal ÷ target, so summing it across a cap table
+ * drifts: 18 equal slices of 5.5555…%, each stored as 5.56%, total 100.05%.
+ * Recomputing from the nominal keeps every row and every total exact.
+ *
+ * When the stored value differs from nominal by more than rounding, an admin
+ * overrode it on purpose — and `ownershipFraction()` pays that override, so it
+ * wins here too. The display must never quote a share the money contradicts.
+ */
+export function displayOwnershipPercent(
+  allocation: InvestorAllocation,
+  portfolio: Pick<Portfolio, 'investasiAwal'> | null | undefined,
+): number {
+  const stored = allocation.ownershipPercent
+  const target = portfolio?.investasiAwal ?? 0
+  // No target to divide by: the stored value is all we have.
+  if (target <= 0) return stored ?? 0
+  const computed = (allocation.investedAmount / target) * 100
+  if (stored == null) return computed
+  return Math.abs(stored - computed) > OWNERSHIP_DISPLAY_TOLERANCE ? stored : computed
+}
+
+/**
  * Fraction of the whole investor pool that belongs to Arunami's own investors.
  * Deals co-funded by investors outside Arunami set this below 1; the remainder
  * of the pool is theirs and is settled off this platform entirely.

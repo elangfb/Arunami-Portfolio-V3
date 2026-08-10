@@ -22,7 +22,8 @@ import OverrideSection from '@/components/admin/OverrideSection'
 import { useAuthStore } from '@/store/authStore'
 import { brandOf } from '@/lib/portfolioName'
 import { CapTableFillBar } from '@/components/shared/CapTableFillBar'
-import { formatCurrencyCompact } from '@/lib/utils'
+import { formatCurrencyCompact, formatOwnershipPercent } from '@/lib/utils'
+import { displayOwnershipPercent } from '@/lib/distributionStrategies'
 import { formatPeriod } from '@/lib/dateUtils'
 import { ArrowLeft, AlertTriangle, Pencil, Trash2, UserPlus } from 'lucide-react'
 import type {
@@ -519,7 +520,9 @@ function AllocationsSection({ portfolio, allocations, investors, onSaved, logOve
     } finally { setBusy(false) }
   }
 
-  const totalPercent = allocations.reduce((s, a) => s + (a.ownershipPercent ?? 0), 0)
+  // Sum the same computed shares the rows show, so a fully-allocated cap table
+  // totals exactly 100% instead of the stored values' rounded 100.05%.
+  const totalPercent = allocations.reduce((s, a) => s + displayOwnershipPercent(a, portfolio), 0)
 
   return (
     <div className="rounded-lg border bg-card">
@@ -569,7 +572,7 @@ function AllocationsSection({ portfolio, allocations, investors, onSaved, logOve
                       <TableCell className="py-2.5 px-3 text-center">
                         {editing
                           ? <Input type="number" value={editPercent} onChange={e => setEditPercent(e.target.value)} className="h-8 w-20 text-center mx-auto" />
-                          : (a.ownershipPercent != null ? `${a.ownershipPercent}%` : '—')}
+                          : formatOwnershipPercent(displayOwnershipPercent(a, portfolio))}
                       </TableCell>
                       <TableCell className="py-2.5 px-3 text-right">
                         {editing ? (

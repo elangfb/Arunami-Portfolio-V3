@@ -44,6 +44,16 @@ export function formatPercent(value: number, showSign = false): string {
   return formatted
 }
 
+/**
+ * Cap-table ownership, at 2 decimals. Deliberately finer than `formatPercent`:
+ * a pool split 18 ways gives each holder 5.5555…%, which one decimal renders as
+ * a misleading 5.6%, and equal slices must read equal everywhere they appear.
+ * Feed it `displayOwnershipPercent()`, not a raw stored `ownershipPercent`.
+ */
+export function formatOwnershipPercent(value: number): string {
+  return `${value.toFixed(2)}%`
+}
+
 export function calcMoM(current: number, previous: number): number {
   if (previous === 0) return 0
   return ((current - previous) / previous) * 100

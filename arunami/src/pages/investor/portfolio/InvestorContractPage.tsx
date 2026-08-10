@@ -3,8 +3,8 @@ import { useOutletContext } from 'react-router-dom'
 import { getAllocationsForInvestor } from '@/lib/firestore'
 import { useAuthStore } from '@/store/authStore'
 import { contractStatus, daysRemainingLabel } from '@/lib/contracts'
-import { DISTRIBUTION_MODEL_OPTIONS } from '@/lib/distributionStrategies'
-import { formatCurrencyExact, formatPercent } from '@/lib/utils'
+import { DISTRIBUTION_MODEL_OPTIONS, displayOwnershipPercent } from '@/lib/distributionStrategies'
+import { formatCurrencyExact, formatOwnershipPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ContractDurationBar } from '@/components/shared/ContractStatus'
 import { AlertTriangle } from 'lucide-react'
@@ -36,8 +36,7 @@ export default function InvestorContractPage() {
 
   const schemeLabel = DISTRIBUTION_MODEL_OPTIONS.find(o => o.value === portfolioConfig?.returnModel)?.label
     ?? portfolioConfig?.returnModel ?? '—'
-  const ownershipPct = allocation?.ownershipPercent
-    ?? (portfolio.investasiAwal > 0 && allocation ? (allocation.investedAmount / portfolio.investasiAwal) * 100 : 0)
+  const ownershipPct = allocation ? displayOwnershipPercent(allocation, portfolio) : 0
   const joinedLabel = allocation?.joinedAt?.seconds
     ? new Date(allocation.joinedAt.seconds * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—'
@@ -51,7 +50,7 @@ export default function InvestorContractPage() {
 
   const terms: { label: string; value: string }[] = [
     { label: 'Nominal Investasi', value: allocation ? formatCurrencyExact(allocation.investedAmount) : '—' },
-    { label: 'Kepemilikan', value: allocation ? formatPercent(ownershipPct) : '—' },
+    { label: 'Kepemilikan', value: allocation ? formatOwnershipPercent(ownershipPct) : '—' },
     { label: 'Tanggal Bergabung', value: joinedLabel },
     { label: 'Skema Bagi Hasil', value: schemeLabel },
     { label: 'Frekuensi Laporan', value: FREQ_LABELS[portfolioConfig?.reportingFrequency ?? ''] ?? '—' },

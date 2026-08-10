@@ -20,7 +20,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { formatCurrencyCompact } from '@/lib/utils'
+import { formatCurrencyCompact, formatOwnershipPercent } from '@/lib/utils'
+import { displayOwnershipPercent } from '@/lib/distributionStrategies'
 import { brandOf } from '@/lib/portfolioName'
 import { CapTableFillBar } from '@/components/shared/CapTableFillBar'
 import { PlusCircle, Pencil, Trash2, UserPlus, Search, ChevronDown, X, Settings2, Archive, ArchiveRestore, Wrench } from 'lucide-react'
@@ -596,7 +597,7 @@ export default function AdminPortfolios() {
                                                         className="h-8 w-20 text-center mx-auto"
                                                       />
                                                     ) : (
-                                                      alloc.ownershipPercent != null ? `${alloc.ownershipPercent}%` : '—'
+                                                      formatOwnershipPercent(displayOwnershipPercent(alloc, p))
                                                     )}
                                                   </TableCell>
                                                   <TableCell className="py-2.5 px-3 text-right">
