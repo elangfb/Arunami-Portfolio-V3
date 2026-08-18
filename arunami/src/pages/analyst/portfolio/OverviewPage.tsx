@@ -342,8 +342,8 @@ export default function OverviewPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead className="text-right">Aktual {formatPeriod(comparePeriodA)}</TableHead>
                   <TableHead className="text-right">Aktual {formatPeriod(comparePeriodB)}</TableHead>
+                  <TableHead className="text-right">Aktual {formatPeriod(comparePeriodA)}</TableHead>
                   <TableHead className="text-right">Proyeksi {formatPeriod(comparePeriodA)}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -357,31 +357,40 @@ export default function OverviewPage() {
                   // comparing a month against itself would just print +0.0%.
                   const dPrev = sameMonthSelected ? null : delta(r.current, r.previous)
                   const dProj = delta(r.current, r.projection)
-                  const cell = (v: number | null, d: number | null) => (
+                  // Percentages belong to month A, not to the column they are
+                  // measured against — so they sit in month A's cell, each
+                  // labelled with its baseline to keep the two apart.
+                  const deltas = [
+                    { d: dPrev, label: `vs ${formatPeriod(comparePeriodB)}` },
+                    { d: dProj, label: 'vs proyeksi' },
+                  ].filter((x): x is { d: number; label: string } => x.d !== null)
+                  const cell = (v: number | null) => (
                     v == null
                       ? <TableCell className="text-right text-muted-foreground">—</TableCell>
-                      : <TableCell className="text-right">
-                          {formatCurrencyExact(v)}
-                          {d !== null && (
-                            <div className={`text-[10px] ${d >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                              {d >= 0 ? '+' : ''}{d.toFixed(1)}%
-                            </div>
-                          )}
-                        </TableCell>
+                      : <TableCell className="text-right">{formatCurrencyExact(v)}</TableCell>
                   )
                   return (
                     <TableRow key={r.label}>
                       <TableCell className="font-medium">{r.label}</TableCell>
-                      {cell(r.current, null)}
-                      {cell(r.previous, dPrev)}
-                      {cell(r.projection, dProj)}
+                      {cell(r.previous)}
+                      {r.current == null
+                        ? <TableCell className="text-right text-muted-foreground">—</TableCell>
+                        : <TableCell className="text-right">
+                            {formatCurrencyExact(r.current)}
+                            {deltas.map(({ d, label }) => (
+                              <div key={label} className={`text-[10px] ${d >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                {d >= 0 ? '+' : ''}{d.toFixed(1)}% {label}
+                              </div>
+                            ))}
+                          </TableCell>}
+                      {cell(r.projection)}
                     </TableRow>
                   )
                 })}
               </TableBody>
             </Table>
             <p className="mt-3 text-xs text-muted-foreground">
-              Persentase menunjukkan perubahan {formatPeriod(comparePeriodA)} terhadap kolom tersebut.
+              Persentase berada di kolom {formatPeriod(comparePeriodA)} dan menunjukkan perubahannya terhadap baseline yang tertulis.
             </p>
           </CardContent>
         </Card>
