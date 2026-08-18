@@ -467,6 +467,9 @@ function PerbandinganSection({
     { label: 'Yield Bulanan', a: rowA?.monthlyYield ?? 0, b: rowB?.monthlyYield ?? 0, fmt: formatPercent },
     { label: 'Yield Tahunan', a: rowA?.annualizedYield ?? 0, b: rowB?.annualizedYield ?? 0, fmt: formatPercent },
   ]
+  const labelA = periodA ? formatPeriod(periodA) : 'A'
+  const labelB = periodB ? formatPeriod(periodB) : 'B'
+  const sameMonth = periodA !== '' && periodA === periodB
   return (
     <section className="space-y-4">
       <SectionTitle>Perbandingan Periode</SectionTitle>
@@ -486,33 +489,40 @@ function PerbandinganSection({
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Metrik</TableHead>
-              <TableHead className="text-right">{periodA ? formatPeriod(periodA) : 'A'}</TableHead>
-              <TableHead className="text-right">{periodB ? formatPeriod(periodB) : 'B'}</TableHead>
-              <TableHead className="text-right">Δ</TableHead>
-              <TableHead className="text-right">B vs Proyeksi</TableHead>
+              <TableHead className="text-right">{labelA}</TableHead>
+              <TableHead className="text-right">{labelB}</TableHead>
+              <TableHead className="text-right">Proyeksi {labelB}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {metrics.map(m => {
-              const delta = m.b - m.a
-              const up = delta >= 0
               const vsProj = m.projB != null && m.projB !== 0 ? m.b - m.projB : null
+              // Both gaps describe period B, so they hang under B's own number
+              // as subtitles instead of taking columns that read as if they
+              // belonged to the baseline. A month compared against itself
+              // would only ever print a zero, so that subtitle is dropped.
+              const gaps = [
+                sameMonth ? null : { v: m.b - m.a, label: `vs ${labelA}` },
+                vsProj == null ? null : { v: vsProj, label: 'vs proyeksi' },
+              ].filter((g): g is { v: number; label: string } => g !== null)
               return (
                 <TableRow key={m.label}>
                   <TableCell className="font-medium">{m.label}</TableCell>
                   <TableCell className="text-right">{m.fmt(m.a)}</TableCell>
-                  <TableCell className="text-right">{m.fmt(m.b)}</TableCell>
-                  <TableCell className={`text-right ${up ? 'text-emerald-600' : 'text-red-600'}`}>
-                    <span className="inline-flex items-center justify-end gap-0.5">
-                      {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{m.fmt(Math.abs(delta))}
-                    </span>
+                  <TableCell className="text-right">
+                    {m.fmt(m.b)}
+                    {gaps.map(({ v, label }) => (
+                      <div
+                        key={label}
+                        className={`flex items-center justify-end gap-0.5 text-[10px] ${v >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                      >
+                        {v >= 0 ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />}
+                        {m.fmt(Math.abs(v))} {label}
+                      </div>
+                    ))}
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {vsProj == null ? '—' : (
-                      <span className={vsProj >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                        {vsProj >= 0 ? '+' : '−'}{m.fmt(Math.abs(vsProj))}
-                      </span>
-                    )}
+                    {m.projB == null || m.projB === 0 ? '—' : m.fmt(m.projB)}
                   </TableCell>
                 </TableRow>
               )
@@ -520,7 +530,10 @@ function PerbandinganSection({
           </TableBody>
         </Table>
       </Card>
-      <p className="text-xs text-muted-foreground">Δ = B − A. Kolom terakhir membandingkan aktual periode B terhadap proyeksinya.</p>
+      <p className="text-xs text-muted-foreground">
+        Selisih ditulis di bawah angka {labelB} — terhadap {labelA} dan terhadap proyeksinya.
+        Proyeksi hanya tersedia untuk Revenue dan Net Profit.
+      </p>
     </section>
   )
 }
